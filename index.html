@@ -1686,6 +1686,54 @@ body.is-dragging .player.selected{
   .view-preset-control{order:20}
 }
 
+
+/* v160: controlli frecce a pulsanti */
+#drawingDash,
+#drawingHead{
+  position:absolute!important;
+  width:1px!important;
+  height:1px!important;
+  overflow:hidden!important;
+  clip:rect(0 0 0 0)!important;
+  clip-path:inset(50%)!important;
+  white-space:nowrap!important;
+}
+.drawing-choice-row{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:6px;
+  margin-top:6px;
+}
+.drawing-choice-btn{
+  min-height:30px;
+  padding:5px 6px;
+  border:1px solid rgba(255,255,255,.14);
+  border-radius:7px;
+  background:#252a31;
+  color:#fff;
+  font:inherit;
+  font-size:10px;
+  font-weight:800;
+  cursor:pointer;
+  touch-action:manipulation;
+}
+.drawing-choice-btn:hover{
+  border-color:rgba(255,255,255,.28);
+}
+.drawing-choice-btn.active{
+  border-color:#8bd450;
+  background:#2f3c25;
+  box-shadow:0 0 0 1px rgba(139,212,80,.16) inset;
+}
+@media(max-width:900px){
+  .drawing-choice-row{gap:4px}
+  .drawing-choice-btn{
+    min-height:34px;
+    font-size:9px;
+    padding-inline:4px;
+  }
+}
+
 </style>
 
 <script async src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
@@ -1769,10 +1817,20 @@ body.is-dragging .player.selected{
   <div class="library-panel">
     <div class="library-title">Object style</div>
     <label class="style-control"><span>Spessore</span><input id="drawingWidth" type="range" min="2" max="14" step="1" value="6"></label>
-    <label class="style-control"><span>Punta</span><input id="drawingHead" type="range" min="8" max="22" step="1" value="13"></label>
+    <label class="style-control"><span>Punta</span><input id="drawingHead" type="range" min="8" max="22" step="1" value="13">
+<div class="drawing-choice-row" id="drawingHeadButtons" aria-label="Dimensione punta freccia">
+  <button type="button" class="drawing-choice-btn" data-head-size="10">Piccola</button>
+  <button type="button" class="drawing-choice-btn" data-head-size="13">Media</button>
+  <button type="button" class="drawing-choice-btn" data-head-size="18">Grande</button>
+</div></label>
     <label class="style-control"><span>Curvatura</span><input id="drawingCurve" type="range" min="-220" max="220" step="10" value="-90"></label>
     <label class="style-control"><span>Opacità</span><input id="drawingOpacity" type="range" min="0.10" max="1" step="0.05" value="1"></label>
-    <label class="style-control"><span>Tratteggio</span><input id="drawingDash" type="range" min="0" max="3" step="1" value="0"></label>
+    <label class="style-control"><span>Tratteggio</span><input id="drawingDash" type="range" min="0" max="3" step="1" value="0">
+<div class="drawing-choice-row" id="drawingDashButtons" aria-label="Stile corpo freccia">
+  <button type="button" class="drawing-choice-btn" data-dash-style="0">Continua</button>
+  <button type="button" class="drawing-choice-btn" data-dash-style="1">Tratteggio</button>
+  <button type="button" class="drawing-choice-btn" data-dash-style="3">Puntinata</button>
+</div></label>
     <label class="style-control"><span>Forma</span>
       <select id="shapeMode" class="select" style="padding:5px;font-size:10px">
         <option value="both">Bordo + riempimento</option>
@@ -2101,7 +2159,7 @@ body.is-dragging .player.selected{
 <input type="file" id="projectFile" accept=".json" hidden>
 
 <script>
-const STORAGE_KEY="setPieceBoardPro_v159";
+const STORAGE_KEY="setPieceBoardPro_v160";
 
 function safeStorageGet(key){
   try{
@@ -5454,6 +5512,49 @@ function getCurrentDrawingWidth(){
   );
 }
 
+
+function syncDrawingPresetButtons(){
+  const d=selectedDrawing!==null?page().drawings[selectedDrawing]:null;
+  const src=d||drawingDefaults;
+
+  const dashStyle=Math.max(
+    0,
+    Math.min(3,Number(src.dashStyle??drawingDefaults.dashStyle)||0)
+  );
+
+  document.querySelectorAll("[data-dash-style]").forEach(button=>{
+    button.classList.toggle(
+      "active",
+      Number(button.dataset.dashStyle)===dashStyle
+    );
+    button.setAttribute(
+      "aria-pressed",
+      String(Number(button.dataset.dashStyle)===dashStyle)
+    );
+  });
+
+  const currentHead=Number(src.headSize||drawingDefaults.headSize);
+  const headPresets=[10,13,18];
+  const nearest=headPresets.reduce(
+    (best,value)=>
+      Math.abs(value-currentHead)<Math.abs(best-currentHead)
+        ? value
+        : best,
+    headPresets[0]
+  );
+
+  document.querySelectorAll("[data-head-size]").forEach(button=>{
+    button.classList.toggle(
+      "active",
+      Number(button.dataset.headSize)===nearest
+    );
+    button.setAttribute(
+      "aria-pressed",
+      String(Number(button.dataset.headSize)===nearest)
+    );
+  });
+}
+
 function syncDrawingControls(){
   if(
     selectedDrawing!==null &&
@@ -5488,6 +5589,8 @@ function syncDrawingControls(){
       b.dataset.color===(src.color||drawingDefaults.color)
     );
   });
+
+  syncDrawingPresetButtons();
 }
 function boardPoint(e){const r=document.getElementById("board").getBoundingClientRect();return{x:(e.clientX-r.left)/r.width*1000,y:(e.clientY-r.top)/r.height*620}}
 
@@ -5580,6 +5683,41 @@ boardShell.addEventListener("drop",e=>{
   if(!Number.isInteger(idx) || !state.roster[idx])return;
 
   placeRosterPlayerAtPointer(idx,e.clientX,e.clientY);
+});
+
+
+document.querySelectorAll("[data-dash-style]").forEach(button=>{
+  button.addEventListener("click",()=>{
+    const value=Number(button.dataset.dashStyle)||0;
+    applyDrawingStyleChange("dashStyle",value);
+    const hidden=document.getElementById("drawingDash");
+    if(hidden)hidden.value=String(value);
+    syncDrawingPresetButtons();
+    setStatus(
+      value===0
+        ? "Corpo freccia continuo"
+        : value===3
+          ? "Corpo freccia puntinato"
+          : "Corpo freccia tratteggiato"
+    );
+  });
+});
+
+document.querySelectorAll("[data-head-size]").forEach(button=>{
+  button.addEventListener("click",()=>{
+    const value=Number(button.dataset.headSize)||13;
+    applyDrawingStyleChange("headSize",value);
+    const hidden=document.getElementById("drawingHead");
+    if(hidden)hidden.value=String(value);
+    syncDrawingPresetButtons();
+    setStatus(
+      value<=10
+        ? "Punta freccia piccola"
+        : value>=18
+          ? "Punta freccia grande"
+          : "Punta freccia media"
+    );
+  });
 });
 
 document.getElementById("board").addEventListener("pointerdown",e=>{
@@ -5762,6 +5900,12 @@ document.getElementById("notes").addEventListener("input",e=>{
 
 
 function applyDrawingStyleChange(property,value){
+  if(property==="dashStyle"){
+    value=Math.round(Math.max(0,Math.min(3,Number(value)||0)));
+  }
+  if(property==="headSize"){
+    value=Math.max(6,Math.min(30,Number(value)||drawingDefaults.headSize));
+  }
   const indexes=selectedDrawings.size
     ? [...selectedDrawings].filter(i=>page().drawings[i])
     : (
@@ -7434,7 +7578,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v159",
+    appVersion:"v160",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -8383,7 +8527,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=159",
+        "./service-worker.js?v=160",
         { updateViaCache: "none" }
       );
 
@@ -8455,6 +8599,7 @@ if ("serviceWorker" in navigator) {
 }
 
 initializeContinuousHistory();
+syncDrawingPresetButtons();
 </script>
 
 </body>

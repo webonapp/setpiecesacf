@@ -438,3 +438,17 @@ Preset di visualizzazione, fase 2
 - Evitati step Undo quando si richiama un preset già attivo
 - Preset salvato nel progetto e nei backup
 - Layout responsive per Mac e iPad
+
+
+ROADMAP 20 PASSAGGI - PASSAGGIO 12/20 - v160
+Frecce professionali, fase 1
+
+- Stile corpo freccia trasformato in pulsanti espliciti
+- Scelte rapide: Continua, Tratteggio, Puntinata
+- Dimensione punta trasformata in preset rapidi
+- Scelte punta: Piccola, Media, Grande
+- I controlli precedenti restano internamente compatibili ma non occupano più spazio visivo
+- Pulsante attivo sempre sincronizzato con la freccia selezionata
+- Nuove frecce ereditano correttamente l'ultimo preset scelto
+- Migliorata usabilità touch su iPad
+- Nessuna modifica alla geometria o allo spessore delle frecce esistenti
