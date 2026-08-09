@@ -282,3 +282,16 @@ FIX v148 - SPESSORE FRECCE
 - Rimossa l'ombra direzionale che alterava otticamente lo spessore
 - Tratteggio ricalcolato sullo spessore reale
 - Compatibilità con frecce delle versioni precedenti
+
+
+ROADMAP 20 PASSAGGI - PASSAGGIO 01/20 - v149
+Fondazione tecnica / integrità progetto
+
+- Introdotto PROJECT_SCHEMA_VERSION
+- Aggiunta normalizzazione centralizzata di progetto, schemi, giocatori e oggetti grafici
+- Coordinate e valori numerici vengono validati prima di essere usati
+- Salvataggio protetto contro stati corrotti
+- Ripristino Undo/Redo protetto contro snapshot non validi
+- Limite storico ridotto e centralizzato per contenere l'uso di memoria
+- Ogni nuovo schema inizializza correttamente gli override grafici
+- Nessuna modifica intenzionale all'esperienza utente o al layout

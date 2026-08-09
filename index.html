@@ -2023,7 +2023,7 @@ body.field-view-mode #board{
 <input type="file" id="projectFile" accept=".json" hidden>
 
 <script>
-const STORAGE_KEY="setPieceBoardPro_v148";
+const STORAGE_KEY="setPieceBoardPro_v149";
 
 function safeStorageGet(key){
   try{
@@ -2178,17 +2178,37 @@ function snapshotState(){
 }
 function restoreSnapshot(snapshot){
   historyLocked=true;
-  const parsed=JSON.parse(snapshot);
-  state=parsed.state;
-  currentPage=Math.min(parsed.currentPage,state.pages.length-1);
-  renderAll();
-  save(false);
-  historyLocked=false;
+
+  try{
+    const parsed=JSON.parse(snapshot);
+    const restored=normalizeProjectState(parsed.state);
+
+    if(!assertProjectIntegrity(restored)){
+      throw new Error("Snapshot non valido");
+    }
+
+    state=restored;
+    currentPage=Math.max(
+      0,
+      Math.min(
+        finiteNumber(parsed.currentPage,0),
+        state.pages.length-1
+      )
+    );
+
+    renderAll();
+    save(false);
+  }catch(error){
+    console.error("Ripristino snapshot fallito:",error);
+    setStatus("Impossibile ripristinare questa modifica");
+  }finally{
+    historyLocked=false;
+  }
 }
 function pushHistory(){
   if(historyLocked)return;
   undoStack.push(snapshotState());
-  if(undoStack.length>500)undoStack.shift();
+  if(undoStack.length>MAX_HISTORY_STEPS)undoStack.shift();
   redoStack=[];
   updateHistoryButtons();
 }
@@ -2215,7 +2235,7 @@ const defaultRoster=[];
 function defaultPositions(count=state?.roster?.length || defaultRoster.length){
   return Array.from({length:count},()=>null);
 }
-const emptyPage=i=>({title:i===0?"ACF Fiorentina · Schema 1":`Schema ${i+1}`,notes:"",positions:defaultPositions(defaultRoster.length),drawings:[],balls:[],texts:[]});
+const emptyPage=i=>({title:i===0?"ACF Fiorentina · Schema 1":`Schema ${i+1}`,notes:"",positions:defaultPositions(defaultRoster.length),drawings:[],balls:[],texts:[],playerDisplayOverrides:{}});
 let state={roster:defaultRoster,pages:Array.from({length:10},(_,i)=>emptyPage(i)),playerScale:.90,homeChestCircle:true,awayChestCircle:false,homeRosterLoaded:false,awayRosterLoaded:false,homeRosterTemplate:null};
 
 const FIORENTINA_PRESET=[
@@ -2275,9 +2295,201 @@ function updateHomeRosterTemplate(){
   }
 }
 
+
+const PROJECT_SCHEMA_VERSION=1;
+const MAX_HISTORY_STEPS=250;
+
+function finiteNumber(value,fallback=0){
+  const numeric=Number(value);
+  return Number.isFinite(numeric) ? numeric : fallback;
+}
+
+function clampNumber(value,min,max,fallback=min){
+  return Math.max(min,Math.min(max,finiteNumber(value,fallback)));
+}
+
+function normalizePlayerRecord(player,index=0){
+  const safe=player && typeof player==="object" ? player : {};
+  const team=["home","away","gk"].includes(safe.team) ? safe.team : "home";
+
+  safe.id=String(safe.id || `${team}-${Date.now()}-${index}`);
+  safe.number=(
+    safe.number===null ||
+    safe.number===undefined ||
+    safe.number===""
+  ) ? 0 : safe.number;
+
+  safe.firstName=String(safe.firstName||"").trim();
+  safe.lastName=String(safe.lastName||"").trim();
+
+  if(!safe.firstName && !safe.lastName){
+    const parts=String(safe.name||"").trim().split(/\s+/).filter(Boolean);
+    if(parts.length===1){
+      safe.lastName=parts[0];
+    }else if(parts.length>1){
+      safe.firstName=parts.shift();
+      safe.lastName=parts.join(" ");
+    }
+  }
+
+  safe.name=[safe.firstName,safe.lastName].filter(Boolean).join(" ");
+  safe.team=team;
+  safe.individualScale=
+    safe.individualScale===null || safe.individualScale===undefined
+      ? null
+      : clampNumber(safe.individualScale,.5,2,.9);
+
+  if(typeof safe.showLastName!=="boolean")safe.showLastName=team!=="away";
+  if(typeof safe.showChestCircle!=="boolean")safe.showChestCircle=team!=="away";
+  if(typeof safe.showShirtNumber!=="boolean")safe.showShirtNumber=false;
+  if(typeof safe.showOpponentBlankLine!=="boolean")safe.showOpponentBlankLine=false;
+
+  return safe;
+}
+
+function normalizeDrawingRecord(drawing){
+  const safe=drawing && typeof drawing==="object" ? drawing : {};
+  const allowedTypes=new Set(["arrow","curve","circle","rect"]);
+
+  safe.type=allowedTypes.has(safe.type) ? safe.type : "arrow";
+  safe.x1=clampNumber(safe.x1,0,1000,100);
+  safe.y1=clampNumber(safe.y1,0,620,100);
+  safe.x2=clampNumber(safe.x2,0,1000,300);
+  safe.y2=clampNumber(safe.y2,0,620,200);
+
+  ["c1x","c2x"].forEach(key=>{
+    if(safe[key]!==undefined)safe[key]=clampNumber(safe[key],0,1000,safe.x1);
+  });
+  ["c1y","c2y"].forEach(key=>{
+    if(safe[key]!==undefined)safe[key]=clampNumber(safe[key],0,620,safe.y1);
+  });
+
+  safe.color=String(safe.color||drawingDefaults.color);
+  safe.width=normalizeDrawingWidth(safe.width,drawingDefaults.width);
+  safe.headSize=clampNumber(safe.headSize,4,40,drawingDefaults.headSize);
+  safe.curveOffset=finiteNumber(safe.curveOffset,drawingDefaults.curveOffset);
+  safe.opacity=clampNumber(safe.opacity,.05,1,1);
+  safe.shapeMode=["both","fill","border"].includes(safe.shapeMode)
+    ? safe.shapeMode
+    : "both";
+  safe.dashStyle=Math.round(clampNumber(safe.dashStyle,0,3,0));
+
+  return safe;
+}
+
+function normalizePageRecord(projectPage,index,rosterLength){
+  const safe=projectPage && typeof projectPage==="object" ? projectPage : {};
+
+  safe.title=String(
+    safe.title ||
+    (index===0 ? "ACF Fiorentina · Schema 1" : `Schema ${index+1}`)
+  );
+  safe.notes=String(safe.notes||"");
+
+  safe.positions=Array.from({length:rosterLength},(_,playerIndex)=>{
+    const pos=safe.positions?.[playerIndex];
+    if(!pos || !Number.isFinite(Number(pos.x)) || !Number.isFinite(Number(pos.y))){
+      return null;
+    }
+
+    return {
+      x:clampNumber(pos.x,0,100,50),
+      y:clampNumber(pos.y,0,100,50)
+    };
+  });
+
+  safe.drawings=Array.isArray(safe.drawings)
+    ? safe.drawings.map(normalizeDrawingRecord)
+    : [];
+
+  safe.balls=Array.isArray(safe.balls)
+    ? safe.balls.map(ball=>({
+        ...ball,
+        x:clampNumber(ball?.x,0,100,50),
+        y:clampNumber(ball?.y,0,100,50)
+      }))
+    : [];
+
+  safe.texts=Array.isArray(safe.texts)
+    ? safe.texts.map(text=>({
+        ...text,
+        x:clampNumber(text?.x,0,100,50),
+        y:clampNumber(text?.y,0,100,50),
+        text:String(text?.text??text?.value??"")
+      }))
+    : [];
+
+  if(!safe.playerDisplayOverrides || typeof safe.playerDisplayOverrides!=="object"){
+    safe.playerDisplayOverrides={};
+  }
+
+  return safe;
+}
+
+function normalizeProjectState(projectState){
+  const safe=projectState && typeof projectState==="object" ? projectState : {};
+
+  safe.schemaVersion=PROJECT_SCHEMA_VERSION;
+  safe.playerScale=clampNumber(safe.playerScale,.65,1.65,.90);
+
+  if(!["normal","bench","locker"].includes(safe.presentationMode)){
+    safe.presentationMode="normal";
+  }
+
+  safe.homeChestCircle=
+    typeof safe.homeChestCircle==="boolean" ? safe.homeChestCircle : true;
+  safe.awayChestCircle=
+    typeof safe.awayChestCircle==="boolean" ? safe.awayChestCircle : false;
+
+  safe.roster=Array.isArray(safe.roster)
+    ? safe.roster.map(normalizePlayerRecord)
+    : [];
+
+  if(!Array.isArray(safe.pages) || !safe.pages.length){
+    safe.pages=[emptyPage(0)];
+  }
+
+  safe.pages=safe.pages
+    .slice(0,30)
+    .map((projectPage,index)=>
+      normalizePageRecord(projectPage,index,safe.roster.length)
+    );
+
+  if(!Array.isArray(safe.homeRosterTemplate)){
+    safe.homeRosterTemplate=[];
+  }else{
+    safe.homeRosterTemplate=safe.homeRosterTemplate.map(normalizePlayerRecord);
+  }
+
+  return safe;
+}
+
+function assertProjectIntegrity(projectState){
+  if(!projectState || typeof projectState!=="object")return false;
+  if(!Array.isArray(projectState.roster))return false;
+  if(!Array.isArray(projectState.pages) || !projectState.pages.length)return false;
+
+  return projectState.pages.every(projectPage=>
+    Array.isArray(projectPage.positions) &&
+    projectPage.positions.length===projectState.roster.length &&
+    Array.isArray(projectPage.drawings) &&
+    Array.isArray(projectPage.balls) &&
+    Array.isArray(projectPage.texts)
+  );
+}
+
 function save(show=true){
-  safeStorageSet(STORAGE_KEY,JSON.stringify(state));
-  if(show)setStatus("Progetto salvato");
+  state=normalizeProjectState(state);
+
+  if(!assertProjectIntegrity(state)){
+    console.error("Salvataggio annullato: stato progetto non valido");
+    setStatus("Errore integrità progetto");
+    return false;
+  }
+
+  const saved=safeStorageSet(STORAGE_KEY,JSON.stringify(state));
+  if(show)setStatus(saved ? "Progetto salvato" : "Salvataggio non riuscito");
+  return saved;
 }
 
 function applyV94PermanentRosterUpdates(){
@@ -2424,6 +2636,8 @@ function load(){
   applyV94PermanentRosterUpdates();
   ensurePlayerRoles();
   fixLegacyOpponentTenName();
+
+  state=normalizeProjectState(state);
 }
 
 const PLAYER_ROLE_ORDER=["portiere","difensore","centrocampista","attaccante","avversario"];
@@ -3698,7 +3912,7 @@ function startGroupDrag(e){
 
     if(dragSnapshot && dragSnapshot!==snapshotState()){
       undoStack.push(dragSnapshot);
-      if(undoStack.length>500)undoStack.shift();
+      if(undoStack.length>MAX_HISTORY_STEPS)undoStack.shift();
       redoStack=[];
       updateHistoryButtons();
     }
@@ -4516,7 +4730,7 @@ function renderDrawings(){
 function commitDragHistory(){
   if(dragSnapshot && dragSnapshot!==snapshotState()){
     undoStack.push(dragSnapshot);
-    if(undoStack.length>500)undoStack.shift();
+    if(undoStack.length>MAX_HISTORY_STEPS)undoStack.shift();
     redoStack=[];
     updateHistoryButtons();
   }
@@ -6494,7 +6708,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v148",
+    appVersion:"v149",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
