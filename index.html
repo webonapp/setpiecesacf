@@ -2230,7 +2230,7 @@ body.export-clean-view .board-shell{
 <input type="file" id="projectFile" accept=".json" hidden>
 
 <script>
-const STORAGE_KEY="setPieceBoardPro_v166";
+const STORAGE_KEY="setPieceBoardPro_v167";
 
 function safeStorageGet(key){
   try{
@@ -2610,31 +2610,21 @@ const FIORENTINA_PRESET=[
 ].map((p,i)=>({id:"p"+i,...p}));
 
 
-function page(){return state.pages[currentPage]}
-
-function updateHomeRosterTemplate(){
-  const homePlayers=state.roster
-    .filter(player=>
-      player.team!=="away" &&
-      !String(player.id||"").startsWith("copy-")
-    )
-    .map((player,index)=>{
-      const cloned=JSON.parse(JSON.stringify(player));
-      const surname=String(cloned.lastName||cloned.name||"").trim();
-
-      return {
-        ...cloned,
-        id:cloned.id||`acf-custom-${Date.now()}-${index}`,
-        firstName:"",
-        lastName:surname,
-        name:surname,
-        individualScale:null
-      };
-    });
-
-  if(homePlayers.length){
-    state.homeRosterTemplate=homePlayers;
+function page(){
+  if(!Array.isArray(state.pages) || !state.pages.length){
+    state.pages=[createPage("Schema 1")];
+    currentPage=0;
   }
+
+  currentPage=Math.max(
+    0,
+    Math.min(
+      state.pages.length-1,
+      Number(currentPage)||0
+    )
+  );
+
+  return state.pages[currentPage];
 }
 
 
@@ -2860,12 +2850,12 @@ function assertProjectIntegrity(projectState){
 }
 
 
-const RECOVERY_STORAGE_KEY="setPieceBoardPro_recovery_v166";
+const RECOVERY_STORAGE_KEY="setPieceBoardPro_recovery_v167";
 let recoverySaveTimer=null;
 
 function createRecoverySnapshot(){
   return {
-    version:"v166",
+    version:"v167",
     savedAt:Date.now(),
     currentPage,
     state:deepClone(state)
@@ -6032,6 +6022,189 @@ function updateLineupCounters(){
   if(awayEl)awayEl.textContent=`${away}/11`;
 }
 
+
+function sanitizeSelectionSet(set,maxExclusive){
+  const clean=new Set();
+
+  (set||[]).forEach(value=>{
+    const index=Number(value);
+    if(
+      Number.isInteger(index) &&
+      index>=0 &&
+      index<maxExclusive
+    ){
+      clean.add(index);
+    }
+  });
+
+  return clean;
+}
+
+function repairRuntimeSelections(){
+  const rosterLength=Array.isArray(state.roster)
+    ? state.roster.length
+    : 0;
+
+  const drawingsLength=Array.isArray(page()?.drawings)
+    ? page().drawings.length
+    : 0;
+
+  const ballsLength=Array.isArray(page()?.balls)
+    ? page().balls.length
+    : 0;
+
+  const textsLength=Array.isArray(page()?.texts)
+    ? page().texts.length
+    : 0;
+
+  selectedPlayers=sanitizeSelectionSet(
+    selectedPlayers,
+    rosterLength
+  );
+  selectedRosterPlayers=sanitizeSelectionSet(
+    selectedRosterPlayers,
+    rosterLength
+  );
+  selectedDrawings=sanitizeSelectionSet(
+    selectedDrawings,
+    drawingsLength
+  );
+  selectedBalls=sanitizeSelectionSet(
+    selectedBalls,
+    ballsLength
+  );
+  selectedTexts=sanitizeSelectionSet(
+    selectedTexts,
+    textsLength
+  );
+
+  if(
+    selectedDrawing!==null &&
+    (
+      !Number.isInteger(Number(selectedDrawing)) ||
+      Number(selectedDrawing)<0 ||
+      Number(selectedDrawing)>=drawingsLength
+    )
+  ){
+    selectedDrawing=null;
+  }
+
+  if(
+    selectedBall!==null &&
+    (
+      !Number.isInteger(Number(selectedBall)) ||
+      Number(selectedBall)<0 ||
+      Number(selectedBall)>=ballsLength
+    )
+  ){
+    selectedBall=null;
+  }
+
+  if(
+    selectedText!==null &&
+    (
+      !Number.isInteger(Number(selectedText)) ||
+      Number(selectedText)<0 ||
+      Number(selectedText)>=textsLength
+    )
+  ){
+    selectedText=null;
+  }
+}
+
+function repairProjectRuntimeState(){
+  let changed=false;
+
+  if(!Array.isArray(state.pages) || !state.pages.length){
+    state.pages=[createPage("Schema 1")];
+    currentPage=0;
+    changed=true;
+  }
+
+  const boundedPage=Math.max(
+    0,
+    Math.min(
+      state.pages.length-1,
+      Number(currentPage)||0
+    )
+  );
+
+  if(boundedPage!==currentPage){
+    currentPage=boundedPage;
+    changed=true;
+  }
+
+  state.pages.forEach((projectPage,index)=>{
+    const normalized=normalizePage(projectPage,index);
+
+    if(normalized){
+      state.pages[index]=normalized;
+    }
+  });
+
+  repairRuntimeSelections();
+
+  return changed;
+}
+
+function safeRenderAll(){
+  try{
+    repairProjectRuntimeState();
+    renderAll();
+    return true;
+  }catch(error){
+    console.error("Render recovery:",error);
+
+    try{
+      state=normalizeProjectState(state);
+      currentPage=Math.max(
+        0,
+        Math.min(
+          state.pages.length-1,
+          Number(currentPage)||0
+        )
+      );
+
+      repairRuntimeSelections();
+      renderAll();
+      setStatus("Interfaccia ripristinata automaticamente");
+      return true;
+    }catch(secondError){
+      console.error("Render recovery fallito:",secondError);
+      return false;
+    }
+  }
+}
+
+function installRuntimeErrorGuard(){
+  window.addEventListener("unhandledrejection",event=>{
+    console.error(
+      "Errore asincrono intercettato:",
+      event.reason
+    );
+
+    hideSnapGuides();
+
+    document.body.classList.remove(
+      "export-in-progress"
+    );
+  });
+
+  window.addEventListener("error",event=>{
+    console.error(
+      "Errore runtime intercettato:",
+      event.error||event.message
+    );
+
+    hideSnapGuides();
+
+    document.body.classList.remove(
+      "export-in-progress"
+    );
+  });
+}
+
+
 function renderAll(){
   renderSchemeSelect();
   renderRoster();
@@ -8196,7 +8369,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v166",
+    appVersion:"v167",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -8948,7 +9121,17 @@ function installLogicalBoardRenderer(){
     setTimeout(scheduleLogicalBoardFit,450);
   },{passive:true});
 
-  document.addEventListener("visibilitychange",()=>{
+  
+window.addEventListener("blur",()=>{
+  hideSnapGuides();
+  document.body.classList.remove("export-in-progress");
+});
+
+document.addEventListener("pointercancel",()=>{
+  hideSnapGuides();
+});
+
+document.addEventListener("visibilitychange",()=>{
     if(document.visibilityState==="visible"){
       setTimeout(scheduleLogicalBoardFit,30);
       setTimeout(scheduleLogicalBoardFit,180);
@@ -9176,6 +9359,8 @@ if(recoverySnapshot){
   }
 }
 
+installRuntimeErrorGuard();
+repairProjectRuntimeState();
 renderAll();updateHistoryButtons();syncDrawingControls();updateSelectedNamesButton();syncChestCircleControls();
 </script>
 
@@ -9184,7 +9369,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=166",
+        "./service-worker.js?v=167",
         { updateViaCache: "none" }
       );
 

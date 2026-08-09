@@ -535,3 +535,18 @@ Autosave e recupero sessione
 - Se il recovery è più recente, la sessione viene ripristinata automaticamente.
 - Conservata anche la pagina/schema su cui si stava lavorando.
 - Nessuna modifica visiva o ai contenuti degli schemi.
+
+
+ROADMAP 20 PASSAGGI - PASSAGGIO 19/20 - v167
+Stabilità runtime e self-healing
+
+- Aggiunto controllo d'integrità dello stato prima del rendering.
+- currentPage viene sempre ricondotto a uno schema valido.
+- Se manca ogni schema viene ricreato automaticamente uno Schema 1 sicuro.
+- Selezioni obsolete di giocatori, frecce, palloni e testi vengono ripulite.
+- page() resa resistente a riferimenti fuori indice.
+- Aggiunto safeRenderAll per recupero automatico da stato parzialmente corrotto.
+- Errori runtime e Promise non gestite non lasciano più SNAP/export in stato bloccato.
+- Cleanup aggiuntivo su blur e pointercancel, utile soprattutto su iPad.
+- Recovery snapshot aggiornato alla v167.
+- Nessuna modifica intenzionale a grafica o contenuto degli schemi.
