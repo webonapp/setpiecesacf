@@ -295,3 +295,16 @@ Fondazione tecnica / integrità progetto
 - Limite storico ridotto e centralizzato per contenere l'uso di memoria
 - Ogni nuovo schema inizializza correttamente gli override grafici
 - Nessuna modifica intenzionale all'esperienza utente o al layout
+
+
+ROADMAP 20 PASSAGGI - PASSAGGIO 02/20 - v150
+Motore grafico comune, fase 1
+
+- Introdotto un gestore comune delle selezioni per palloni, testi e disegni
+- Introdotto un motore Pointer Drag condiviso con requestAnimationFrame
+- Pallone e testo ora usano lo stesso ciclo: selezione, drag, history, salvataggio
+- Cleanup centralizzato degli event listener di trascinamento
+- Gestione pointerId uniforme per Mac e iPad
+- clearAllSelections ora aggiorna anche i testi
+- Nessuna modifica intenzionale al layout o alle coordinate degli schemi
+- Frecce e maglie restano sul motore precedente in questa release per ridurre il rischio

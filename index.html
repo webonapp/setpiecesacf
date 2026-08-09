@@ -2023,7 +2023,7 @@ body.field-view-mode #board{
 <input type="file" id="projectFile" accept=".json" hidden>
 
 <script>
-const STORAGE_KEY="setPieceBoardPro_v149";
+const STORAGE_KEY="setPieceBoardPro_v150";
 
 function safeStorageGet(key){
   try{
@@ -3655,13 +3655,130 @@ function toggleSetSelection(set,index,additive){
   else set.add(index);
 }
 
-function clearAllSelections(){
+const OBJECT_SELECTIONS={
+  ball:{
+    set:()=>selectedBalls,
+    setPrimary:index=>{selectedBall=index},
+    clearPrimary:()=>{selectedBall=null}
+  },
+  text:{
+    set:()=>selectedTexts,
+    setPrimary:index=>{selectedText=index},
+    clearPrimary:()=>{selectedText=null}
+  },
+  drawing:{
+    set:()=>selectedDrawings,
+    setPrimary:index=>{selectedDrawing=index},
+    clearPrimary:()=>{selectedDrawing=null}
+  }
+};
+
+function clearSelectionKinds(except=null){
   selectedPlayers.clear();
   selectedRosterPlayers.clear();
-  clearObjectSelections();
+
+  if(except!=="ball"){
+    selectedBalls.clear();
+    selectedBall=null;
+  }
+  if(except!=="text"){
+    selectedTexts.clear();
+    selectedText=null;
+  }
+  if(except!=="drawing"){
+    selectedDrawings.clear();
+    selectedDrawing=null;
+  }
+}
+
+function selectObjectKind(kind,index,additive=false){
+  const config=OBJECT_SELECTIONS[kind];
+  if(!config)return false;
+
+  const set=config.set();
+
+  if(!additive){
+    clearSelectionKinds(kind);
+    if(!set.has(index))set.clear();
+  }
+
+  if(additive && set.has(index)){
+    set.delete(index);
+    config.clearPrimary();
+    return false;
+  }
+
+  set.add(index);
+  config.setPrimary(index);
+  return true;
+}
+
+function startBoardObjectDrag({
+  event,
+  element,
+  initial,
+  applyPosition,
+  onFinish
+}){
+  const board=document.getElementById("board");
+  const rect=board?.getBoundingClientRect();
+
+  if(!board || !rect || !rect.width || !rect.height)return false;
+
+  const pointerId=event.pointerId;
+  const startX=event.clientX;
+  const startY=event.clientY;
+
+  dragSnapshot=snapshotState();
+  beginDragVisual(element,pointerId);
+
+  const updater=createRafDragUpdater(moveEvent=>{
+    const deltaX=(moveEvent.clientX-startX)/rect.width*100;
+    const deltaY=(moveEvent.clientY-startY)/rect.height*100;
+    applyPosition(deltaX,deltaY,moveEvent,initial);
+  });
+
+  let finished=false;
+
+  const cleanup=()=>{
+    window.removeEventListener("pointermove",move);
+    window.removeEventListener("pointerup",finish);
+    window.removeEventListener("pointercancel",finish);
+  };
+
+  const move=moveEvent=>{
+    if(moveEvent.pointerId!==pointerId)return;
+    moveEvent.preventDefault();
+    updater.schedule(moveEvent);
+  };
+
+  const finish=endEvent=>{
+    if(finished || endEvent.pointerId!==pointerId)return;
+    finished=true;
+
+    updater.flush();
+    cleanup();
+    endDragVisual(element,pointerId);
+    commitDragHistory();
+
+    if(typeof onFinish==="function")onFinish(endEvent);
+    save(false);
+  };
+
+  window.addEventListener("pointermove",move,{passive:false});
+  window.addEventListener("pointerup",finish);
+  window.addEventListener("pointercancel",finish);
+
+  return true;
+}
+
+
+function clearAllSelections(){
+  clearSelectionKinds();
   refreshSelectionVisuals();
   renderDrawings();
   renderBalls();
+  renderTexts();
   renderRoster();
 }
 
@@ -3949,62 +4066,31 @@ function renderBalls(){
 
 
       const additive=e.metaKey||e.ctrlKey;
-      if(!additive){
-        selectedPlayers.clear();
-        selectedRosterPlayers.clear();
-        selectedTexts.clear();
-        selectedDrawings.clear();
-        selectedBalls.clear();
-      }
-      if(additive && selectedBalls.has(i))selectedBalls.delete(i);
-      else selectedBalls.add(i);
-
-      selectedBall=i;
-      selectedDrawing=null;
-      selectedText=null;
+      const selected=selectObjectKind("ball",i,additive);
 
       refreshSelectionVisuals();
       refreshObjectSelectionVisuals();
+
+      if(!selected)return;
+
       el.classList.add("selected","selected-object");
 
-      const board=document.getElementById("board");
-      const rect=board.getBoundingClientRect();
-      const start={x:e.clientX,y:e.clientY};
       const initial={...ball};
-      const pointerId=e.pointerId;
-      dragSnapshot=snapshotState();
-      beginDragVisual(el,pointerId);
 
-      const updater=createRafDragUpdater(ev=>{
-        ball.x=Math.max(1.5,Math.min(98.5,initial.x+(ev.clientX-start.x)/rect.width*100));
-        ball.y=Math.max(2,Math.min(98,initial.y+(ev.clientY-start.y)/rect.height*100));
-        el.style.left=ball.x+"%";
-        el.style.top=ball.y+"%";
+      startBoardObjectDrag({
+        event:e,
+        element:el,
+        initial,
+        applyPosition:(dx,dy)=>{
+          ball.x=Math.max(1.5,Math.min(98.5,initial.x+dx));
+          ball.y=Math.max(2,Math.min(98,initial.y+dy));
+          el.style.left=ball.x+"%";
+          el.style.top=ball.y+"%";
+        },
+        onFinish:()=>{
+          refreshObjectSelectionVisuals();
+        }
       });
-
-      const move=ev=>{
-        if(ev.pointerId!==pointerId)return;
-        ev.preventDefault();
-        updater.schedule(ev);
-      };
-
-      const finish=ev=>{
-        if(ev.pointerId!==pointerId)return;
-
-        updater.flush();
-        window.removeEventListener("pointermove",move);
-        window.removeEventListener("pointerup",finish);
-        window.removeEventListener("pointercancel",finish);
-
-        endDragVisual(el,pointerId);
-        commitDragHistory();
-        refreshObjectSelectionVisuals();
-        save(false);
-      };
-
-      window.addEventListener("pointermove",move,{passive:false});
-      window.addEventListener("pointerup",finish);
-      window.addEventListener("pointercancel",finish);
     });
 
     layer.appendChild(el);
@@ -4048,62 +4134,31 @@ el.addEventListener("pointerdown",e=>{
       },460);
 
       const additive=e.metaKey||e.ctrlKey;
-      if(!additive){
-        selectedPlayers.clear();
-        selectedRosterPlayers.clear();
-        selectedBalls.clear();
-        selectedDrawings.clear();
-        selectedTexts.clear();
-      }
-      if(additive && selectedTexts.has(i))selectedTexts.delete(i);
-      else selectedTexts.add(i);
-
-      selectedText=i;
-      selectedDrawing=null;
-      selectedBall=null;
+      const selected=selectObjectKind("text",i,additive);
 
       refreshSelectionVisuals();
       refreshObjectSelectionVisuals();
+
+      if(!selected)return;
+
       el.classList.add("selected","selected-object");
 
-      const board=document.getElementById("board");
-      const rect=board.getBoundingClientRect();
-      const start={x:e.clientX,y:e.clientY};
       const initial={...item};
-      const pointerId=e.pointerId;
-      dragSnapshot=snapshotState();
-      beginDragVisual(el,pointerId);
 
-      const updater=createRafDragUpdater(ev=>{
-        item.x=Math.max(1,Math.min(99,initial.x+(ev.clientX-start.x)/rect.width*100));
-        item.y=Math.max(2,Math.min(98,initial.y+(ev.clientY-start.y)/rect.height*100));
-        el.style.left=item.x+"%";
-        el.style.top=item.y+"%";
+      startBoardObjectDrag({
+        event:e,
+        element:el,
+        initial,
+        applyPosition:(dx,dy)=>{
+          item.x=Math.max(1,Math.min(99,initial.x+dx));
+          item.y=Math.max(2,Math.min(98,initial.y+dy));
+          el.style.left=item.x+"%";
+          el.style.top=item.y+"%";
+        },
+        onFinish:()=>{
+          refreshObjectSelectionVisuals();
+        }
       });
-
-      const move=ev=>{
-        if(ev.pointerId!==pointerId)return;
-        ev.preventDefault();
-        updater.schedule(ev);
-      };
-
-      const finish=ev=>{
-        if(ev.pointerId!==pointerId)return;
-
-        updater.flush();
-        window.removeEventListener("pointermove",move);
-        window.removeEventListener("pointerup",finish);
-        window.removeEventListener("pointercancel",finish);
-
-        endDragVisual(el,pointerId);
-        commitDragHistory();
-        refreshObjectSelectionVisuals();
-        save(false);
-      };
-
-      window.addEventListener("pointermove",move,{passive:false});
-      window.addEventListener("pointerup",finish);
-      window.addEventListener("pointercancel",finish);
     });
 
     layer.appendChild(el);
@@ -6708,7 +6763,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v149",
+    appVersion:"v150",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
