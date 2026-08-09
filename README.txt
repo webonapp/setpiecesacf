@@ -579,23 +579,16 @@ v169 - Correzioni richieste + audit v168
 - Nessuna modifica agli schemi esistenti o alla resa delle frecce già salvate.
 
 
-v170
-- Eliminato completamente il menu a tendina dei preset di visualizzazione dall'interfaccia.
-- Rimossi i relativi listener per evitare errori su elemento DOM assente.
-- SNAP impostato attivo di default per nuovi progetti e stati privi di preferenza salvata.
-- I progetti che hanno già una scelta SNAP esplicita continuano a rispettarla.
-- Migrazione v169 -> v170 mantenuta.
+v172 - Base stabile v169: menu preset rimosso, SNAP ON di default, nessuna modifica al motore di caricamento.
 
 
-v171 - FIX CRITICO refresh / stato / rosa / SNAP
+v173 - Stato rosa derivato dai giocatori realmente presenti. Eliminato falso alert 'rosa già caricata' causato da booleani stale.
 
-- Confermato dal video: dopo refresh veniva mostrato Schema 1 vuoto e una successiva azione poteva far riapparire il vecchio schema.
-- Rimossa la doppia sorgente concorrente caricamento normale + recovery post-load.
-- Ora prima del PRIMO render viene scelto un solo stato: il salvataggio/recovery più recente per timestamp.
-- Introdotta chiave storage stabile setPieceBoardPro_main: le future versioni non devono più creare un nuovo progetto per ogni numero versione.
-- Migrazione automatica da v164-v170 e relativi recovery.
-- currentPage salvato anche nel progetto principale.
-- Aggiornamento Service Worker non risalva più uno stato parzialmente inizializzato prima del reload.
-- Stato rosa Fiorentina/avversario derivato dai giocatori realmente presenti, non da un booleano potenzialmente vecchio.
-- SNAP forzato ON una volta per la migrazione v171; successivamente resta liberamente disattivabile dall'utente.
-- Add Pallone esegue render completo e coerente.
+
+v174 - Chiave storage stabile. Un solo stato viene caricato prima del primo render. currentPage persistente. Rimossa commutazione recovery dopo load.
+
+
+v175 - Autosave heartbeat 700ms solo se lo stato cambia. Flush atomico su refresh/background/pagehide. Input/change salvati subito.
+
+
+v176 - Audit finale: coerenza roster/pagine/positions, SNAP ON una volta, niente save durante controllerchange, verifiche sintattiche complete.
