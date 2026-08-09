@@ -493,3 +493,17 @@ Snap intelligente, fase 2
 - FIX importante: trascinando più maglie insieme lo snap non deforma più la formazione.
 - Nel drag di gruppo viene agganciato il giocatore-ancora e applicato lo stesso delta a tutto il gruppo.
 - SNAP resta opzionale e disattivato di default.
+
+
+ROADMAP 20 PASSAGGI - PASSAGGIO 16/20 - v164
+Export e stampa robusti, fase 1
+
+- PNG e PDF ora usano una sessione di export isolata.
+- Tutte le selezioni vengono nascoste durante la cattura.
+- Stato completo dell'interfaccia ripristinato dopo l'export.
+- Ripristino garantito anche se html2canvas/jsPDF genera un errore.
+- PDF multi-schema ripulisce le selezioni a ogni pagina.
+- Attesa di due frame prima della cattura per evitare render incompleti.
+- Interazioni bloccate temporaneamente durante l'esportazione.
+- Corretto il rischio di perdere selezioni di palloni, testi, frecce o multi-selezioni.
+- Nessuna modifica al contenuto degli schemi.

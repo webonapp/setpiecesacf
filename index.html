@@ -1775,6 +1775,18 @@ body.is-dragging .player.selected{
   background:rgba(83,170,255,.72);
 }
 
+
+/* v164: export stabile */
+body.export-in-progress{
+  cursor:progress;
+}
+body.export-in-progress .board-shell,
+body.export-in-progress .touch-command-bar,
+body.export-in-progress .leftbar,
+body.export-in-progress .rightbar{
+  pointer-events:none!important;
+}
+
 </style>
 
 <script async src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
@@ -2207,7 +2219,7 @@ body.is-dragging .player.selected{
 <input type="file" id="projectFile" accept=".json" hidden>
 
 <script>
-const STORAGE_KEY="setPieceBoardPro_v163";
+const STORAGE_KEY="setPieceBoardPro_v164";
 
 function safeStorageGet(key){
   try{
@@ -6471,6 +6483,76 @@ async function captureCurrentScheme(){
   });
 }
 
+
+function snapshotExportUiState(){
+  return {
+    currentPage,
+    selectedPlayers:new Set(selectedPlayers),
+    selectedRosterPlayers:new Set(selectedRosterPlayers),
+    selectedDrawing,
+    selectedDrawings:new Set(selectedDrawings),
+    selectedBall,
+    selectedBalls:new Set(selectedBalls),
+    selectedText,
+    selectedTexts:new Set(selectedTexts)
+  };
+}
+
+function clearExportSelections(){
+  selectedPlayers.clear();
+  selectedRosterPlayers.clear();
+  selectedDrawing=null;
+  selectedDrawings.clear();
+  selectedBall=null;
+  selectedBalls.clear();
+  selectedText=null;
+  selectedTexts.clear();
+
+  refreshSelectionVisuals();
+  refreshObjectSelectionVisuals();
+  renderBalls();
+  renderTexts();
+  renderDrawings();
+  syncDrawingControls();
+}
+
+function restoreExportUiState(snapshot){
+  if(!snapshot)return;
+
+  currentPage=Math.max(
+    0,
+    Math.min(
+      state.pages.length-1,
+      Number(snapshot.currentPage)||0
+    )
+  );
+
+  selectedPlayers=new Set(snapshot.selectedPlayers||[]);
+  selectedRosterPlayers=new Set(snapshot.selectedRosterPlayers||[]);
+  selectedDrawing=snapshot.selectedDrawing??null;
+  selectedDrawings=new Set(snapshot.selectedDrawings||[]);
+  selectedBall=snapshot.selectedBall??null;
+  selectedBalls=new Set(snapshot.selectedBalls||[]);
+  selectedText=snapshot.selectedText??null;
+  selectedTexts=new Set(snapshot.selectedTexts||[]);
+
+  renderAll();
+  refreshSelectionVisuals();
+  refreshObjectSelectionVisuals();
+  renderBalls();
+  renderTexts();
+  renderDrawings();
+  syncDrawingControls();
+}
+
+async function nextStableRender(){
+  await new Promise(resolve=>
+    requestAnimationFrame(()=>
+      requestAnimationFrame(resolve)
+    )
+  );
+}
+
 function safeFileName(name){
   return String(name||"schema")
     .normalize("NFD")
@@ -6480,54 +6562,56 @@ function safeFileName(name){
 }
 
 document.getElementById("exportPng").addEventListener("click",async()=>{
+  const uiSnapshot=snapshotExportUiState();
+
   try{
+    document.body.classList.add("export-in-progress");
     setStatus("Creazione PNG...");
-    const previousPlayers=new Set(selectedPlayers);
-    const previousDrawing=selectedDrawing;
-    selectedPlayers.clear();
-    selectedDrawing=null;
-    selectedBall=null;
-    selectedText=null;
-    selectedRosterPlayers.clear();
-    refreshSelectionVisuals();
-    renderBalls();
-    renderDrawings();
-    syncDrawingControls();
+    clearExportSelections();
+    await nextStableRender();
 
     const canvas=await captureCurrentScheme();
     const link=document.createElement("a");
+
     link.download=safeFileName(page().title)+".png";
     link.href=canvas.toDataURL("image/png",1);
+    link.rel="noopener";
     link.click();
 
-    selectedPlayers=previousPlayers;
-    selectedDrawing=previousDrawing;
-    refreshSelectionVisuals();
-    renderDrawings();
     setStatus("PNG esportato");
   }catch(err){
     console.error(err);
-    alert("Impossibile esportare il PNG. Verifica la connessione internet e riprova.");
+    alert(
+      "Impossibile esportare il PNG. "+
+      "Verifica la connessione internet e riprova."
+    );
+  }finally{
+    restoreExportUiState(uiSnapshot);
+    document.body.classList.remove("export-in-progress");
   }
 });
 
 document.getElementById("exportPdf").addEventListener("click",async()=>{
-  try{
-    if(!window.jspdf?.jsPDF)throw new Error("Libreria PDF non disponibile");
-    setStatus("Creazione PDF...");
+  const uiSnapshot=snapshotExportUiState();
 
-    const oldPage=currentPage;
-    const previousPlayers=new Set(selectedPlayers);
-    const previousDrawing=selectedDrawing;
-    selectedPlayers.clear();
-    selectedDrawing=null;
+  try{
+    document.body.classList.add("export-in-progress");
+    if(!window.jspdf?.jsPDF){
+      throw new Error("Libreria PDF non disponibile");
+    }
+
+    setStatus("Creazione PDF...");
+    clearExportSelections();
 
     const {jsPDF}=window.jspdf;
-    const pdf=new jsPDF({orientation:"landscape",unit:"mm",format:"a4"});
+    const pdf=new jsPDF({
+      orientation:"landscape",
+      unit:"mm",
+      format:"a4"
+    });
+
     const pageWidth=297;
     const pageHeight=210;
-
-    // PDF più vicino alla resa del PNG: margini ridotti e immagine più grande.
     const sideMargin=5;
     const bottomMargin=5;
     const titleY=8.5;
@@ -6538,34 +6622,53 @@ document.getElementById("exportPdf").addEventListener("click",async()=>{
     for(let i=0;i<state.pages.length;i++){
       currentPage=i;
       renderAll();
-      await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+      clearExportSelections();
+      await nextStableRender();
 
       const canvas=await captureCurrentScheme();
       const imgData=canvas.toDataURL("image/png",1);
-      const ratio=Math.min(maxW/canvas.width,maxH/canvas.height);
+      const ratio=Math.min(
+        maxW/canvas.width,
+        maxH/canvas.height
+      );
       const w=canvas.width*ratio;
-      const h=canvas.height*ratio;
+      const imageHeight=canvas.height*ratio;
       const x=(pageWidth-w)/2;
 
-      if(i>0)pdf.addPage("a4","landscape");
+      if(i>0){
+        pdf.addPage("a4","landscape");
+      }
+
       pdf.setFont("helvetica","bold");
       pdf.setFontSize(15);
-      pdf.text(state.pages[i].title||`Schema ${i+1}`,sideMargin,titleY);
-      pdf.addImage(imgData,"PNG",x,imageTop,w,h,undefined,"NONE");
+      pdf.text(
+        state.pages[i].title||`Schema ${i+1}`,
+        sideMargin,
+        titleY
+      );
+      pdf.addImage(
+        imgData,
+        "PNG",
+        x,
+        imageTop,
+        w,
+        imageHeight,
+        undefined,
+        "NONE"
+      );
     }
 
     pdf.save("ACF_Fiorentina_Schemi_Palle_Inattive.pdf");
-
-    currentPage=oldPage;
-    selectedPlayers=previousPlayers;
-    selectedDrawing=previousDrawing;
-    renderAll();
-    refreshSelectionVisuals();
-    renderDrawings();
     setStatus("PDF esportato");
   }catch(err){
     console.error(err);
-    alert("Impossibile esportare il PDF. Verifica la connessione internet e riprova.");
+    alert(
+      "Impossibile esportare il PDF. "+
+      "Verifica la connessione internet e riprova."
+    );
+  }finally{
+    restoreExportUiState(uiSnapshot);
+    document.body.classList.remove("export-in-progress");
   }
 });
 
@@ -7918,7 +8021,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v163",
+    appVersion:"v164",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -8877,7 +8980,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=163",
+        "./service-worker.js?v=164",
         { updateViaCache: "none" }
       );
 
