@@ -1734,6 +1734,16 @@ body.is-dragging .player.selected{
   }
 }
 
+
+/* v161: resa deterministica di frecce e forme */
+#drawingsLayer line,
+#drawingsLayer path,
+#drawingsLayer rect,
+#drawingsLayer circle,
+#drawingsLayer ellipse{
+  vector-effect:non-scaling-stroke;
+}
+
 </style>
 
 <script async src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
@@ -2159,7 +2169,7 @@ body.is-dragging .player.selected{
 <input type="file" id="projectFile" accept=".json" hidden>
 
 <script>
-const STORAGE_KEY="setPieceBoardPro_v160";
+const STORAGE_KEY="setPieceBoardPro_v161";
 
 function safeStorageGet(key){
   try{
@@ -4968,6 +4978,61 @@ document.getElementById("textEditorModal").addEventListener("keydown",e=>{
   }
 });
 
+
+function normalizeDrawingStrokeWidth(value){
+  const numeric=Number(value);
+  if(!Number.isFinite(numeric))return 4;
+  return Math.max(1,Math.min(20,numeric));
+}
+
+function getDrawingDashArray(d){
+  const style=Math.round(
+    Math.max(0,Math.min(3,Number(d?.dashStyle)||0))
+  );
+
+  if(style===0)return "";
+
+  /*
+    v161: il pattern è calcolato dalla scala logica del disegno,
+    non dalla resa casuale del browser/SVG.
+  */
+  const width=normalizeDrawingStrokeWidth(d?.width);
+
+  if(style===3){
+    const dot=Math.max(1.25,width*.55);
+    const gap=Math.max(5,width*2.15);
+    return `${dot} ${gap}`;
+  }
+
+  const dash=Math.max(9,width*3.4);
+  const gap=Math.max(6,width*2.05);
+  return `${dash} ${gap}`;
+}
+
+function applyDrawingStrokeStyle(element,d){
+  if(!element || !d)return;
+
+  const width=normalizeDrawingStrokeWidth(d.width);
+  element.setAttribute("stroke-width",String(width));
+  element.setAttribute("stroke-linecap","round");
+  element.setAttribute("stroke-linejoin","round");
+
+  const dashArray=getDrawingDashArray(d);
+  if(dashArray){
+    element.setAttribute("stroke-dasharray",dashArray);
+    element.setAttribute("stroke-dashoffset","0");
+  }else{
+    element.removeAttribute("stroke-dasharray");
+    element.removeAttribute("stroke-dashoffset");
+  }
+
+  /*
+    Mantiene lo spessore visivo coerente durante resize,
+    campo intero e trasformazioni SVG.
+  */
+  element.setAttribute("vector-effect","non-scaling-stroke");
+}
+
 function renderDrawings(){
   const svg=document.getElementById("drawLayer");
   if(!svg)return;
@@ -5900,6 +5965,9 @@ document.getElementById("notes").addEventListener("input",e=>{
 
 
 function applyDrawingStyleChange(property,value){
+  if(property==="width"){
+    value=normalizeDrawingStrokeWidth(value);
+  }
   if(property==="dashStyle"){
     value=Math.round(Math.max(0,Math.min(3,Number(value)||0)));
   }
@@ -7578,7 +7646,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v160",
+    appVersion:"v161",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -8527,7 +8595,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=160",
+        "./service-worker.js?v=161",
         { updateViaCache: "none" }
       );
 

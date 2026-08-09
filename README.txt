@@ -452,3 +452,17 @@ Frecce professionali, fase 1
 - Nuove frecce ereditano correttamente l'ultimo preset scelto
 - Migliorata usabilità touch su iPad
 - Nessuna modifica alla geometria o allo spessore delle frecce esistenti
+
+
+ROADMAP 20 PASSAGGI - PASSAGGIO 13/20 - v161
+Frecce professionali, fase 2
+
+- Spessore delle frecce normalizzato e deterministico
+- Eliminata la dipendenza della resa dello spessore dal resize SVG
+- Aggiunto vector-effect non-scaling-stroke
+- Pattern Continua / Tratteggio / Puntinata calcolato in modo stabile
+- Tratteggio ora dipende solo dallo stile scelto e dallo spessore impostato
+- stroke-linecap e stroke-linejoin uniformati
+- Disegni esistenti normalizzati al caricamento
+- Migliorata coerenza tra vista normale, Campo intero e iPad
+- Nessuna modifica intenzionale a posizioni, colori o contenuto degli schemi
