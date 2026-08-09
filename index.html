@@ -2023,7 +2023,7 @@ body.field-view-mode #board{
 <input type="file" id="projectFile" accept=".json" hidden>
 
 <script>
-const STORAGE_KEY="setPieceBoardPro_v150";
+const STORAGE_KEY="setPieceBoardPro_v151";
 
 function safeStorageGet(key){
   try{
@@ -3629,12 +3629,7 @@ function renderPlayers(){
 }
 
 function clearObjectSelections(){
-  selectedBalls.clear();
-  selectedTexts.clear();
-  selectedDrawings.clear();
-  selectedBall=null;
-  selectedText=null;
-  selectedDrawing=null;
+  clearSelectionKinds();
 }
 
 function refreshObjectSelectionVisuals(){
@@ -3645,7 +3640,11 @@ function refreshObjectSelectionVisuals(){
     el.classList.toggle("selected-object",selectedTexts.has(Number(el.dataset.index)));
   });
   document.querySelectorAll("[data-drawing-index]").forEach(el=>{
-    el.classList.toggle("drawing-group-selected",selectedDrawings.has(Number(el.dataset.drawingIndex)));
+    const index=Number(el.dataset.drawingIndex);
+    const isSelected=selectedDrawings.has(index);
+
+    el.classList.toggle("drawing-group-selected",isSelected);
+    el.classList.toggle("drawing-selected",selectedDrawing===index);
   });
 }
 
@@ -3710,6 +3709,79 @@ function selectObjectKind(kind,index,additive=false){
 
   set.add(index);
   config.setPrimary(index);
+  return true;
+}
+
+
+function startLogicalBoardDrag({
+  event,
+  element,
+  onDelta,
+  onFinish,
+  beginVisual=true
+}){
+  const board=document.getElementById("board");
+  const rect=board?.getBoundingClientRect();
+
+  if(!board || !rect || !rect.width || !rect.height)return false;
+
+  const pointerId=event.pointerId;
+  const startX=event.clientX;
+  const startY=event.clientY;
+
+  dragSnapshot=snapshotState();
+
+  if(beginVisual){
+    beginSmoothDrag(element,pointerId);
+  }
+
+  const updater=createRafDragUpdater(moveEvent=>{
+    const dx=(moveEvent.clientX-startX)/rect.width*1000;
+    const dy=(moveEvent.clientY-startY)/rect.height*620;
+
+    if(typeof onDelta==="function"){
+      onDelta(dx,dy,moveEvent);
+    }
+  });
+
+  let finished=false;
+
+  const cleanup=()=>{
+    window.removeEventListener("pointermove",move);
+    window.removeEventListener("pointerup",finish);
+    window.removeEventListener("pointercancel",finish);
+  };
+
+  const move=moveEvent=>{
+    if(moveEvent.pointerId!==pointerId)return;
+    moveEvent.preventDefault();
+    updater.schedule(moveEvent);
+  };
+
+  const finish=endEvent=>{
+    if(finished || endEvent.pointerId!==pointerId)return;
+    finished=true;
+
+    updater.flush();
+    cleanup();
+
+    if(beginVisual){
+      endSmoothDrag(element,pointerId);
+    }
+
+    commitDragHistory();
+
+    if(typeof onFinish==="function"){
+      onFinish(endEvent);
+    }
+
+    save(false);
+  };
+
+  window.addEventListener("pointermove",move,{passive:false});
+  window.addEventListener("pointerup",finish);
+  window.addEventListener("pointercancel",finish);
+
   return true;
 }
 
@@ -4392,37 +4464,19 @@ function renderDrawings(){
       e.stopPropagation();
 
       const additive=e.metaKey||e.ctrlKey;
-
-      if(additive){
-        toggleSetSelection(selectedDrawings,i,true);
-      }else if(!selectedDrawings.has(i)){
-        selectedDrawings.clear();
-        selectedDrawings.add(i);
-      }
-
-      if(!additive){
-        selectedPlayers.clear();
-        selectedRosterPlayers.clear();
-        selectedBalls.clear();
-        selectedTexts.clear();
-      }
-
-      selectedDrawing=selectedDrawings.has(i)?i:null;
-      selectedBall=null;
-      selectedText=null;
+      const selected=selectObjectKind("drawing",i,additive);
 
       refreshSelectionVisuals();
       syncDrawingControls();
       renderDrawings();
       refreshObjectSelectionVisuals();
 
-      if(!selectedDrawings.has(i))return;
+      if(!selected || !selectedDrawings.has(i))return;
 
-      const board=document.getElementById("board");
-      const rect=board.getBoundingClientRect();
-      const pointerId=e.pointerId;
-      const startPoint={x:e.clientX,y:e.clientY};
-      const movingIndexes=[...selectedDrawings].filter(index=>page().drawings[index]);
+      const movingIndexes=[...selectedDrawings].filter(
+        index=>page().drawings[index]
+      );
+
       const initial=new Map(
         movingIndexes.map(index=>[
           index,
@@ -4430,48 +4484,38 @@ function renderDrawings(){
         ])
       );
 
-      dragSnapshot=snapshotState();
-      beginSmoothDrag(hit,pointerId);
+      startLogicalBoardDrag({
+        event:e,
+        element:hit,
+        onDelta:(dx,dy)=>{
+          movingIndexes.forEach(index=>{
+            const original=initial.get(index);
+            const current=page().drawings[index];
+            if(!original||!current)return;
 
-      const updater=createRafDragUpdater(ev=>{
-        if(!rect.width||!rect.height)return;
+            ["x1","x2","c1x","c2x"].forEach(key=>{
+              if(Number.isFinite(original[key])){
+                current[key]=original[key]+dx;
+              }
+            });
 
-        const dx=(ev.clientX-startPoint.x)/rect.width*1000;
-        const dy=(ev.clientY-startPoint.y)/rect.height*620;
+            ["y1","y2","c1y","c2y"].forEach(key=>{
+              if(Number.isFinite(original[key])){
+                current[key]=original[key]+dy;
+              }
+            });
 
-        movingIndexes.forEach(index=>{
-          const original=initial.get(index);
-          const current=page().drawings[index];
-          if(!original||!current)return;
-
-          ["x1","x2","c1x","c2x"].forEach(key=>{
-            if(Number.isFinite(original[key]))current[key]=original[key]+dx;
+            clampDrawing(current);
           });
-          ["y1","y2","c1y","c2y"].forEach(key=>{
-            if(Number.isFinite(original[key]))current[key]=original[key]+dy;
-          });
 
-          clampDrawing(current);
-        });
-
-        renderDrawings();
+          renderDrawings();
+        },
+        onFinish:()=>{
+          renderDrawings();
+          refreshObjectSelectionVisuals();
+          syncDrawingControls();
+        }
       });
-
-      const move=ev=>updater.schedule(ev);
-      const finish=()=>{
-        updater.flush();
-        window.removeEventListener("pointermove",move);
-        window.removeEventListener("pointerup",finish);
-        window.removeEventListener("pointercancel",finish);
-        endSmoothDrag(hit,pointerId);
-        commitDragHistory();
-        renderDrawings();
-        refreshObjectSelectionVisuals();
-      };
-
-      window.addEventListener("pointermove",move,{passive:true});
-      window.addEventListener("pointerup",finish,{once:true});
-      window.addEventListener("pointercancel",finish,{once:true});
     });
   };
 
@@ -4817,6 +4861,15 @@ function getCurrentDrawingWidth(){
 }
 
 function syncDrawingControls(){
+  if(
+    selectedDrawing!==null &&
+    !selectedDrawings.has(selectedDrawing)
+  ){
+    selectedDrawing=selectedDrawings.size
+      ? [...selectedDrawings][0]
+      : null;
+  }
+
   const d=selectedDrawing!==null?page().drawings[selectedDrawing]:null;
   const src=d||drawingDefaults;
   const color=document.getElementById("drawingColor");
@@ -6763,7 +6816,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v150",
+    appVersion:"v151",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),

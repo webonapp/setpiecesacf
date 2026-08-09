@@ -308,3 +308,17 @@ Motore grafico comune, fase 1
 - clearAllSelections ora aggiorna anche i testi
 - Nessuna modifica intenzionale al layout o alle coordinate degli schemi
 - Frecce e maglie restano sul motore precedente in questa release per ridurre il rischio
+
+
+ROADMAP 20 PASSAGGI - PASSAGGIO 03/20 - v151
+Motore grafico comune, fase 2
+
+- Frecce dritte, frecce curve, cerchi e rettangoli migrati al motore comune di selezione
+- Drag dei disegni migrato a un gestore Pointer condiviso
+- Coordinate logiche 1000×620 gestite da un unico helper
+- Cleanup centralizzato di pointermove / pointerup / pointercancel
+- Multi-selezione dei disegni mantenuta
+- Selezione primaria e selezione multipla ora restano sincronizzate
+- Undo e salvataggio del drag seguono lo stesso ciclo di palloni e testi
+- Nessuna modifica intenzionale al layout o alla resa grafica
+- Maglie restano sul motore storico per un'ultima migrazione separata
