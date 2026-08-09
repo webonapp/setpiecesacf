@@ -577,3 +577,11 @@ v169 - Correzioni richieste + audit v168
 - Corretto bug self-test storage v168: ora rileva realmente un fallimento di localStorage.
 - Recovery reso coerente con i wrapper safeStorageGet/Set/Remove.
 - Nessuna modifica agli schemi esistenti o alla resa delle frecce già salvate.
+
+
+v170
+- Eliminato completamente il menu a tendina dei preset di visualizzazione dall'interfaccia.
+- Rimossi i relativi listener per evitare errori su elemento DOM assente.
+- SNAP impostato attivo di default per nuovi progetti e stati privi di preferenza salvata.
+- I progetti che hanno già una scelta SNAP esplicita continuano a rispettarla.
+- Migrazione v169 -> v170 mantenuta.
