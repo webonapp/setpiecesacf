@@ -1630,6 +1630,15 @@ body.is-dragging .player.selected{
   -webkit-touch-callout:none!important;
 }
 
+
+/* v153: maniglie grafiche ottimizzate per Pointer Events */
+.drawing-handle{
+  touch-action:none!important;
+  -webkit-user-select:none!important;
+  user-select:none!important;
+  -webkit-touch-callout:none!important;
+}
+
 </style>
 
 <script async src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
@@ -2032,7 +2041,7 @@ body.is-dragging .player.selected{
 <input type="file" id="projectFile" accept=".json" hidden>
 
 <script>
-const STORAGE_KEY="setPieceBoardPro_v152";
+const STORAGE_KEY="setPieceBoardPro_v153";
 
 function safeStorageGet(key){
   try{
@@ -3815,8 +3824,6 @@ function startLogicalBoardDrag({
     if(typeof onFinish==="function"){
       onFinish(endEvent);
     }
-
-    save(false);
   };
 
   window.addEventListener("pointermove",move,{passive:false});
@@ -3889,7 +3896,6 @@ function startBoardObjectDrag({
     commitDragHistory();
 
     if(typeof onFinish==="function")onFinish(endEvent);
-    save(false);
   };
 
   window.addEventListener("pointermove",move,{passive:false});
@@ -4438,6 +4444,19 @@ function renderDrawings(){
 
   const ensureCurveControls=d=>{
     if(d.type!=="curve")return;
+
+    ["c1x","c2x"].forEach(key=>{
+      if(Number.isFinite(Number(d[key]))){
+        d[key]=Math.max(0,Math.min(1000,Number(d[key])));
+      }
+    });
+
+    ["c1y","c2y"].forEach(key=>{
+      if(Number.isFinite(Number(d[key]))){
+        d[key]=Math.max(0,Math.min(620,Number(d[key])));
+      }
+    });
+
     if([d.c1x,d.c1y,d.c2x,d.c2y].every(Number.isFinite))return;
 
     const dx=d.x2-d.x1;
@@ -4491,7 +4510,11 @@ function renderDrawings(){
   };
 
   const addHandle=(g,d,xKey,yKey,radius=7)=>{
-    const handle=document.createElementNS("http://www.w3.org/2000/svg","circle");
+    const handle=document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "circle"
+    );
+
     handle.classList.add("drawing-handle");
     handle.setAttribute("cx",d[xKey]);
     handle.setAttribute("cy",d[yKey]);
@@ -4502,31 +4525,31 @@ function renderDrawings(){
       e.preventDefault();
       e.stopPropagation();
 
-      dragSnapshot=snapshotState();
-      const pointerId=e.pointerId;
-      beginSmoothDrag(handle,pointerId);
+      const startX=finiteNumber(d[xKey],0);
+      const startY=finiteNumber(d[yKey],0);
 
-      const updater=createRafDragUpdater(ev=>{
-        const p=boardPoint(ev);
-        d[xKey]=Math.max(0,Math.min(1000,p.x));
-        d[yKey]=Math.max(0,Math.min(620,p.y));
-        renderDrawings();
+      startLogicalBoardDrag({
+        event:e,
+        element:handle,
+        onDelta:(dx,dy)=>{
+          d[xKey]=Math.max(
+            0,
+            Math.min(1000,startX+dx)
+          );
+
+          d[yKey]=Math.max(
+            0,
+            Math.min(620,startY+dy)
+          );
+
+          renderDrawings();
+        },
+        onFinish:()=>{
+          renderDrawings();
+          refreshObjectSelectionVisuals();
+          syncDrawingControls();
+        }
       });
-
-      const move=ev=>updater.schedule(ev);
-      const finish=()=>{
-        updater.flush();
-        window.removeEventListener("pointermove",move);
-        window.removeEventListener("pointerup",finish);
-        window.removeEventListener("pointercancel",finish);
-        endSmoothDrag(handle,pointerId);
-        commitDragHistory();
-        renderDrawings();
-      };
-
-      window.addEventListener("pointermove",move,{passive:true});
-      window.addEventListener("pointerup",finish,{once:true});
-      window.addEventListener("pointercancel",finish,{once:true});
     });
 
     g.appendChild(handle);
@@ -4689,7 +4712,11 @@ function renderDrawings(){
         const h4={x2:d.x2,y1:d.y1};
 
         const addMixedHandle=(xKey,yKey,xValue,yValue)=>{
-          const handle=document.createElementNS("http://www.w3.org/2000/svg","circle");
+          const handle=document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "circle"
+          );
+
           handle.classList.add("drawing-handle");
           handle.setAttribute("cx",xValue);
           handle.setAttribute("cy",yValue);
@@ -4700,31 +4727,31 @@ function renderDrawings(){
             e.preventDefault();
             e.stopPropagation();
 
-            dragSnapshot=snapshotState();
-            const pointerId=e.pointerId;
-            beginSmoothDrag(handle,pointerId);
+            const startX=finiteNumber(d[xKey],0);
+            const startY=finiteNumber(d[yKey],0);
 
-            const updater=createRafDragUpdater(ev=>{
-              const p=boardPoint(ev);
-              d[xKey]=Math.max(0,Math.min(1000,p.x));
-              d[yKey]=Math.max(0,Math.min(620,p.y));
-              renderDrawings();
+            startLogicalBoardDrag({
+              event:e,
+              element:handle,
+              onDelta:(dx,dy)=>{
+                d[xKey]=Math.max(
+                  0,
+                  Math.min(1000,startX+dx)
+                );
+
+                d[yKey]=Math.max(
+                  0,
+                  Math.min(620,startY+dy)
+                );
+
+                renderDrawings();
+              },
+              onFinish:()=>{
+                renderDrawings();
+                refreshObjectSelectionVisuals();
+                syncDrawingControls();
+              }
             });
-
-            const move=ev=>updater.schedule(ev);
-            const finish=()=>{
-              updater.flush();
-              window.removeEventListener("pointermove",move);
-              window.removeEventListener("pointerup",finish);
-              window.removeEventListener("pointercancel",finish);
-              endSmoothDrag(handle,pointerId);
-              commitDragHistory();
-              renderDrawings();
-            };
-
-            window.addEventListener("pointermove",move,{passive:true});
-            window.addEventListener("pointerup",finish,{once:true});
-            window.addEventListener("pointercancel",finish,{once:true});
           });
 
           g.appendChild(handle);
@@ -6892,7 +6919,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v152",
+    appVersion:"v153",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),

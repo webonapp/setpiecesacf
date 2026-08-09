@@ -337,3 +337,18 @@ Motore grafico comune, fase 3
 - Cmd/Ctrl continua a gestire la multiselezione senza avviare drag accidentali
 - Doppio tap/click rapido degli avversari preservato
 - Palloni, testi, frecce, forme e maglie ora condividono la stessa base di selezione/drag
+
+
+ROADMAP 20 PASSAGGI - PASSAGGIO 05/20 - v153
+Motore grafico comune, completamento
+
+- Maniglie di frecce dritte migrate al motore Pointer Drag condiviso
+- Maniglie delle frecce curve migrate al motore condiviso
+- Control point Bézier delle curve gestiti dallo stesso sistema
+- Maniglie di cerchi e rettangoli migrate al motore condiviso
+- Un solo snapshot Undo per ogni modifica tramite maniglia
+- Eliminati salvataggi duplicati al termine del drag
+- Coordinate delle curve normalizzate per evitare valori fuori campo
+- Touch handling delle maniglie migliorato su iPad
+- Motore grafico comune ora copre maglie, palloni, testi, frecce, curve e forme
+- Nessuna modifica intenzionale al layout o alla grafica del progetto
