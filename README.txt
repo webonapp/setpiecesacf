@@ -377,3 +377,19 @@ Undo/Redo robusto, fase 2
 - Undo/Redo chiudono regolazioni aperte in sicurezza.
 - Stato accessibile Undo/Redo sincronizzato.
 - Cache service worker aggiornata a v155.
+
+
+ROADMAP 20 PASSAGGI - PASSAGGIO 08/20 - v156
+Architettura modalità, fase 1
+
+- Separata la logica di visualizzazione in tre livelli:
+  1. base globale della modalità
+  2. override dello schema corrente
+  3. valore del singolo giocatore
+- Centralizzata la lettura di nome, numero, cerchio e linea
+- Centralizzata la scrittura degli override dello schema
+- PANCHINA / SPOGLIATOIO / PREPARAZIONE mantengono il comportamento esistente
+- I flag locali continuano a modificare soltanto lo schema corrente
+- Override non validi vengono ripuliti automaticamente al caricamento
+- Aggiunto controllo di integrità degli override per ogni schema
+- Nessuna modifica intenzionale al layout o alla resa grafica

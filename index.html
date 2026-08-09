@@ -2042,7 +2042,7 @@ body.is-dragging .player.selected{
 <input type="file" id="projectFile" accept=".json" hidden>
 
 <script>
-const STORAGE_KEY="setPieceBoardPro_v155";
+const STORAGE_KEY="setPieceBoardPro_v156";
 
 function safeStorageGet(key){
   try{
@@ -2577,6 +2577,28 @@ function normalizePageRecord(projectPage,index,rosterLength){
     safe.playerDisplayOverrides={};
   }
 
+  Object.keys(safe.playerDisplayOverrides).forEach(key=>{
+    const override=safe.playerDisplayOverrides[key];
+
+    if(!override || typeof override!=="object"){
+      delete safe.playerDisplayOverrides[key];
+      return;
+    }
+
+    Object.keys(override).forEach(property=>{
+      if(
+        PLAYER_DISPLAY_PROPERTIES.has(property) &&
+        typeof override[property]!=="boolean"
+      ){
+        delete override[property];
+      }
+    });
+
+    if(!Object.keys(override).length){
+      delete safe.playerDisplayOverrides[key];
+    }
+  });
+
   return safe;
 }
 
@@ -2628,7 +2650,9 @@ function assertProjectIntegrity(projectState){
     projectPage.positions.length===projectState.roster.length &&
     Array.isArray(projectPage.drawings) &&
     Array.isArray(projectPage.balls) &&
-    Array.isArray(projectPage.texts)
+    Array.isArray(projectPage.texts) &&
+    projectPage.playerDisplayOverrides &&
+    typeof projectPage.playerDisplayOverrides==="object"
   );
 }
 
@@ -2883,14 +2907,101 @@ function getPlayerDisplayOverride(index){
   return overrides[key];
 }
 
-function getEffectivePlayerDisplayValue(index,property,fallback){
-  const override=getPlayerDisplayOverride(index);
 
-  if(typeof override[property]==="boolean"){
-    return override[property];
+const PLAYER_DISPLAY_PROPERTIES=new Set([
+  "showLastName",
+  "showShirtNumber",
+  "showChestCircle",
+  "showOpponentBlankLine"
+]);
+
+function getGlobalPlayerDisplayBase(player,property){
+  if(!player || !PLAYER_DISPLAY_PROPERTIES.has(property))return undefined;
+
+  if(property==="showChestCircle"){
+    return player.team==="away"
+      ? state.awayChestCircle===true
+      : state.homeChestCircle!==false;
   }
 
-  return fallback;
+  if(property==="showLastName"){
+    if(state.presentationMode==="locker")return false;
+    if(state.presentationMode==="bench")return true;
+  }
+
+  if(property==="showShirtNumber"){
+    if(state.presentationMode==="locker")return false;
+    if(state.presentationMode==="bench")return true;
+  }
+
+  if(property==="showOpponentBlankLine"){
+    if(state.presentationMode==="locker")return true;
+  }
+
+  return player[property];
+}
+
+function getPagePlayerDisplayOverride(index,property){
+  const overrides=page()?.playerDisplayOverrides;
+  if(!overrides || typeof overrides!=="object")return undefined;
+
+  const player=state.roster[index];
+  if(!player)return undefined;
+
+  const key=String(player.id || index);
+  const override=overrides[key];
+
+  if(!override || typeof override!=="object")return undefined;
+  return override[property];
+}
+
+function getPlayerDisplayValue(index,property,fallback){
+  const player=state.roster[index];
+  if(!player)return fallback;
+
+  const pageOverride=getPagePlayerDisplayOverride(index,property);
+  if(typeof pageOverride==="boolean")return pageOverride;
+
+  const globalBase=getGlobalPlayerDisplayBase(player,property);
+  if(typeof globalBase==="boolean")return globalBase;
+
+  return typeof fallback==="boolean"
+    ? fallback
+    : Boolean(player[property]);
+}
+
+function setPagePlayerDisplayValue(index,property,value){
+  if(!PLAYER_DISPLAY_PROPERTIES.has(property))return false;
+
+  const player=state.roster[index];
+  if(!player)return false;
+
+  const override=getPlayerDisplayOverride(index);
+  override[property]=Boolean(value);
+  return true;
+}
+
+function clearPagePlayerDisplayValue(index,property){
+  const player=state.roster[index];
+  const overrides=page()?.playerDisplayOverrides;
+
+  if(!player || !overrides || typeof overrides!=="object")return false;
+
+  const key=String(player.id || index);
+  const override=overrides[key];
+  if(!override || typeof override!=="object")return false;
+
+  delete override[property];
+
+  if(!Object.keys(override).length){
+    delete overrides[key];
+  }
+
+  return true;
+}
+
+function getEffectivePlayerDisplayValue(index,property,fallback){
+  return getPlayerDisplayValue(index,property,fallback);
 }
 
 function getSelectedPlayerIndexesForNumberToggle(){
@@ -6932,8 +7043,11 @@ document.getElementById("homeChestCircleToggle").addEventListener("change",e=>{
 
   if(ids.length){
     ids.forEach(index=>{
-      const override=getPlayerDisplayOverride(index);
-      override.showChestCircle=e.target.checked;
+      setPagePlayerDisplayValue(
+        index,
+        "showChestCircle",
+        e.target.checked
+      );
     });
 
     setStatus(e.target.checked
@@ -6959,8 +7073,11 @@ document.getElementById("awayChestCircleToggle").addEventListener("change",e=>{
 
   if(ids.length){
     ids.forEach(index=>{
-      const override=getPlayerDisplayOverride(index);
-      override.showChestCircle=e.target.checked;
+      setPagePlayerDisplayValue(
+        index,
+        "showChestCircle",
+        e.target.checked
+      );
     });
 
     setStatus(e.target.checked
@@ -7075,7 +7192,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v155",
+    appVersion:"v156",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -8016,7 +8133,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=155",
+        "./service-worker.js?v=156",
         { updateViaCache: "none" }
       );
 
