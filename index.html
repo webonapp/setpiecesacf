@@ -2042,7 +2042,7 @@ body.is-dragging .player.selected{
 <input type="file" id="projectFile" accept=".json" hidden>
 
 <script>
-const STORAGE_KEY="setPieceBoardPro_v157";
+const STORAGE_KEY="setPieceBoardPro_v158";
 
 function safeStorageGet(key){
   try{
@@ -2612,6 +2612,17 @@ function normalizeProjectState(projectState){
     safe.presentationMode="normal";
   }
 
+  safe.viewPreset=normalizeViewPresetId(
+    safe.viewPreset ||
+    (
+      safe.presentationMode==="bench"
+        ? "bench"
+        : safe.presentationMode==="locker"
+          ? "locker"
+          : "preparation"
+    )
+  );
+
   safe.homeChestCircle=
     typeof safe.homeChestCircle==="boolean" ? safe.homeChestCircle : true;
   safe.awayChestCircle=
@@ -2644,6 +2655,7 @@ function assertProjectIntegrity(projectState){
   if(!projectState || typeof projectState!=="object")return false;
   if(!Array.isArray(projectState.roster))return false;
   if(!Array.isArray(projectState.pages) || !projectState.pages.length)return false;
+  if(!VIEW_PRESETS[normalizeViewPresetId(projectState.viewPreset)])return false;
 
   return projectState.pages.every(projectPage=>
     Array.isArray(projectPage.positions) &&
@@ -2908,6 +2920,119 @@ function getPlayerDisplayOverride(index){
 }
 
 
+
+
+const VIEW_PRESETS={
+  preparation:{
+    id:"preparation",
+    label:"Preparazione",
+    presentationMode:"normal",
+    fieldView:false,
+    description:"Modifica libera dello schema"
+  },
+  bench:{
+    id:"bench",
+    label:"Panchina",
+    presentationMode:"bench",
+    fieldView:false,
+    description:"Nome, numero e cerchio pronti per la panchina"
+  },
+  locker:{
+    id:"locker",
+    label:"Spogliatoio",
+    presentationMode:"locker",
+    fieldView:false,
+    description:"Visualizzazione essenziale per lo spogliatoio"
+  },
+  staff:{
+    id:"staff",
+    label:"Presentazione staff",
+    presentationMode:"normal",
+    fieldView:true,
+    description:"Campo pulito a schermo intero per presentazione"
+  },
+  print:{
+    id:"print",
+    label:"Stampa",
+    presentationMode:"normal",
+    fieldView:false,
+    description:"Base neutra per esportazione e stampa"
+  },
+  analysis:{
+    id:"analysis",
+    label:"Analisi interna",
+    presentationMode:"normal",
+    fieldView:false,
+    description:"Configurazione libera per lavoro interno"
+  }
+};
+
+function normalizeViewPresetId(value){
+  return Object.prototype.hasOwnProperty.call(VIEW_PRESETS,value)
+    ? value
+    : "preparation";
+}
+
+function getViewPreset(id=state.viewPreset){
+  return VIEW_PRESETS[normalizeViewPresetId(id)];
+}
+
+function syncViewPresetFromPresentationMode(){
+  if(state.presentationMode==="bench"){
+    state.viewPreset="bench";
+    return;
+  }
+
+  if(state.presentationMode==="locker"){
+    state.viewPreset="locker";
+    return;
+  }
+
+  if(!["staff","print","analysis"].includes(state.viewPreset)){
+    state.viewPreset="preparation";
+  }
+}
+
+function applyViewPreset(presetId,{
+  recordHistory=true,
+  updateFieldView=true
+}={}){
+  const normalizedId=normalizeViewPresetId(presetId);
+  const preset=VIEW_PRESETS[normalizedId];
+
+  const previousPreset=state.viewPreset;
+  const previousMode=state.presentationMode;
+
+  if(recordHistory){
+    pushHistory();
+  }
+
+  state.viewPreset=normalizedId;
+  state.presentationMode=preset.presentationMode;
+
+  renderPlayers();
+  renderRoster();
+  syncRosterDisplayOptions();
+  syncChestCircleControls();
+  updatePresentationModeButtons();
+
+  if(
+    updateFieldView &&
+    typeof fieldViewMode==="boolean" &&
+    preset.fieldView!==fieldViewMode
+  ){
+    setFieldViewMode(preset.fieldView);
+  }
+
+  save(false);
+
+  return {
+    changed:
+      previousPreset!==state.viewPreset ||
+      previousMode!==state.presentationMode,
+    preset
+  };
+}
 
 const PRESENTATION_MODE_DEFAULTS={
   normal:{
@@ -3433,9 +3558,7 @@ function placeRosterPlayerAtPointer(index,clientX,clientY){
   refreshSelectionVisuals();
   updateLineupCounters();
   save(false);
-  assertPresentationModeNonDestructive(displayOverridesBefore);
-
-  setStatus(
+setStatus(
     `${state.roster[index].lastName||state.roster[index].name||"Giocatore"} aggiunto allo schema`
   );
   return true;
@@ -4190,6 +4313,7 @@ function clearAllSelections(){
 
 
 function updatePresentationModeButtons(){
+  syncViewPresetFromPresentationMode();
   const bench=document.getElementById("benchModeBtn");
   const dressing=document.getElementById("dressingRoomModeBtn");
   const preparation=document.getElementById("preparationModeBtn");
@@ -4199,25 +4323,6 @@ function updatePresentationModeButtons(){
   preparation?.classList.toggle("active",state.presentationMode==="normal");
 }
 
-
-function snapshotPageDisplayOverrides(){
-  return JSON.stringify(
-    state.pages.map(projectPage=>
-      projectPage.playerDisplayOverrides||{}
-    )
-  );
-}
-
-function assertPresentationModeNonDestructive(beforeSnapshot){
-  const afterSnapshot=snapshotPageDisplayOverrides();
-  if(beforeSnapshot!==afterSnapshot){
-    console.warn(
-      "Modalità presentazione ha modificato override locali: ripristino non distruttivo richiesto"
-    );
-    return false;
-  }
-  return true;
-}
 
 function applyGlobalPlayerDisplayMode(mode){
   const normalizedMode=
@@ -4232,10 +4337,14 @@ function applyGlobalPlayerDisplayMode(mode){
     return;
   }
 
-  const displayOverridesBefore=snapshotPageDisplayOverrides();
-
   pushHistory();
   state.presentationMode=normalizedMode;
+  state.viewPreset=
+    normalizedMode==="bench"
+      ? "bench"
+      : normalizedMode==="locker"
+        ? "locker"
+        : "preparation";
 
   /*
     v157: la modalità è un livello di presentazione globale e non
@@ -7237,7 +7346,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v157",
+    appVersion:"v158",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -8178,7 +8287,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=157",
+        "./service-worker.js?v=158",
         { updateViaCache: "none" }
       );
 

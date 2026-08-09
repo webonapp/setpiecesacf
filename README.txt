@@ -408,3 +408,21 @@ Architettura modalità, fase 2
 - I flag locali continuano a funzionare in tutte le modalità
 - Aggiunto controllo interno per verificare che un cambio modalità non alteri gli schemi
 - Nessuna modifica intenzionale al layout o alla grafica
+
+
+ROADMAP 20 PASSAGGI - PASSAGGIO 10/20 - v158
+Preset di visualizzazione, fase 1
+
+- Introdotto un motore centralizzato VIEW_PRESETS
+- Preparati i preset:
+  - Preparazione
+  - Panchina
+  - Spogliatoio
+  - Presentazione staff
+  - Stampa
+  - Analisi interna
+- PANCHINA / SPOGLIATOIO / PREPARAZIONE ora mantengono sincronizzato anche il preset interno
+- Aggiunta proprietà state.viewPreset con migrazione automatica dei progetti esistenti
+- Predisposto il passaggio controllato alla modalità Campo intero per i preset che lo richiederanno
+- Rimossi controlli diagnostici v157 non più necessari
+- Nessuna modifica intenzionale all'interfaccia in questa release
