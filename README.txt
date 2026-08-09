@@ -566,3 +566,14 @@ Finalizzazione e hardening generale
 - Service Worker aggiornato a v168 e attivazione immediata quando supportata.
 - Nessuna modifica intenzionale alla grafica o agli schemi.
 - ROADMAP 20/20 COMPLETATA.
+
+
+v169 - Correzioni richieste + audit v168
+
+- Rimossa la scritta/pulsante visivo "VISTA"; resta il selettore preset.
+- Rifatta la disposizione dei controlli Punta e Tratteggio.
+- Pulsanti frecce confinati correttamente nella sidebar, senza sovrapposizioni.
+- Default nuove frecce: Punta Media (13), Tratteggio Continuo (0).
+- Corretto bug self-test storage v168: ora rileva realmente un fallimento di localStorage.
+- Recovery reso coerente con i wrapper safeStorageGet/Set/Remove.
+- Nessuna modifica agli schemi esistenti o alla resa delle frecce già salvate.
