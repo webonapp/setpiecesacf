@@ -522,3 +522,16 @@ Export e stampa robusti, fase 2
 - Timeout di sicurezza sulle immagini per evitare export bloccati.
 - Controlli fullscreen e guide SNAP esclusi dalla copia esportata.
 - Nessuna modifica ai dati o alla disposizione degli schemi.
+
+
+ROADMAP 20 PASSAGGI - PASSAGGIO 18/20 - v166
+Autosave e recupero sessione
+
+- Aggiunto snapshot di recovery separato dal salvataggio principale.
+- Recovery aggiornato con debounce per non appesantire iPad/Mac.
+- Salvataggio forzato quando l'app passa in background o viene chiusa.
+- Timestamp di aggiornamento aggiunto allo stato progetto.
+- All'avvio viene confrontato il salvataggio normale con il recovery.
+- Se il recovery è più recente, la sessione viene ripristinata automaticamente.
+- Conservata anche la pagina/schema su cui si stava lavorando.
+- Nessuna modifica visiva o ai contenuti degli schemi.

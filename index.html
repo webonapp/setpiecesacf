@@ -2230,7 +2230,7 @@ body.export-clean-view .board-shell{
 <input type="file" id="projectFile" accept=".json" hidden>
 
 <script>
-const STORAGE_KEY="setPieceBoardPro_v165";
+const STORAGE_KEY="setPieceBoardPro_v166";
 
 function safeStorageGet(key){
   try{
@@ -2859,7 +2859,68 @@ function assertProjectIntegrity(projectState){
   );
 }
 
+
+const RECOVERY_STORAGE_KEY="setPieceBoardPro_recovery_v166";
+let recoverySaveTimer=null;
+
+function createRecoverySnapshot(){
+  return {
+    version:"v166",
+    savedAt:Date.now(),
+    currentPage,
+    state:deepClone(state)
+  };
+}
+
+function writeRecoverySnapshot(){
+  try{
+    localStorage.setItem(
+      RECOVERY_STORAGE_KEY,
+      JSON.stringify(createRecoverySnapshot())
+    );
+  }catch(error){
+    console.warn("Recovery snapshot non salvato:",error);
+  }
+}
+
+function scheduleRecoverySnapshot(){
+  clearTimeout(recoverySaveTimer);
+  recoverySaveTimer=setTimeout(
+    writeRecoverySnapshot,
+    350
+  );
+}
+
+function readRecoverySnapshot(){
+  try{
+    const raw=localStorage.getItem(RECOVERY_STORAGE_KEY);
+    if(!raw)return null;
+
+    const parsed=JSON.parse(raw);
+    if(
+      !parsed ||
+      !parsed.state ||
+      !Array.isArray(parsed.state.pages) ||
+      !parsed.state.pages.length
+    ){
+      return null;
+    }
+
+    return parsed;
+  }catch(error){
+    console.warn("Recovery snapshot non leggibile:",error);
+    return null;
+  }
+}
+
+function clearRecoverySnapshot(){
+  try{
+    localStorage.removeItem(RECOVERY_STORAGE_KEY);
+  }catch(_){}
+}
+
 function save(show=true){
+  state.updatedAt=Date.now();
   state=normalizeProjectState(state);
 
   if(!assertProjectIntegrity(state)){
@@ -2871,6 +2932,8 @@ function save(show=true){
   const saved=safeStorageSet(STORAGE_KEY,JSON.stringify(state));
   if(show)setStatus(saved ? "Progetto salvato" : "Salvataggio non riuscito");
   return saved;
+
+  scheduleRecoverySnapshot();
 }
 
 function applyV94PermanentRosterUpdates(){
@@ -8133,7 +8196,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v165",
+    appVersion:"v166",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -9084,7 +9147,36 @@ document.addEventListener("keydown",event=>{
 
 installLogicalBoardRenderer();
 window.addEventListener("beforeunload",()=>save(false));
-load();renderAll();updateHistoryButtons();syncDrawingControls();updateSelectedNamesButton();syncChestCircleControls();
+load();
+const recoverySnapshot=readRecoverySnapshot();
+if(recoverySnapshot){
+  try{
+    const normalSavedAt=Number(state?.updatedAt||0);
+    const recoverySavedAt=Number(recoverySnapshot.savedAt||0);
+
+    if(recoverySavedAt>normalSavedAt+1000){
+      const recovered=normalizeProjectState(recoverySnapshot.state);
+      if(recovered){
+        state=recovered;
+        currentPage=Math.max(
+          0,
+          Math.min(
+            state.pages.length-1,
+            Number(recoverySnapshot.currentPage)||0
+          )
+        );
+        setTimeout(
+          ()=>setStatus("Sessione di lavoro recuperata automaticamente"),
+          0
+        );
+      }
+    }
+  }catch(error){
+    console.warn("Ripristino recovery non riuscito:",error);
+  }
+}
+
+renderAll();updateHistoryButtons();syncDrawingControls();updateSelectedNamesButton();syncChestCircleControls();
 </script>
 
 <script>
@@ -9092,7 +9184,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=165",
+        "./service-worker.js?v=166",
         { updateViaCache: "none" }
       );
 
@@ -9165,6 +9257,19 @@ if ("serviceWorker" in navigator) {
 
 initializeContinuousHistory();
 syncDrawingPresetButtons();
+
+document.addEventListener("visibilitychange",()=>{
+  if(document.visibilityState==="hidden"){
+    clearTimeout(recoverySaveTimer);
+    writeRecoverySnapshot();
+  }
+});
+
+window.addEventListener("pagehide",()=>{
+  clearTimeout(recoverySaveTimer);
+  writeRecoverySnapshot();
+});
+
 </script>
 
 </body>
