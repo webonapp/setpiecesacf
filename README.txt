@@ -393,3 +393,18 @@ Architettura modalità, fase 1
 - Override non validi vengono ripuliti automaticamente al caricamento
 - Aggiunto controllo di integrità degli override per ogni schema
 - Nessuna modifica intenzionale al layout o alla resa grafica
+
+
+ROADMAP 20 PASSAGGI - PASSAGGIO 09/20 - v157
+Architettura modalità, fase 2
+
+- PANCHINA e SPOGLIATOIO diventano preset globali non distruttivi
+- Il cambio modalità non riscrive più gli override salvati nei singoli schemi
+- Tornando a PREPARAZIONE riappaiono automaticamente le personalizzazioni locali
+- Gerarchia definitiva:
+  1. override dello schema corrente
+  2. preset globale PANCHINA/SPOGLIATOIO
+  3. valore base del giocatore/squadra
+- I flag locali continuano a funzionare in tutte le modalità
+- Aggiunto controllo interno per verificare che un cambio modalità non alteri gli schemi
+- Nessuna modifica intenzionale al layout o alla grafica
