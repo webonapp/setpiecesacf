@@ -1794,6 +1794,7 @@ body.is-dragging .player.selected{
 
   <div class="touch-command-bar" id="touchCommandBar" aria-label="Comandi rapidi">
     <button type="button" class="touch-command" id="touchUndoBtn" title="Torna indietro">Torna indietro</button>
+    <button type="button" class="touch-command" id="touchRedoBtn" title="Ripristina modifica">Ripristina</button>
     <span class="touch-command-divider"></span>
     <button type="button" class="touch-command" id="touchCopyBtn" title="Copia selezione">Copia</button>
     <button type="button" class="touch-command" id="touchPasteBtn" title="Incolla selezione">Incolla</button>
@@ -2041,7 +2042,7 @@ body.is-dragging .player.selected{
 <input type="file" id="projectFile" accept=".json" hidden>
 
 <script>
-const STORAGE_KEY="setPieceBoardPro_v153";
+const STORAGE_KEY="setPieceBoardPro_v154";
 
 function safeStorageGet(key){
   try{
@@ -2223,30 +2224,96 @@ function restoreSnapshot(snapshot){
     historyLocked=false;
   }
 }
-function pushHistory(){
-  if(historyLocked)return;
-  undoStack.push(snapshotState());
-  if(undoStack.length>MAX_HISTORY_STEPS)undoStack.shift();
+let historyTransaction=null;
+
+function pushUniqueHistory(stack,snapshot){
+  if(!snapshot)return false;
+  if(stack.length && stack[stack.length-1]===snapshot)return false;
+
+  stack.push(snapshot);
+  if(stack.length>MAX_HISTORY_STEPS)stack.shift();
+  return true;
+}
+
+function beginHistoryTransaction(label="Modifica"){
+  if(historyLocked || historyTransaction)return false;
+
+  historyTransaction={
+    label,
+    before:snapshotState()
+  };
+  return true;
+}
+
+function commitHistoryTransaction(){
+  if(!historyTransaction)return false;
+
+  const transaction=historyTransaction;
+  historyTransaction=null;
+
+  const after=snapshotState();
+  if(transaction.before===after){
+    updateHistoryButtons();
+    return false;
+  }
+
+  pushUniqueHistory(undoStack,transaction.before);
   redoStack=[];
   updateHistoryButtons();
+  return true;
 }
+
+function cancelHistoryTransaction(){
+  historyTransaction=null;
+  updateHistoryButtons();
+}
+
+function pushHistory(){
+  if(historyLocked)return false;
+
+  const added=pushUniqueHistory(undoStack,snapshotState());
+  if(added)redoStack=[];
+
+  updateHistoryButtons();
+  return added;
+}
+
 function undo(){
-  if(!undoStack.length)return;
-  redoStack.push(snapshotState());
-  restoreSnapshot(undoStack.pop());
+  if(historyLocked || !undoStack.length)return;
+
+  cancelHistoryTransaction();
+
+  const current=snapshotState();
+  const previous=undoStack.pop();
+
+  pushUniqueHistory(redoStack,current);
+  restoreSnapshot(previous);
+
   updateHistoryButtons();
   setStatus("Operazione annullata");
 }
+
 function redo(){
-  if(!redoStack.length)return;
-  undoStack.push(snapshotState());
-  restoreSnapshot(redoStack.pop());
+  if(historyLocked || !redoStack.length)return;
+
+  cancelHistoryTransaction();
+
+  const current=snapshotState();
+  const next=redoStack.pop();
+
+  pushUniqueHistory(undoStack,current);
+  restoreSnapshot(next);
+
   updateHistoryButtons();
   setStatus("Operazione ripristinata");
 }
+
 function updateHistoryButtons(){
   const touchUndo=document.getElementById("touchUndoBtn");
   if(touchUndo)touchUndo.disabled=!undoStack.length;
+
+  const touchRedo=document.getElementById("touchRedoBtn");
+  if(touchRedo)touchRedo.disabled=!redoStack.length;
 }
 
 const defaultRoster=[];
@@ -4930,15 +4997,18 @@ function renderDrawings(){
   });
 }
 function commitDragHistory(){
-  if(dragSnapshot && dragSnapshot!==snapshotState()){
-    undoStack.push(dragSnapshot);
-    if(undoStack.length>MAX_HISTORY_STEPS)undoStack.shift();
+  const current=snapshotState();
+
+  if(dragSnapshot && dragSnapshot!==current){
+    pushUniqueHistory(undoStack,dragSnapshot);
     redoStack=[];
-    updateHistoryButtons();
   }
+
   dragSnapshot=null;
   drawingDragStart=null;
   drawingInitial=null;
+
+  updateHistoryButtons();
   save(false);
 }
 
@@ -5594,7 +5664,15 @@ document.getElementById("exportPdf").addEventListener("click",async()=>{
 });
 
 document.getElementById("importJson").addEventListener("click",()=>document.getElementById("projectFile").click());
-document.getElementById("projectFile").addEventListener("change",async e=>{const f=e.target.files[0];if(!f)return;try{const obj=JSON.parse(await f.text());if(obj.roster&&obj.pages){pushHistory();state=obj;currentPage=0;renderAll();save()}}catch(err){alert("File JSON non valido")}e.target.value=""});
+document.getElementById("projectFile").addEventListener("change",async e=>{const f=e.target.files[0];if(!f)return;try{const obj=JSON.parse(await f.text());if(obj.roster&&obj.pages){
+  pushHistory();
+  state=normalizeProjectState(obj);
+  currentPage=0;
+  redoStack=[];
+  renderAll();
+  save();
+  updateHistoryButtons();
+}}catch(err){alert("File JSON non valido")}e.target.value=""});
 
 const modal=document.getElementById("rosterModal");
 
@@ -6308,9 +6386,18 @@ document.addEventListener("keydown",e=>{
     distributeSelectedHorizontally();
     return;
   }
+  if(mod && !isEditableTarget(e.target) && e.key.toLowerCase()==="y"){
+    e.preventDefault();
+    redo();
+    return;
+  }
+
   if(!mod || e.key.toLowerCase()!=="z")return;
+  if(isEditableTarget(e.target))return;
+
   e.preventDefault();
-  if(e.shiftKey) redo(); else undo();
+  if(e.shiftKey)redo();
+  else undo();
 });
 
 
@@ -6919,7 +7006,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v153",
+    appVersion:"v154",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -7793,6 +7880,7 @@ document.getElementById("preparationModeBtn").addEventListener(
 );
 
 document.getElementById("touchUndoBtn").addEventListener("click",undo);
+document.getElementById("touchRedoBtn").addEventListener("click",redo);
 document.getElementById("touchCopyBtn").addEventListener("click",copyCurrentSelection);
 document.getElementById("touchPasteBtn").addEventListener("click",pasteClipboardSelection);
 document.getElementById("touchDeleteBtn").addEventListener("click",deleteCurrentSelection);
@@ -7859,7 +7947,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=127",
+        "./service-worker.js?v=154",
         { updateViaCache: "none" }
       );
 

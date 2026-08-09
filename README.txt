@@ -352,3 +352,18 @@ Motore grafico comune, completamento
 - Touch handling delle maniglie migliorato su iPad
 - Motore grafico comune ora copre maglie, palloni, testi, frecce, curve e forme
 - Nessuna modifica intenzionale al layout o alla grafica del progetto
+
+
+ROADMAP 20 PASSAGGI - PASSAGGIO 06/20 - v154
+Undo/Redo robusto, fase 1
+
+- Cronologia deduplicata: snapshot identici non occupano più step
+- Undo e Redo protetti durante ripristini o transazioni
+- Introdotta base transazionale begin/commit/cancel per le prossime operazioni complesse
+- Drag usa la stessa deduplicazione centralizzata
+- Aggiunto pulsante touch Ripristina accanto a Torna indietro
+- Cmd/Ctrl+Shift+Z continua a fare Redo
+- Aggiunto Cmd/Ctrl+Y come scorciatoia Redo
+- Shortcut Undo/Redo ignorate durante la scrittura in input e textarea
+- Corretto cache-busting del service worker rimasto fermo a v127
+- Import progetto normalizzato prima del rendering
