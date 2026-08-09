@@ -466,3 +466,16 @@ Frecce professionali, fase 2
 - Disegni esistenti normalizzati al caricamento
 - Migliorata coerenza tra vista normale, Campo intero e iPad
 - Nessuna modifica intenzionale a posizioni, colori o contenuto degli schemi
+
+
+ROADMAP 20 PASSAGGI - PASSAGGIO 14/20 - v162
+Snap intelligente, fase 1
+
+- Toggle SNAP aggiunto nella barra comandi.
+- Snap disattivato di default.
+- Griglia logica al 5%.
+- Aggancio morbido solo quando un oggetto si avvicina alla griglia.
+- Maglie, palloni e testi supportano lo snap.
+- Guide temporanee verticali/orizzontali durante l'aggancio.
+- Stato SNAP salvato nel progetto e nei backup.
+- Nessuna posizione esistente viene modificata automaticamente.

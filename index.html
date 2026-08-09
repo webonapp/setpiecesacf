@@ -1744,6 +1744,23 @@ body.is-dragging .player.selected{
   vector-effect:non-scaling-stroke;
 }
 
+
+/* v162 - Snap intelligente */
+.snap-control{
+  display:flex;align-items:center;gap:6px;min-height:34px;padding:0 9px;
+  border:1px solid rgba(255,255,255,.12);border-radius:9px;
+  background:rgba(255,255,255,.035);font-size:10px;font-weight:900;
+  letter-spacing:.05em;cursor:pointer;user-select:none;-webkit-user-select:none;
+  touch-action:manipulation
+}
+.snap-control input{width:15px;height:15px;margin:0;accent-color:#8bd450}
+.snap-control.active{border-color:#8bd450;background:#2f3c25}
+.snap-guide{position:absolute;z-index:65;pointer-events:none;background:rgba(83,170,255,.72);opacity:0}
+.snap-guide.visible{opacity:1}
+.snap-guide.vertical{width:1px;top:0;bottom:0}
+.snap-guide.horizontal{height:1px;left:0;right:0}
+@media(max-width:900px){.snap-control{min-height:34px;padding-inline:7px;font-size:9px}}
+
 </style>
 
 <script async src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
@@ -1895,6 +1912,9 @@ body.is-dragging .player.selected{
   </div>
 
   <div class="board-shell">
+    <div class="snap-guide vertical" id="snapGuideV" aria-hidden="true"></div>
+    <div class="snap-guide horizontal" id="snapGuideH" aria-hidden="true"></div>
+
     <button type="button" class="field-fullscreen-exit" id="fieldFullscreenExitBtn" title="Esci dalla modalità campo intero">×</button>
     <button type="button" class="field-fullscreen-nav prev" id="fieldPrevSchemeBtn" title="Schema precedente">‹</button>
     <button type="button" class="field-fullscreen-nav next" id="fieldNextSchemeBtn" title="Schema successivo">›</button>
@@ -1924,6 +1944,10 @@ body.is-dragging .player.selected{
     <span class="touch-command-divider"></span><button type="button" class="touch-command" id="touchLockBtn" aria-pressed="false" title="Blocca modifiche sul campo">Blocca</button>
     <button type="button" class="touch-command primary" id="touchFullscreenBtn" title="Mostra solo il campo">Campo intero</button>
     <span class="touch-command-divider preset-divider"></span>
+    <label class="snap-control" title="Aggancio intelligente alla griglia">
+      <input type="checkbox" id="snapToggle">
+      <span>SNAP</span>
+    </label>
     <label class="view-preset-control" title="Preset di visualizzazione">
       <span>Vista</span>
       <select id="viewPresetSelect" aria-label="Preset di visualizzazione">
@@ -2169,7 +2193,7 @@ body.is-dragging .player.selected{
 <input type="file" id="projectFile" accept=".json" hidden>
 
 <script>
-const STORAGE_KEY="setPieceBoardPro_v161";
+const STORAGE_KEY="setPieceBoardPro_v162";
 
 function safeStorageGet(key){
   try{
@@ -2734,6 +2758,9 @@ function normalizeProjectState(projectState){
 
   safe.schemaVersion=PROJECT_SCHEMA_VERSION;
   safe.playerScale=clampNumber(safe.playerScale,.65,1.65,.90);
+
+  if(typeof safe.snapEnabled!=="boolean")safe.snapEnabled=false;
+  safe.snapStep=clampNumber(safe.snapStep,1,20,5);
 
   if(!["normal","bench","locker"].includes(safe.presentationMode)){
     safe.presentationMode="normal";
@@ -4381,6 +4408,59 @@ function startLogicalBoardDrag({
   return true;
 }
 
+
+function getSnapCandidatePercent(x,y,bounds={}){
+  const minX=bounds.minX??0,maxX=bounds.maxX??100;
+  const minY=bounds.minY??0,maxY=bounds.maxY??100;
+  const rawX=Math.max(minX,Math.min(maxX,Number(x)));
+  const rawY=Math.max(minY,Math.min(maxY,Number(y)));
+
+  if(!state.snapEnabled){
+    return {x:rawX,y:rawY,snappedX:false,snappedY:false};
+  }
+
+  const step=clampNumber(state.snapStep,1,20,5);
+  const targetX=Math.max(minX,Math.min(maxX,Math.round(rawX/step)*step));
+  const targetY=Math.max(minY,Math.min(maxY,Math.round(rawY/step)*step));
+  const threshold=Math.max(.8,Math.min(2,step*.3));
+
+  const snappedX=Math.abs(targetX-rawX)<=threshold;
+  const snappedY=Math.abs(targetY-rawY)<=threshold;
+
+  return {
+    x:snappedX?targetX:rawX,
+    y:snappedY?targetY:rawY,
+    snappedX,
+    snappedY
+  };
+}
+
+function showSnapGuides(candidate){
+  const v=document.getElementById("snapGuideV");
+  const hor=document.getElementById("snapGuideH");
+
+  if(v){
+    v.classList.toggle("visible",Boolean(state.snapEnabled&&candidate?.snappedX));
+    if(candidate?.snappedX)v.style.left=candidate.x+"%";
+  }
+  if(hor){
+    hor.classList.toggle("visible",Boolean(state.snapEnabled&&candidate?.snappedY));
+    if(candidate?.snappedY)hor.style.top=candidate.y+"%";
+  }
+}
+
+function hideSnapGuides(){
+  document.getElementById("snapGuideV")?.classList.remove("visible");
+  document.getElementById("snapGuideH")?.classList.remove("visible");
+}
+
+function syncSnapControl(){
+  const toggle=document.getElementById("snapToggle");
+  if(!toggle)return;
+  toggle.checked=state.snapEnabled===true;
+  toggle.closest(".snap-control")?.classList.toggle("active",state.snapEnabled===true);
+}
+
 function startBoardObjectDrag({
   event,
   element,
@@ -4719,14 +4799,14 @@ function startGroupDrag({
         const original=initial.get(index);
         if(!original)return;
 
-        const nextX=Math.max(
-          1.5,
-          Math.min(98.5,original.x+dx)
+        const candidate=getSnapCandidatePercent(
+          original.x+dx,
+          original.y+dy,
+          {minX:1.5,maxX:98.5,minY:2,maxY:98}
         );
-        const nextY=Math.max(
-          2,
-          Math.min(98,original.y+dy)
-        );
+        const nextX=candidate.x;
+        const nextY=candidate.y;
+        if(index===indices[0])showSnapGuides(candidate);
 
         page().positions[index]={
           x:nextX,
@@ -4747,6 +4827,7 @@ function startGroupDrag({
       });
     },
     onFinish:()=>{
+      hideSnapGuides();
       renderPlayers();
       refreshUnifiedSelectionVisuals();
     }
@@ -4792,12 +4873,18 @@ function renderBalls(){
         element:el,
         initial,
         applyPosition:(dx,dy)=>{
-          ball.x=Math.max(1.5,Math.min(98.5,initial.x+dx));
-          ball.y=Math.max(2,Math.min(98,initial.y+dy));
+          const candidate=getSnapCandidatePercent(
+            initial.x+dx,initial.y+dy,
+            {minX:1.5,maxX:98.5,minY:2,maxY:98}
+          );
+          ball.x=candidate.x;
+          ball.y=candidate.y;
+          showSnapGuides(candidate);
           el.style.left=ball.x+"%";
           el.style.top=ball.y+"%";
         },
         onFinish:()=>{
+          hideSnapGuides();
           refreshObjectSelectionVisuals();
         }
       });
@@ -4860,12 +4947,18 @@ el.addEventListener("pointerdown",e=>{
         element:el,
         initial,
         applyPosition:(dx,dy)=>{
-          item.x=Math.max(1,Math.min(99,initial.x+dx));
-          item.y=Math.max(2,Math.min(98,initial.y+dy));
+          const candidate=getSnapCandidatePercent(
+            initial.x+dx,initial.y+dy,
+            {minX:1,maxX:99,minY:2,maxY:98}
+          );
+          item.x=candidate.x;
+          item.y=candidate.y;
+          showSnapGuides(candidate);
           el.style.left=item.x+"%";
           el.style.top=item.y+"%";
         },
         onFinish:()=>{
+          hideSnapGuides();
           refreshObjectSelectionVisuals();
         }
       });
@@ -5656,6 +5749,7 @@ function syncDrawingControls(){
   });
 
   syncDrawingPresetButtons();
+syncSnapControl();
 }
 function boardPoint(e){const r=document.getElementById("board").getBoundingClientRect();return{x:(e.clientX-r.left)/r.width*1000,y:(e.clientY-r.top)/r.height*620}}
 
@@ -5712,6 +5806,8 @@ function renderAll(){
 
   updatePresentationModeButtons();
   syncViewPresetControl();
+
+  syncSnapControl();
 }
 
 
@@ -7646,7 +7742,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v161",
+    appVersion:"v162",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -8520,6 +8616,16 @@ document.getElementById("preparationModeBtn").addEventListener(
   ()=>applyGlobalPlayerDisplayMode("normal")
 );
 
+
+document.getElementById("snapToggle").addEventListener("change",event=>{
+  pushHistory();
+  state.snapEnabled=event.target.checked;
+  hideSnapGuides();
+  syncSnapControl();
+  save(false);
+  setStatus(state.snapEnabled?"Snap intelligente attivo":"Snap intelligente disattivato");
+});
+
 document.getElementById("viewPresetSelect").addEventListener("change",event=>{
   applyViewPreset(event.target.value,{
     recordHistory:true,
@@ -8595,7 +8701,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=161",
+        "./service-worker.js?v=162",
         { updateViaCache: "none" }
       );
 
