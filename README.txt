@@ -322,3 +322,18 @@ Motore grafico comune, fase 2
 - Undo e salvataggio del drag seguono lo stesso ciclo di palloni e testi
 - Nessuna modifica intenzionale al layout o alla resa grafica
 - Maglie restano sul motore storico per un'ultima migrazione separata
+
+
+ROADMAP 20 PASSAGGI - PASSAGGIO 04/20 - v152
+Motore grafico comune, fase 3
+
+- Maglie/giocatori migrate al motore Pointer Drag condiviso
+- Selezione giocatori integrata nel gestore comune delle selezioni
+- Drag singolo e drag di gruppo mantengono lo stesso comportamento
+- Eliminato il possibile salto iniziale della maglia quando viene presa fuori centro
+- Un solo snapshot Undo per ogni trascinamento completo
+- Cleanup comune degli event listener pointermove/pointerup/pointercancel
+- Gestione pointerId uniforme per Mac e iPad
+- Cmd/Ctrl continua a gestire la multiselezione senza avviare drag accidentali
+- Doppio tap/click rapido degli avversari preservato
+- Palloni, testi, frecce, forme e maglie ora condividono la stessa base di selezione/drag

@@ -1621,6 +1621,15 @@ body.field-view-mode #board{
   width:29px!important;
 }
 
+
+/* v152: il motore comune evita selezioni native durante il drag delle maglie */
+.player.drag-active,
+body.is-dragging .player.selected{
+  user-select:none!important;
+  -webkit-user-select:none!important;
+  -webkit-touch-callout:none!important;
+}
+
 </style>
 
 <script async src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
@@ -2023,7 +2032,7 @@ body.field-view-mode #board{
 <input type="file" id="projectFile" accept=".json" hidden>
 
 <script>
-const STORAGE_KEY="setPieceBoardPro_v151";
+const STORAGE_KEY="setPieceBoardPro_v152";
 
 function safeStorageGet(key){
   try{
@@ -3673,8 +3682,10 @@ const OBJECT_SELECTIONS={
 };
 
 function clearSelectionKinds(except=null){
-  selectedPlayers.clear();
-  selectedRosterPlayers.clear();
+  if(except!=="player"){
+    selectedPlayers.clear();
+    selectedRosterPlayers.clear();
+  }
 
   if(except!=="ball"){
     selectedBalls.clear();
@@ -3711,6 +3722,36 @@ function selectObjectKind(kind,index,additive=false){
   config.setPrimary(index);
   return true;
 }
+
+function selectFieldPlayer(index,additive=false){
+  if(!state.roster[index] || !page().positions[index])return false;
+
+  if(!additive){
+    clearSelectionKinds("player");
+    selectedRosterPlayers.clear();
+
+    if(!selectedPlayers.has(index)){
+      selectedPlayers.clear();
+      selectedPlayers.add(index);
+    }
+  }else{
+    if(selectedPlayers.has(index)){
+      selectedPlayers.delete(index);
+      selectedRosterPlayers.delete(index);
+      return false;
+    }
+
+    selectedPlayers.add(index);
+  }
+
+  return selectedPlayers.has(index);
+}
+
+function refreshUnifiedSelectionVisuals(){
+  refreshSelectionVisuals();
+  refreshObjectSelectionVisuals();
+}
+
 
 
 function startLogicalBoardDrag({
@@ -3790,16 +3831,30 @@ function startBoardObjectDrag({
   element,
   initial,
   applyPosition,
-  onFinish
+  onFinish,
+  startClientX=null,
+  startClientY=null,
+  pointerIdOverride=null
 }){
   const board=document.getElementById("board");
   const rect=board?.getBoundingClientRect();
 
   if(!board || !rect || !rect.width || !rect.height)return false;
 
-  const pointerId=event.pointerId;
-  const startX=event.clientX;
-  const startY=event.clientY;
+  const pointerId=
+    pointerIdOverride!==null
+      ? pointerIdOverride
+      : event.pointerId;
+
+  const startX=
+    startClientX!==null
+      ? startClientX
+      : event.clientX;
+
+  const startY=
+    startClientY!==null
+      ? startClientY
+      : event.clientY;
 
   dragSnapshot=snapshotState();
   beginDragVisual(element,pointerId);
@@ -3958,25 +4013,33 @@ function refreshSelectionVisuals(){
   syncRosterDisplayOptions();
 }
 function selectOnly(index){
-  selectedPlayers.clear();
-  selectedPlayers.add(index);
-  refreshSelectionVisuals();
-  renderAll();
+  selectFieldPlayer(index,false);
+  refreshUnifiedSelectionVisuals();
 }
 function toggleSelection(index){
-  if(selectedPlayers.has(index))selectedPlayers.delete(index);
-  else selectedPlayers.add(index);
-  refreshSelectionVisuals();
-  renderAll();
+  selectFieldPlayer(index,true);
+  refreshUnifiedSelectionVisuals();
 }
 function handlePlayerPointerDown(e){
   if(tool!=="move")return;
+
   e.preventDefault();
   e.stopPropagation();
 
   const idx=Number(e.currentTarget.dataset.index);
+  if(!state.roster[idx] || !page().positions[idx])return;
 
-  if(state.roster[idx]?.team==="away"){
+  const target=e.currentTarget;
+  const pointerId=e.pointerId;
+  const startX=e.clientX;
+  const startY=e.clientY;
+  const additive=e.metaKey||e.ctrlKey;
+
+  /*
+    Mantiene il comportamento storico del doppio tap/click rapido
+    per gli avversari, senza interferire con il trascinamento.
+  */
+  if(state.roster[idx].team==="away"){
     const key=state.roster[idx].id||String(idx);
     const now=performance.now();
     const previous=playerClickTimes.get(key)||0;
@@ -3989,130 +4052,143 @@ function handlePlayerPointerDown(e){
 
     playerClickTimes.set(key,now);
     setTimeout(()=>{
-      if(playerClickTimes.get(key)===now)playerClickTimes.delete(key);
+      if(playerClickTimes.get(key)===now){
+        playerClickTimes.delete(key);
+      }
     },450);
   }
-  selectedRosterPlayers.clear();
-  if(state.roster[idx]?.team==="away")selectedRosterPlayers.add(idx);
-  selectedDrawing=null;
-  selectedBall=null;
-  selectedText=null;
-  renderDrawings();
-  renderBalls();
-  const additive=e.metaKey||e.ctrlKey;
 
-  if(additive){
-    toggleSelection(idx);
-    return;
-  }
+  const selected=selectFieldPlayer(idx,additive);
+  refreshUnifiedSelectionVisuals();
 
-  if(!selectedPlayers.has(idx))selectOnly(idx);
+  /*
+    Cmd/Ctrl-click resta dedicato alla multiselezione.
+    Il trascinamento parte da un pointerdown normale, come prima.
+  */
+  if(additive || !selected)return;
 
-  const startX=e.clientX;
-  const startY=e.clientY;
-  const target=e.currentTarget;
-  let started=false;
+  let dragStarted=false;
 
-  const move=ev=>{
-    if(started)return;
-    if(Math.hypot(ev.clientX-startX,ev.clientY-startY)<5)return;
-    started=true;
-    window.removeEventListener("pointermove",move);
-    window.removeEventListener("pointerup",up);
+  const cleanupPending=()=>{
+    window.removeEventListener("pointermove",pendingMove);
+    window.removeEventListener("pointerup",pendingEnd);
+    window.removeEventListener("pointercancel",pendingEnd);
+  };
+
+  const pendingMove=moveEvent=>{
+    if(moveEvent.pointerId!==pointerId)return;
+
+    if(
+      Math.hypot(
+        moveEvent.clientX-startX,
+        moveEvent.clientY-startY
+      )<5
+    ){
+      return;
+    }
+
+    dragStarted=true;
+    cleanupPending();
+
     startGroupDrag({
-      ...e,
-      clientX:startX,
-      clientY:startY,
-      currentTarget:target,
-      pointerId:e.pointerId
+      originalEvent:e,
+      startX,
+      startY,
+      target,
+      pointerId
     });
   };
 
-  const up=()=>{
-    window.removeEventListener("pointermove",move);
-    window.removeEventListener("pointerup",up);
+  const pendingEnd=endEvent=>{
+    if(endEvent.pointerId!==pointerId)return;
+    cleanupPending();
+
+    if(!dragStarted){
+      refreshUnifiedSelectionVisuals();
+    }
   };
 
-  window.addEventListener("pointermove",move,{passive:true});
-  window.addEventListener("pointerup",up,{once:true});
+  window.addEventListener("pointermove",pendingMove,{passive:true});
+  window.addEventListener("pointerup",pendingEnd);
+  window.addEventListener("pointercancel",pendingEnd);
 }
-function startGroupDrag(e){
-  const board=document.getElementById("board");
-  const indices=[...selectedPlayers].filter(i=>page().positions[i]);
-  if(!indices.length)return;
 
-  const pointerId=e.pointerId;
-  const target=e.currentTarget;
-  const anchorIndex=Number(target?.dataset?.index);
-  const validAnchor=indices.includes(anchorIndex) ? anchorIndex : indices[0];
-
-  const initial=new Map(
-    indices.map(i=>[i,{...page().positions[i]}])
+function startGroupDrag({
+  originalEvent,
+  startX,
+  startY,
+  target,
+  pointerId
+}){
+  const indices=[...selectedPlayers].filter(
+    index=>page().positions[index]
   );
 
-  const anchorInitial={...initial.get(validAnchor)};
-  const elements=new Map(
-    indices.map(i=>[
-      i,
-      document.querySelector(`.player[data-index="${i}"]`)
+  if(!indices.length)return false;
+
+  const initial=new Map(
+    indices.map(index=>[
+      index,
+      {...page().positions[index]}
     ])
   );
 
-  dragSnapshot=snapshotState();
-  beginDragVisual(target,pointerId);
+  const elements=new Map(
+    indices.map(index=>[
+      index,
+      document.querySelector(`.player[data-index="${index}"]`)
+    ])
+  );
 
-  const updatePositionsFromPointer=ev=>{
-    const point=boardPoint(ev);
-    const anchorX=Math.max(1.5,Math.min(98.5,point.x/10));
-    const anchorY=Math.max(2,Math.min(98,point.y/6.2));
+  /*
+    Il motore condiviso lavora per delta del puntatore.
+    Questo elimina il piccolo salto che il vecchio drag poteva
+    produrre quando si prendeva la maglia lontano dal centro.
+  */
+  return startBoardObjectDrag({
+    event:originalEvent,
+    element:target,
+    initial:null,
+    startClientX:startX,
+    startClientY:startY,
+    pointerIdOverride:pointerId,
+    applyPosition:(dx,dy)=>{
+      indices.forEach(index=>{
+        const original=initial.get(index);
+        if(!original)return;
 
-    const dx=anchorX-anchorInitial.x;
-    const dy=anchorY-anchorInitial.y;
+        const nextX=Math.max(
+          1.5,
+          Math.min(98.5,original.x+dx)
+        );
+        const nextY=Math.max(
+          2,
+          Math.min(98,original.y+dy)
+        );
 
-    indices.forEach(i=>{
-      const original=initial.get(i);
-      page().positions[i]={
-        x:Math.max(1.5,Math.min(98.5,original.x+dx)),
-        y:Math.max(2,Math.min(98,original.y+dy))
-      };
+        page().positions[index]={
+          x:nextX,
+          y:nextY
+        };
 
-      const el=elements.get(i);
-      if(!el)return;
+        const element=elements.get(index);
+        if(!element)return;
 
-      el.style.left=page().positions[i].x+"%";
-      el.style.top=page().positions[i].y+"%";
-      el.style.transform=`translate(-50%,-50%) scale(${state.roster[i].individualScale ?? state.playerScale ?? .90})`;
-    });
-  };
-
-  const updater=makeSmoothDragFrame(updatePositionsFromPointer);
-  const move=ev=>updater.move(ev);
-
-  const finish=ev=>{
-    updater.move(ev);
-    updater.flush();
-
-    window.removeEventListener("pointermove",move);
-    window.removeEventListener("pointerup",finish);
-    window.removeEventListener("pointercancel",finish);
-
-    endDragVisual(target,pointerId);
-    renderPlayers();
-
-    if(dragSnapshot && dragSnapshot!==snapshotState()){
-      undoStack.push(dragSnapshot);
-      if(undoStack.length>MAX_HISTORY_STEPS)undoStack.shift();
-      redoStack=[];
-      updateHistoryButtons();
+        element.style.left=nextX+"%";
+        element.style.top=nextY+"%";
+        element.style.transform=
+          `translate(-50%,-50%) scale(${
+            state.roster[index].individualScale ??
+            state.playerScale ??
+            .90
+          })`;
+      });
+    },
+    onFinish:()=>{
+      renderPlayers();
+      refreshUnifiedSelectionVisuals();
     }
-
-    dragSnapshot=null;
-    save(false);
-  };
-
-  window.addEventListener("pointermove",move,{passive:true});
-  window.addEventListener("pointerup",finish,{once:true});
-  window.addEventListener("pointercancel",finish,{once:true});
+  });
 }
 function renderBalls(){
   const layer=document.getElementById("ballsLayer");
@@ -6816,7 +6892,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v151",
+    appVersion:"v152",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
