@@ -1761,6 +1761,20 @@ body.is-dragging .player.selected{
 .snap-guide.horizontal{height:1px;left:0;right:0}
 @media(max-width:900px){.snap-control{min-height:34px;padding-inline:7px;font-size:9px}}
 
+
+/* v163: guide SNAP intelligenti */
+.snap-guide.player-snap{
+  background:rgba(139,212,80,.88);
+  box-shadow:0 0 0 1px rgba(139,212,80,.12);
+}
+.snap-guide.center-snap{
+  background:rgba(255,203,65,.92);
+  box-shadow:0 0 0 1px rgba(255,203,65,.14);
+}
+.snap-guide.grid-snap{
+  background:rgba(83,170,255,.72);
+}
+
 </style>
 
 <script async src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
@@ -1944,7 +1958,7 @@ body.is-dragging .player.selected{
     <span class="touch-command-divider"></span><button type="button" class="touch-command" id="touchLockBtn" aria-pressed="false" title="Blocca modifiche sul campo">Blocca</button>
     <button type="button" class="touch-command primary" id="touchFullscreenBtn" title="Mostra solo il campo">Campo intero</button>
     <span class="touch-command-divider preset-divider"></span>
-    <label class="snap-control" title="Aggancio intelligente alla griglia">
+    <label class="snap-control" title="Aggancio intelligente a griglia, centro campo e allineamento giocatori">
       <input type="checkbox" id="snapToggle">
       <span>SNAP</span>
     </label>
@@ -2193,7 +2207,7 @@ body.is-dragging .player.selected{
 <input type="file" id="projectFile" accept=".json" hidden>
 
 <script>
-const STORAGE_KEY="setPieceBoardPro_v162";
+const STORAGE_KEY="setPieceBoardPro_v163";
 
 function safeStorageGet(key){
   try{
@@ -4409,29 +4423,157 @@ function startLogicalBoardDrag({
 }
 
 
-function getSnapCandidatePercent(x,y,bounds={}){
+
+function getPlayerSnapAnchors(excludeIndexes=[]){
+  const excluded=new Set(excludeIndexes);
+  const xAnchors=[50];
+  const yAnchors=[50];
+
+  page().positions.forEach((position,index)=>{
+    if(!position || excluded.has(index))return;
+
+    if(Number.isFinite(Number(position.x))){
+      xAnchors.push(Number(position.x));
+    }
+    if(Number.isFinite(Number(position.y))){
+      yAnchors.push(Number(position.y));
+    }
+  });
+
+  return {xAnchors,yAnchors};
+}
+
+function findNearestSnapAnchor(value,anchors,threshold){
+  let best=null;
+  let bestDistance=Infinity;
+
+  anchors.forEach(anchor=>{
+    const numeric=Number(anchor);
+    if(!Number.isFinite(numeric))return;
+
+    const distance=Math.abs(numeric-value);
+    if(distance<=threshold && distance<bestDistance){
+      best=numeric;
+      bestDistance=distance;
+    }
+  });
+
+  return {
+    value:best,
+    distance:bestDistance
+  };
+}
+
+function getSnapCandidatePercent(x,y,bounds={},options={}){
   const minX=bounds.minX??0,maxX=bounds.maxX??100;
   const minY=bounds.minY??0,maxY=bounds.maxY??100;
+
   const rawX=Math.max(minX,Math.min(maxX,Number(x)));
   const rawY=Math.max(minY,Math.min(maxY,Number(y)));
 
   if(!state.snapEnabled){
-    return {x:rawX,y:rawY,snappedX:false,snappedY:false};
+    return {
+      x:rawX,
+      y:rawY,
+      snappedX:false,
+      snappedY:false,
+      sourceX:null,
+      sourceY:null
+    };
   }
 
   const step=clampNumber(state.snapStep,1,20,5);
-  const targetX=Math.max(minX,Math.min(maxX,Math.round(rawX/step)*step));
-  const targetY=Math.max(minY,Math.min(maxY,Math.round(rawY/step)*step));
-  const threshold=Math.max(.8,Math.min(2,step*.3));
+  const gridThreshold=Math.max(.8,Math.min(2,step*.3));
+  const alignmentThreshold=1.35;
 
-  const snappedX=Math.abs(targetX-rawX)<=threshold;
-  const snappedY=Math.abs(targetY-rawY)<=threshold;
+  const gridX=Math.max(
+    minX,
+    Math.min(maxX,Math.round(rawX/step)*step)
+  );
+  const gridY=Math.max(
+    minY,
+    Math.min(maxY,Math.round(rawY/step)*step)
+  );
+
+  const anchors=getPlayerSnapAnchors(
+    Array.isArray(options.excludePlayerIndexes)
+      ? options.excludePlayerIndexes
+      : []
+  );
+
+  const nearestX=findNearestSnapAnchor(
+    rawX,
+    anchors.xAnchors,
+    alignmentThreshold
+  );
+  const nearestY=findNearestSnapAnchor(
+    rawY,
+    anchors.yAnchors,
+    alignmentThreshold
+  );
+
+  const gridDistanceX=Math.abs(gridX-rawX);
+  const gridDistanceY=Math.abs(gridY-rawY);
+
+  let resultX=rawX;
+  let resultY=rawY;
+  let snappedX=false;
+  let snappedY=false;
+  let sourceX=null;
+  let sourceY=null;
+
+  if(nearestX.value!==null && nearestX.distance<=gridDistanceX){
+    resultX=Math.max(minX,Math.min(maxX,nearestX.value));
+    snappedX=true;
+    sourceX=nearestX.value===50?"center":"player";
+  }else if(gridDistanceX<=gridThreshold){
+    resultX=gridX;
+    snappedX=true;
+    sourceX=gridX===50?"center":"grid";
+  }
+
+  if(nearestY.value!==null && nearestY.distance<=gridDistanceY){
+    resultY=Math.max(minY,Math.min(maxY,nearestY.value));
+    snappedY=true;
+    sourceY=nearestY.value===50?"center":"player";
+  }else if(gridDistanceY<=gridThreshold){
+    resultY=gridY;
+    snappedY=true;
+    sourceY=gridY===50?"center":"grid";
+  }
 
   return {
-    x:snappedX?targetX:rawX,
-    y:snappedY?targetY:rawY,
+    x:resultX,
+    y:resultY,
     snappedX,
-    snappedY
+    snappedY,
+    sourceX,
+    sourceY
+  };
+}
+
+function getGroupSnapDelta(indices,initial,dx,dy){
+  if(!indices.length){
+    return {dx,dy,candidate:null};
+  }
+
+  const anchorIndex=indices[0];
+  const anchor=initial.get(anchorIndex);
+  if(!anchor){
+    return {dx,dy,candidate:null};
+  }
+
+  const candidate=getSnapCandidatePercent(
+    anchor.x+dx,
+    anchor.y+dy,
+    {minX:1.5,maxX:98.5,minY:2,maxY:98},
+    {excludePlayerIndexes:indices}
+  );
+
+  return {
+    dx:candidate.x-anchor.x,
+    dy:candidate.y-anchor.y,
+    candidate
   };
 }
 
@@ -4439,13 +4581,36 @@ function showSnapGuides(candidate){
   const v=document.getElementById("snapGuideV");
   const hor=document.getElementById("snapGuideH");
 
+  [v,hor].forEach(guide=>{
+    if(!guide)return;
+    guide.classList.remove("player-snap","center-snap","grid-snap");
+  });
+
   if(v){
     v.classList.toggle("visible",Boolean(state.snapEnabled&&candidate?.snappedX));
-    if(candidate?.snappedX)v.style.left=candidate.x+"%";
+    if(candidate?.snappedX){
+      v.style.left=candidate.x+"%";
+      v.classList.add(
+        candidate.sourceX==="player"
+          ? "player-snap"
+          : candidate.sourceX==="center"
+            ? "center-snap"
+            : "grid-snap"
+      );
+    }
   }
   if(hor){
     hor.classList.toggle("visible",Boolean(state.snapEnabled&&candidate?.snappedY));
-    if(candidate?.snappedY)hor.style.top=candidate.y+"%";
+    if(candidate?.snappedY){
+      hor.style.top=candidate.y+"%";
+      hor.classList.add(
+        candidate.sourceY==="player"
+          ? "player-snap"
+          : candidate.sourceY==="center"
+            ? "center-snap"
+            : "grid-snap"
+      );
+    }
   }
 }
 
@@ -4795,18 +4960,29 @@ function startGroupDrag({
     startClientY:startY,
     pointerIdOverride:pointerId,
     applyPosition:(dx,dy)=>{
+      const groupSnap=getGroupSnapDelta(
+        indices,
+        initial,
+        dx,
+        dy
+      );
+
+      if(groupSnap.candidate){
+        showSnapGuides(groupSnap.candidate);
+      }
+
       indices.forEach(index=>{
         const original=initial.get(index);
         if(!original)return;
 
-        const candidate=getSnapCandidatePercent(
-          original.x+dx,
-          original.y+dy,
-          {minX:1.5,maxX:98.5,minY:2,maxY:98}
+        const nextX=Math.max(
+          1.5,
+          Math.min(98.5,original.x+groupSnap.dx)
         );
-        const nextX=candidate.x;
-        const nextY=candidate.y;
-        if(index===indices[0])showSnapGuides(candidate);
+        const nextY=Math.max(
+          2,
+          Math.min(98,original.y+groupSnap.dy)
+        );
 
         page().positions[index]={
           x:nextX,
@@ -7742,7 +7918,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v162",
+    appVersion:"v163",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -8623,7 +8799,7 @@ document.getElementById("snapToggle").addEventListener("change",event=>{
   hideSnapGuides();
   syncSnapControl();
   save(false);
-  setStatus(state.snapEnabled?"Snap intelligente attivo":"Snap intelligente disattivato");
+  setStatus(state.snapEnabled?"Snap intelligente attivo · griglia + allineamenti":"Snap intelligente disattivato");
 });
 
 document.getElementById("viewPresetSelect").addEventListener("change",event=>{
@@ -8701,7 +8877,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=162",
+        "./service-worker.js?v=163",
         { updateViaCache: "none" }
       );
 

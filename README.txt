@@ -479,3 +479,17 @@ Snap intelligente, fase 1
 - Guide temporanee verticali/orizzontali durante l'aggancio.
 - Stato SNAP salvato nel progetto e nei backup.
 - Nessuna posizione esistente viene modificata automaticamente.
+
+
+ROADMAP 20 PASSAGGI - PASSAGGIO 15/20 - v163
+Snap intelligente, fase 2
+
+- Snap ora riconosce gli allineamenti X/Y degli altri giocatori sul campo.
+- Aggiunto aggancio dedicato al centro campo (50%).
+- Guide verdi = allineamento con giocatore.
+- Guide gialle = centro campo.
+- Guide azzurre = griglia.
+- Palloni e testi possono allinearsi alle coordinate dei giocatori.
+- FIX importante: trascinando più maglie insieme lo snap non deforma più la formazione.
+- Nel drag di gruppo viene agganciato il giocatore-ancora e applicato lo stesso delta a tutto il gruppo.
+- SNAP resta opzionale e disattivato di default.
