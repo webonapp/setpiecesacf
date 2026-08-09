@@ -1639,6 +1639,53 @@ body.is-dragging .player.selected{
   -webkit-touch-callout:none!important;
 }
 
+
+.view-preset-control{
+  display:flex;
+  align-items:center;
+  gap:7px;
+  min-height:36px;
+  padding:0 8px;
+  border:1px solid rgba(255,255,255,.12);
+  border-radius:9px;
+  background:rgba(255,255,255,.035);
+  white-space:nowrap;
+  box-sizing:border-box;
+}
+.view-preset-control>span{
+  font-size:10px;
+  font-weight:900;
+  letter-spacing:.06em;
+  text-transform:uppercase;
+  opacity:.74;
+}
+#viewPresetSelect{
+  min-width:148px;
+  max-width:190px;
+  height:30px;
+  border:1px solid rgba(255,255,255,.15);
+  border-radius:7px;
+  background:#20242a;
+  color:#fff;
+  font:inherit;
+  font-size:11px;
+  font-weight:800;
+  padding:0 26px 0 9px;
+  outline:none;
+  touch-action:manipulation;
+}
+#viewPresetSelect:focus{
+  border-color:#8bd450;
+  box-shadow:0 0 0 2px rgba(139,212,80,.16);
+}
+@media(max-width:1100px){
+  #viewPresetSelect{min-width:126px;max-width:150px;font-size:10px}
+}
+@media(max-width:820px){
+  .touch-command-bar{flex-wrap:wrap!important}
+  .view-preset-control{order:20}
+}
+
 </style>
 
 <script async src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
@@ -1808,6 +1855,18 @@ body.is-dragging .player.selected{
 
     <span class="touch-command-divider"></span><button type="button" class="touch-command" id="touchLockBtn" aria-pressed="false" title="Blocca modifiche sul campo">Blocca</button>
     <button type="button" class="touch-command primary" id="touchFullscreenBtn" title="Mostra solo il campo">Campo intero</button>
+    <span class="touch-command-divider preset-divider"></span>
+    <label class="view-preset-control" title="Preset di visualizzazione">
+      <span>Vista</span>
+      <select id="viewPresetSelect" aria-label="Preset di visualizzazione">
+        <option value="preparation">Preparazione</option>
+        <option value="bench">Panchina</option>
+        <option value="locker">Spogliatoio</option>
+        <option value="staff">Presentazione staff</option>
+        <option value="print">Stampa</option>
+        <option value="analysis">Analisi interna</option>
+      </select>
+    </label>
   </div>
 
   <div class="legend">
@@ -2042,7 +2101,7 @@ body.is-dragging .player.selected{
 <input type="file" id="projectFile" accept=".json" hidden>
 
 <script>
-const STORAGE_KEY="setPieceBoardPro_v158";
+const STORAGE_KEY="setPieceBoardPro_v159";
 
 function safeStorageGet(key){
   try{
@@ -2977,6 +3036,18 @@ function getViewPreset(id=state.viewPreset){
   return VIEW_PRESETS[normalizeViewPresetId(id)];
 }
 
+
+function syncViewPresetControl(){
+  const select=document.getElementById("viewPresetSelect");
+  if(!select)return;
+
+  const normalizedId=normalizeViewPresetId(state.viewPreset);
+  if(select.value!==normalizedId)select.value=normalizedId;
+
+  const preset=getViewPreset(normalizedId);
+  select.title=preset?.description||"Preset di visualizzazione";
+}
+
 function syncViewPresetFromPresentationMode(){
   if(state.presentationMode==="bench"){
     state.viewPreset="bench";
@@ -2993,19 +3064,37 @@ function syncViewPresetFromPresentationMode(){
   }
 }
 
-function applyViewPreset(presetId,{
-  recordHistory=true,
-  updateFieldView=true
-}={}){
+function applyViewPreset(presetId,options={}){
+  const {
+    recordHistory=true,
+    updateFieldView=true
+  }=options;
+
   const normalizedId=normalizeViewPresetId(presetId);
   const preset=VIEW_PRESETS[normalizedId];
 
   const previousPreset=state.viewPreset;
   const previousMode=state.presentationMode;
+  const previousFieldView=
+    typeof fieldViewMode==="boolean"
+      ? fieldViewMode
+      : false;
 
-  if(recordHistory){
-    pushHistory();
+  const targetFieldView=Boolean(preset.fieldView);
+  const willChange=
+    previousPreset!==normalizedId ||
+    previousMode!==preset.presentationMode ||
+    (
+      updateFieldView &&
+      previousFieldView!==targetFieldView
+    );
+
+  if(!willChange){
+    syncViewPresetControl();
+    return {changed:false,preset};
   }
+
+  if(recordHistory)pushHistory();
 
   state.viewPreset=normalizedId;
   state.presentationMode=preset.presentationMode;
@@ -3019,19 +3108,16 @@ function applyViewPreset(presetId,{
   if(
     updateFieldView &&
     typeof fieldViewMode==="boolean" &&
-    preset.fieldView!==fieldViewMode
+    targetFieldView!==fieldViewMode
   ){
-    setFieldViewMode(preset.fieldView);
+    setFieldViewMode(targetFieldView);
   }
 
+  syncViewPresetControl();
   save(false);
+  setStatus(`Vista: ${preset.label}`);
 
-  return {
-    changed:
-      previousPreset!==state.viewPreset ||
-      previousMode!==state.presentationMode,
-    preset
-  };
+  return {changed:true,preset};
 }
 
 const PRESENTATION_MODE_DEFAULTS={
@@ -4321,6 +4407,7 @@ function updatePresentationModeButtons(){
   bench?.classList.toggle("active",state.presentationMode==="bench");
   dressing?.classList.toggle("active",state.presentationMode==="locker");
   preparation?.classList.toggle("active",state.presentationMode==="normal");
+  syncViewPresetControl();
 }
 
 
@@ -5456,6 +5543,7 @@ function renderAll(){
   syncRosterDisplayOptions();
 
   updatePresentationModeButtons();
+  syncViewPresetControl();
 }
 
 
@@ -7346,7 +7434,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v158",
+    appVersion:"v159",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -8127,6 +8215,7 @@ function setFieldViewMode(enabled){
   setTimeout(scheduleLogicalBoardFit,100);
   setTimeout(scheduleLogicalBoardFit,260);
   setTimeout(scheduleLogicalBoardFit,520);
+  syncViewPresetControl();
 }
 
 function toggleFieldViewMode(){
@@ -8219,6 +8308,13 @@ document.getElementById("preparationModeBtn").addEventListener(
   ()=>applyGlobalPlayerDisplayMode("normal")
 );
 
+document.getElementById("viewPresetSelect").addEventListener("change",event=>{
+  applyViewPreset(event.target.value,{
+    recordHistory:true,
+    updateFieldView:true
+  });
+});
+
 document.getElementById("touchUndoBtn").addEventListener("click",undo);
 document.getElementById("touchRedoBtn").addEventListener("click",redo);
 document.getElementById("touchCopyBtn").addEventListener("click",copyCurrentSelection);
@@ -8287,7 +8383,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=158",
+        "./service-worker.js?v=159",
         { updateViaCache: "none" }
       );
 

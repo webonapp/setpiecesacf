@@ -426,3 +426,15 @@ Preset di visualizzazione, fase 1
 - Predisposto il passaggio controllato alla modalità Campo intero per i preset che lo richiederanno
 - Rimossi controlli diagnostici v157 non più necessari
 - Nessuna modifica intenzionale all'interfaccia in questa release
+
+
+ROADMAP 20 PASSAGGI - PASSAGGIO 11/20 - v159
+Preset di visualizzazione, fase 2
+
+- Aggiunto selettore Vista nella barra dei comandi rapidi
+- Preset: Preparazione, Panchina, Spogliatoio, Presentazione staff, Stampa, Analisi interna
+- Presentazione staff può attivare automaticamente Campo intero
+- Selettore sincronizzato con PANCHINA/SPOGLIATOIO/PREPARAZIONE
+- Evitati step Undo quando si richiama un preset già attivo
+- Preset salvato nel progetto e nei backup
+- Layout responsive per Mac e iPad
