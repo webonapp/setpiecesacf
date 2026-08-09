@@ -2042,7 +2042,7 @@ body.is-dragging .player.selected{
 <input type="file" id="projectFile" accept=".json" hidden>
 
 <script>
-const STORAGE_KEY="setPieceBoardPro_v154";
+const STORAGE_KEY="setPieceBoardPro_v155";
 
 function safeStorageGet(key){
   try{
@@ -2268,6 +2268,68 @@ function cancelHistoryTransaction(){
   updateHistoryButtons();
 }
 
+const continuousHistoryControls=new WeakMap();
+
+function bindContinuousHistoryControl(element,label="Regolazione"){
+  if(!element||continuousHistoryControls.has(element))return;
+  const info={active:false,changed:false};
+
+  const begin=()=>{
+    if(info.active)return;
+    info.active=beginHistoryTransaction(label);
+    info.changed=false;
+  };
+  const changed=()=>{
+    if(!info.active)begin();
+    info.changed=true;
+  };
+  const finish=()=>{
+    if(!info.active)return;
+    if(info.changed){
+      commitHistoryTransaction();
+      save(false);
+    }else cancelHistoryTransaction();
+    info.active=false;
+    info.changed=false;
+  };
+
+  element.addEventListener("pointerdown",begin);
+  element.addEventListener("touchstart",begin,{passive:true});
+  element.addEventListener("input",changed);
+  element.addEventListener("change",finish);
+  element.addEventListener("pointerup",finish);
+  element.addEventListener("pointercancel",finish);
+  element.addEventListener("blur",finish);
+  continuousHistoryControls.set(element,{finish});
+}
+
+function finishContinuousHistoryControls(){
+  document.querySelectorAll('input[type="range"]').forEach(element=>{
+    const control=continuousHistoryControls.get(element);
+    if(control)control.finish();
+  });
+}
+
+function initializeContinuousHistory(){
+  const labels={
+    drawingWidth:"Spessore freccia",
+    drawingHeadSize:"Dimensione punta freccia",
+    drawingCurve:"Curvatura freccia",
+    drawingOpacity:"Opacità elemento",
+    playerScale:"Dimensione maglie",
+    playerSize:"Dimensione maglie",
+    ballSize:"Dimensione pallone",
+    textSize:"Dimensione testo"
+  };
+  document.querySelectorAll('input[type="range"]').forEach(element=>{
+    bindContinuousHistoryControl(
+      element,
+      labels[element.id]||element.getAttribute("aria-label")||element.title||"Regolazione"
+    );
+  });
+}
+
+
 function pushHistory(){
   if(historyLocked)return false;
 
@@ -2281,6 +2343,7 @@ function pushHistory(){
 function undo(){
   if(historyLocked || !undoStack.length)return;
 
+  finishContinuousHistoryControls();
   cancelHistoryTransaction();
 
   const current=snapshotState();
@@ -2296,6 +2359,7 @@ function undo(){
 function redo(){
   if(historyLocked || !redoStack.length)return;
 
+  finishContinuousHistoryControls();
   cancelHistoryTransaction();
 
   const current=snapshotState();
@@ -2310,10 +2374,15 @@ function redo(){
 
 function updateHistoryButtons(){
   const touchUndo=document.getElementById("touchUndoBtn");
-  if(touchUndo)touchUndo.disabled=!undoStack.length;
-
+  if(touchUndo){
+    touchUndo.disabled=!undoStack.length;
+    touchUndo.setAttribute("aria-disabled",String(!undoStack.length));
+  }
   const touchRedo=document.getElementById("touchRedoBtn");
-  if(touchRedo)touchRedo.disabled=!redoStack.length;
+  if(touchRedo){
+    touchRedo.disabled=!redoStack.length;
+    touchRedo.setAttribute("aria-disabled",String(!redoStack.length));
+  }
 }
 
 const defaultRoster=[];
@@ -5349,7 +5418,7 @@ function applyDrawingStyleChange(property,value){
       );
 
   if(indexes.length){
-    pushHistory();
+    if(!historyTransaction)pushHistory();
 
     indexes.forEach(index=>{
       const d=page().drawings[index];
@@ -7006,7 +7075,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v154",
+    appVersion:"v155",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -7947,7 +8016,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=154",
+        "./service-worker.js?v=155",
         { updateViaCache: "none" }
       );
 
@@ -8017,6 +8086,8 @@ if ("serviceWorker" in navigator) {
     }
   });
 }
+
+initializeContinuousHistory();
 </script>
 
 </body>

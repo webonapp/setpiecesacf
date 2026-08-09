@@ -367,3 +367,13 @@ Undo/Redo robusto, fase 1
 - Shortcut Undo/Redo ignorate durante la scrittura in input e textarea
 - Corretto cache-busting del service worker rimasto fermo a v127
 - Import progetto normalizzato prima del rendering
+
+
+ROADMAP 20 PASSAGGI - PASSAGGIO 07/20 - v155
+Undo/Redo robusto, fase 2
+- Slider raggruppati in un solo step Undo per gesto.
+- Evitati snapshot multipli durante lo scorrimento.
+- Controlli grafici transaction-aware.
+- Undo/Redo chiudono regolazioni aperte in sicurezza.
+- Stato accessibile Undo/Redo sincronizzato.
+- Cache service worker aggiornata a v155.
