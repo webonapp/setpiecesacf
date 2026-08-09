@@ -599,3 +599,6 @@ Base ripartita dalla v169 stabile.
 - SNAP attivo di default e migrazione una-tantum v177.
 - Flush sincrono su refresh/pagehide/background.
 - Service Worker non salva più durante controllerchange.
+
+
+v178 - Fix eliminazione multipla mista: giocatori, frecce, palloni e testi vengono eliminati insieme con una sola azione. Un solo Undo. Render completo dopo eliminazione. Stato rosa avversaria reso truth-based.
