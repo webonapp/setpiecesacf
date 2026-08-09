@@ -1787,6 +1787,17 @@ body.export-in-progress .rightbar{
   pointer-events:none!important;
 }
 
+
+/* v165: export/stampa robusti - fase 2 */
+body.export-clean-view .field-fullscreen-exit,
+body.export-clean-view .field-fullscreen-nav,
+body.export-clean-view .snap-guide{
+  display:none!important;
+}
+body.export-clean-view .board-shell{
+  box-shadow:none!important;
+}
+
 </style>
 
 <script async src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
@@ -2219,7 +2230,7 @@ body.export-in-progress .rightbar{
 <input type="file" id="projectFile" accept=".json" hidden>
 
 <script>
-const STORAGE_KEY="setPieceBoardPro_v164";
+const STORAGE_KEY="setPieceBoardPro_v165";
 
 function safeStorageGet(key){
   try{
@@ -6453,34 +6464,105 @@ document.getElementById("applyPreset").addEventListener("click",()=>{
 });
 
 
-async function captureCurrentScheme(){
-  const boardShell=document.querySelector(".board-shell");
-  if(!window.html2canvas)throw new Error("Libreria grafica non disponibile");
+function getExportScale(boardShell){
+  const rect=boardShell.getBoundingClientRect();
+  const width=Math.max(1,rect.width);
+  const height=Math.max(1,rect.height);
 
+  /*
+    Mantiene alta qualità su Mac, ma evita canvas eccessivi su iPad/iPhone.
+    Limite prudente: circa 14 megapixel.
+  */
+  const maxPixels=14_000_000;
+  const idealScale=4;
+  const maxScaleByArea=Math.sqrt(maxPixels/(width*height));
+
+  return Math.max(
+    2,
+    Math.min(idealScale,maxScaleByArea)
+  );
+}
+
+async function waitForExportAssets(boardShell){
   if(document.fonts?.ready){
     try{await document.fonts.ready}catch(_){}
   }
 
   const images=[...boardShell.querySelectorAll("img")];
+
   await Promise.all(images.map(img=>{
-    if(img.complete)return Promise.resolve();
+    if(img.complete && img.naturalWidth>0){
+      return Promise.resolve();
+    }
+
     return new Promise(resolve=>{
-      img.addEventListener("load",resolve,{once:true});
-      img.addEventListener("error",resolve,{once:true});
+      const done=()=>resolve();
+      img.addEventListener("load",done,{once:true});
+      img.addEventListener("error",done,{once:true});
+      setTimeout(done,4000);
     });
   }));
 
-  await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+  await nextStableRender();
+}
 
-  return await html2canvas(boardShell,{
-    backgroundColor:"#ffffff",
-    scale:4,
-    useCORS:true,
-    allowTaint:false,
-    logging:false,
-    imageTimeout:15000,
-    removeContainer:true
-  });
+async function captureCurrentScheme(){
+  const boardShell=document.querySelector(".board-shell");
+  if(!boardShell){
+    throw new Error("Campo non disponibile");
+  }
+  if(!window.html2canvas){
+    throw new Error("Libreria grafica non disponibile");
+  }
+
+  await waitForExportAssets(boardShell);
+
+  const preferredScale=getExportScale(boardShell);
+  const attempts=[
+    preferredScale,
+    Math.min(preferredScale,3),
+    2
+  ].filter((value,index,array)=>
+    value>=1.5 &&
+    array.findIndex(v=>Math.abs(v-value)<.05)===index
+  );
+
+  let lastError=null;
+
+  for(const scale of attempts){
+    try{
+      return await html2canvas(boardShell,{
+        backgroundColor:"#ffffff",
+        scale,
+        useCORS:true,
+        allowTaint:false,
+        logging:false,
+        imageTimeout:15000,
+        removeContainer:true,
+        onclone:clonedDocument=>{
+          clonedDocument
+            .querySelectorAll(
+              ".field-fullscreen-exit,"+
+              ".field-fullscreen-nav,"+
+              ".snap-guide"
+            )
+            .forEach(element=>{
+              element.style.display="none";
+            });
+
+          clonedDocument.body.classList.add("export-clean-view");
+        }
+      });
+    }catch(error){
+      lastError=error;
+      console.warn(
+        `Tentativo export fallito a scala ${scale}:`,
+        error
+      );
+    }
+  }
+
+  throw lastError||new Error("Cattura campo non riuscita");
 }
 
 
@@ -6494,7 +6576,12 @@ function snapshotExportUiState(){
     selectedBall,
     selectedBalls:new Set(selectedBalls),
     selectedText,
-    selectedTexts:new Set(selectedTexts)
+    selectedTexts:new Set(selectedTexts),
+    fieldViewMode:Boolean(
+      typeof window.fieldViewMode!=="undefined"
+        ? fieldViewMode
+        : false
+    )
   };
 }
 
@@ -6543,6 +6630,13 @@ function restoreExportUiState(snapshot){
   renderTexts();
   renderDrawings();
   syncDrawingControls();
+
+  if(
+    snapshot.fieldViewMode &&
+    typeof setFieldViewMode==="function"
+  ){
+    setFieldViewMode(true);
+  }
 }
 
 async function nextStableRender(){
@@ -6567,6 +6661,15 @@ document.getElementById("exportPng").addEventListener("click",async()=>{
   try{
     document.body.classList.add("export-in-progress");
     setStatus("Creazione PNG...");
+
+    if(
+      typeof fieldViewMode==="boolean" &&
+      fieldViewMode &&
+      typeof setFieldViewMode==="function"
+    ){
+      setFieldViewMode(false);
+    }
+
     clearExportSelections();
     await nextStableRender();
 
@@ -6596,6 +6699,15 @@ document.getElementById("exportPdf").addEventListener("click",async()=>{
 
   try{
     document.body.classList.add("export-in-progress");
+
+    if(
+      typeof fieldViewMode==="boolean" &&
+      fieldViewMode &&
+      typeof setFieldViewMode==="function"
+    ){
+      setFieldViewMode(false);
+    }
+
     if(!window.jspdf?.jsPDF){
       throw new Error("Libreria PDF non disponibile");
     }
@@ -8021,7 +8133,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v164",
+    appVersion:"v165",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -8980,7 +9092,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=164",
+        "./service-worker.js?v=165",
         { updateViaCache: "none" }
       );
 

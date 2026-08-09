@@ -507,3 +507,18 @@ Export e stampa robusti, fase 1
 - Interazioni bloccate temporaneamente durante l'esportazione.
 - Corretto il rischio di perdere selezioni di palloni, testi, frecce o multi-selezioni.
 - Nessuna modifica al contenuto degli schemi.
+
+
+ROADMAP 20 PASSAGGI - PASSAGGIO 17/20 - v165
+Export e stampa robusti, fase 2
+
+- Export PNG/PDF reso indipendente dalla modalità Campo intero.
+- Prima della cattura viene usata automaticamente la geometria standard del campo.
+- Al termine viene ripristinata anche la precedente modalità Campo intero.
+- Scala export adattiva: alta qualità su Mac, consumo memoria controllato su iPad/iPhone.
+- Limite prudente della superficie canvas per ridurre crash su dispositivi mobili.
+- Retry automatico a qualità inferiore se una cattura ad alta risoluzione fallisce.
+- Attesa esplicita di font e immagini prima dell'acquisizione.
+- Timeout di sicurezza sulle immagini per evitare export bloccati.
+- Controlli fullscreen e guide SNAP esclusi dalla copia esportata.
+- Nessuna modifica ai dati o alla disposizione degli schemi.
