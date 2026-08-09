@@ -579,16 +579,23 @@ v169 - Correzioni richieste + audit v168
 - Nessuna modifica agli schemi esistenti o alla resa delle frecce già salvate.
 
 
-v172 - Base stabile v169: menu preset rimosso, SNAP ON di default, nessuna modifica al motore di caricamento.
+v177 - FIX CRITICO REFRESH / ROSA / SCHEMI
 
+Base ripartita dalla v169 stabile.
 
-v173 - Stato rosa derivato dai giocatori realmente presenti. Eliminato falso alert 'rosa già caricata' causato da booleani stale.
-
-
-v174 - Chiave storage stabile. Un solo stato viene caricato prima del primo render. currentPage persistente. Rimossa commutazione recovery dopo load.
-
-
-v175 - Autosave heartbeat 700ms solo se lo stato cambia. Flush atomico su refresh/background/pagehide. Input/change salvati subito.
-
-
-v176 - Audit finale: coerenza roster/pagine/positions, SNAP ON una volta, niente save durante controllerchange, verifiche sintattiche complete.
+- Un'unica sorgente di stato viene caricata PRIMA del primo render.
+- Rimossa completamente la sostituzione tardiva dello stato tramite recovery.
+- Chiave progetto stabile: setPieceBoardPro_main.
+- currentPage salvato separatamente e dentro il progetto.
+- Dopo refresh viene riaperto automaticamente lo stesso schema.
+- Lo schema viene renderizzato completo immediatamente: rosa, giocatori, palloni, testi, frecce.
+- Il click sul campo o su un pallone non può più essere ciò che "fa comparire" giocatori vecchi.
+- Stato "rosa caricata" derivato dai giocatori realmente presenti, non da un booleano stale.
+- Se la rosa non è realmente presente, il pulsante Carica rosa torna utilizzabile.
+- Menu schemi ricostruito deterministicamente ad ogni render.
+- Cambio schema salva subito currentPage.
+- Aggiunto pulsante visibile NUOVO SCHEMA.
+- Nuovi schemi creati con positions della lunghezza corretta della rosa corrente.
+- SNAP attivo di default e migrazione una-tantum v177.
+- Flush sincrono su refresh/pagehide/background.
+- Service Worker non salva più durante controllerchange.
