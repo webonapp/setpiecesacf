@@ -550,3 +550,19 @@ Stabilità runtime e self-healing
 - Cleanup aggiuntivo su blur e pointercancel, utile soprattutto su iPad.
 - Recovery snapshot aggiornato alla v167.
 - Nessuna modifica intenzionale a grafica o contenuto degli schemi.
+
+
+ROADMAP 20 PASSAGGI - PASSAGGIO 20/20 - v168
+Finalizzazione e hardening generale
+
+- Migrazione automatica del progetto dalle versioni v164-v167.
+- Corretto un bug latente dell'autosave recovery: il debounce era dopo il return di save() e quindi non veniva eseguito.
+- Recovery snapshot aggiornato alla v168.
+- Self-test leggero all'avvio per stato, rosa, campo, layer disegni e storage.
+- Riparazione runtime eseguita prima del rendering finale.
+- Sincronizzazione finale di SNAP, preset frecce e preset visualizzazione.
+- Global error guard reso idempotente.
+- Version marker v168 nel DOM per diagnosi cache.
+- Service Worker aggiornato a v168 e attivazione immediata quando supportata.
+- Nessuna modifica intenzionale alla grafica o agli schemi.
+- ROADMAP 20/20 COMPLETATA.
