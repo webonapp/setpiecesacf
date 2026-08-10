@@ -637,3 +637,18 @@ v181 - FIX COMPLETO v180
 - Tendina schemi sincronizzata e abilitata a ogni render.
 - Service Worker query corretta a v181.
 - Audit statico: nessun listener diretto punta a ID mancanti.
+
+
+v182 - RIGHT COLUMN STABILITY FIX
+- Aggiunto controller indipendente dedicato alla colonna destra.
+- Funziona anche se il grande script principale incontra un errore runtime.
+- Fix Carica rosa Fiorentina.
+- Fix Aggiungi rosa avversario.
+- Fix + Giocatore.
+- Fix toggle nomi selezionati.
+- Fix cerchio Fiorentina/Avversari.
+- Fix Numero nei selezionati.
+- Fix Linea nei selezionati.
+- Fix Note dello schema.
+- Eventi catturati prima dei listener legacy per evitare doppie esecuzioni.
+- Service Worker aggiornato a v182.
