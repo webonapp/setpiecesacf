@@ -2631,25 +2631,24 @@ const FIORENTINA_PRESET=[
   {number:5,firstName:"Marin",lastName:"Pongračić",name:"Marin Pongračić",team:"home",color:"#5b3192"},
   {number:6,firstName:"Luca",lastName:"Ranieri",name:"Luca Ranieri",team:"home",color:"#5b3192"},
   {number:33,firstName:"",lastName:"Viery",name:"Viery",team:"home",color:"#5b3192"},
-  {number:0,firstName:"Víctor",lastName:"Valdepeñas",name:"Víctor Valdepeñas",team:"home",color:"#5b3192"},
-  {number:0,firstName:"Eman",lastName:"Košpo",name:"Eman Košpo",team:"home",color:"#5b3192"},
+  {number:21,firstName:"Víctor",lastName:"Valdepeñas",name:"Víctor Valdepeñas",team:"home",color:"#5b3192"},
+  {number:23,firstName:"Eman",lastName:"Košpo",name:"Eman Košpo",team:"home",color:"#5b3192"},
   {number:29,firstName:"Niccolò",lastName:"Fortini",name:"Niccolò Fortini",team:"home",color:"#5b3192"},
   {number:65,firstName:"Fabiano",lastName:"Parisi",name:"Fabiano Parisi",team:"home",color:"#5b3192"},
-  {number:0,firstName:"Álex",lastName:"Jiménez",name:"Álex Jiménez",team:"home",color:"#5b3192"},
+  {number:20,firstName:"Álex",lastName:"Jiménez",name:"Álex Jiménez",team:"home",color:"#5b3192"},
   {number:2,firstName:"",lastName:"Dodô",name:"Dodô",team:"home",color:"#5b3192"},
-  {number:0,firstName:"João",lastName:"Mário",name:"João Mário",team:"home",color:"#5b3192"},
+  {number:17,firstName:"João",lastName:"Mário",name:"João Mário",team:"home",color:"#5b3192"},
   {number:8,firstName:"Rolando",lastName:"Mandragora",name:"Rolando Mandragora",team:"home",color:"#5b3192"},
-  {number:0,firstName:"Lapo",lastName:"Deli",name:"Lapo Deli",team:"home",color:"#5b3192"},
-  {number:0,firstName:"Christ Inao",lastName:"Oulaï",name:"Christ Inao Oulaï",team:"home",color:"#5b3192"},
+  {number:32,firstName:"Christ Inao",lastName:"Oulaï",name:"Christ Inao Oulaï",team:"home",color:"#5b3192"},
   {number:14,firstName:"Arthur",lastName:"Atta",name:"Arthur Atta",team:"home",color:"#5b3192"},
   {number:27,firstName:"Cher",lastName:"Ndour",name:"Cher Ndour",team:"home",color:"#5b3192"},
   {number:44,firstName:"Nicolò",lastName:"Fagioli",name:"Nicolò Fagioli",team:"home",color:"#5b3192"},
   {number:4,firstName:"Marco",lastName:"Brescianini",name:"Marco Brescianini",team:"home",color:"#5b3192"},
   {number:80,firstName:"Giovanni",lastName:"Fabbian",name:"Giovanni Fabbian",team:"home",color:"#5b3192"},
-  {number:10,firstName:"Albert",lastName:"Gudmundsson",name:"Albert Gudmundsson",team:"home",color:"#5b3192"},
-  {number:20,firstName:"Moise",lastName:"Kean",name:"Moise Kean",team:"home",color:"#5b3192"},
-  {number:9,firstName:"Roberto",lastName:"Piccoli",name:"Roberto Piccoli",team:"home",color:"#5b3192"},
-  {number:61,firstName:"Riccardo",lastName:"Braschi",name:"Riccardo Braschi",team:"home",color:"#5b3192"}
+  {number:11,firstName:"Albert",lastName:"Gudmundsson",name:"Albert Gudmundsson",team:"home",color:"#5b3192"},
+  {number:30,firstName:"Franco",lastName:"Mastantuono",name:"Franco Mastantuono",team:"home",color:"#5b3192"},
+  {number:9,firstName:"Moise",lastName:"Kean",name:"Moise Kean",team:"home",color:"#5b3192"},
+  {number:91,firstName:"Roberto",lastName:"Piccoli",name:"Roberto Piccoli",team:"home",color:"#5b3192"},
 ].map((p,i)=>({id:"p"+i,...p}));
 
 
@@ -2958,7 +2957,6 @@ function applyV94PermanentRosterUpdates(){
     ["valdepenas",{number:0,lastName:"Valdepeñas"}],
     ["kospo",{number:0,lastName:"Košpo"}],
     ["jimenez",{number:0,lastName:"Jiménez"}],
-    ["deli",{number:0,lastName:"Deli"}],
     ["oulai",{number:0,lastName:"Oulaï"}],
     ["ranieri",{number:6,lastName:"Ranieri"}],
     ["fortini",{number:29,lastName:"Fortini"}],
@@ -8238,7 +8236,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v168",
+    appVersion:"v169",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -9210,7 +9208,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=168",
+        "./service-worker.js?v=169",
         { updateViaCache: "none" }
       );
 
