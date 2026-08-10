@@ -1640,25 +1640,7 @@ body.is-dragging .player.selected{
 }
 
 
-.view-preset-control{
-  display:flex;
-  align-items:center;
-  gap:7px;
-  min-height:36px;
-  padding:0 8px;
-  border:1px solid rgba(255,255,255,.12);
-  border-radius:9px;
-  background:rgba(255,255,255,.035);
-  white-space:nowrap;
-  box-sizing:border-box;
-}
-.view-preset-control>span{
-  font-size:10px;
-  font-weight:900;
-  letter-spacing:.06em;
-  text-transform:uppercase;
-  opacity:.74;
-}
+
 #viewPresetSelect{
   min-width:148px;
   max-width:190px;
@@ -1683,7 +1665,6 @@ body.is-dragging .player.selected{
 }
 @media(max-width:820px){
   .touch-command-bar{flex-wrap:wrap!important}
-  .view-preset-control{order:20}
 }
 
 
@@ -2273,11 +2254,6 @@ body.export-clean-view .board-shell{
   <select id="presetSelect"><option value=""></option></select>
   <button id="applyPreset" type="button"></button>
 </div>
-
-
-
-
-
 
 
 <div class="modal-backdrop" id="newSchemeModal">
@@ -3435,8 +3411,6 @@ function getPlayerDisplayOverride(index){
 
   return overrides[key];
 }
-
-
 
 
 const VIEW_PRESETS={
@@ -5082,8 +5056,6 @@ function clearAllSelections(){
 }
 
 
-
-
 function updatePresentationModeButtons(){
   syncViewPresetFromPresentationMode();
   const bench=document.getElementById("benchModeBtn");
@@ -5646,10 +5618,6 @@ function renderBalls(){
     layer.appendChild(el);
   });
 }
-
-
-
-
 
 
 function renderTexts(){
@@ -7848,12 +7816,6 @@ function isEditableTarget(target){
 }
 
 
-
-
-function isEditableTarget(target){
-  return Boolean(target?.closest?.("input, textarea, select, [contenteditable='true']"));
-}
-
 function collectClipboardPayload(){
   const players=[...selectedPlayers]
     .filter(i=>state.roster[i] && page().positions[i])
@@ -8270,18 +8232,6 @@ document.addEventListener("keydown",e=>{
   if(mod && !isEditableTarget(e.target) && e.key.toLowerCase()==="v"){
     e.preventDefault();
     pasteClipboardSelection();
-    return;
-  }
-
-  if(mod && !isEditableTarget(e.target) && e.key.toLowerCase()==="c"){
-    e.preventDefault();
-    copySelectedPlayers();
-    return;
-  }
-
-  if(mod && !isEditableTarget(e.target) && e.key.toLowerCase()==="v"){
-    e.preventDefault();
-    pasteCopiedPlayers();
     return;
   }
 
@@ -8926,7 +8876,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v177",
+    appVersion:"v178",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -9902,7 +9852,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=177",
+        "./service-worker.js?v=178",
         { updateViaCache: "none" }
       );
 

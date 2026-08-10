@@ -586,3 +586,12 @@ v177 - Flip intero campo
 - Maglie, palloni, testi, frecce e forme vengono specchiati rispetto alla mezzeria verticale del campo.
 - Il testo resta leggibile.
 - Undo supportato.
+
+
+v178 - cleanup stabilità
+- Nessuna nuova funzione.
+- Rimosso CSS morto del vecchio controllo VISTA.
+- Rimossa la definizione duplicata di isEditableTarget.
+- Rimosse le seconde scorciatoie Cmd/Ctrl+C e Cmd/Ctrl+V irraggiungibili.
+- Nessuna modifica a rose, SNAP, backup, testi, selezione, drag, Nuovo schema, rinomina o Flip.
+- Audit completo JavaScript, Service Worker, ID e listener superato.
