@@ -579,3 +579,10 @@ v176 - Flip orizzontale
 - Le frecce cambiano correttamente direzione e le curve vengono specchiate.
 - Il testo cambia posizione senza essere scritto al contrario.
 - L'operazione è annullabile con Undo.
+
+
+v177 - Flip intero campo
+- Flip applicato all'intero schema corrente, non alla selezione.
+- Maglie, palloni, testi, frecce e forme vengono specchiati rispetto alla mezzeria verticale del campo.
+- Il testo resta leggibile.
+- Undo supportato.
