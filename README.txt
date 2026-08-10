@@ -522,3 +522,11 @@ Export e stampa robusti, fase 2
 - Timeout di sicurezza sulle immagini per evitare export bloccati.
 - Controlli fullscreen e guide SNAP esclusi dalla copia esportata.
 - Nessuna modifica ai dati o alla disposizione degli schemi.
+
+
+v166 - ripartenza dalla v165 stabile
+- Sistemati i pulsanti Punta e Tratteggio.
+- Default freccia: Punta Media e Tratteggio Continuo.
+- Eliminato completamente il controllo VISTA accanto a SNAP.
+- SNAP attivo al primo avvio della v166; poi resta liberamente disattivabile.
+- Nessuna modifica alla logica delle rose o alle altre funzioni della v165.
