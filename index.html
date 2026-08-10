@@ -2175,6 +2175,7 @@ body.export-clean-view .board-shell{
     <button type="button" class="touch-command" id="touchAlignHorizontalBtn" title="Allinea orizzontalmente">Orizzontale</button>
     <button type="button" class="touch-command" id="touchAlignVerticalBtn" title="Allinea verticalmente">Verticale</button>
     <button type="button" class="touch-command" id="touchDistributeBtn" title="Distribuisci uniformemente">Distribuisci</button>
+    <button type="button" class="touch-command" id="touchFlipHorizontalBtn" title="Flip orizzontale della selezione">Flip</button>
 
     <span class="touch-command-divider"></span><button type="button" class="touch-command" id="touchLockBtn" aria-pressed="false" title="Blocca modifiche sul campo">Blocca</button>
     <button type="button" class="touch-command primary" id="touchFullscreenBtn" title="Mostra solo il campo">Campo intero</button>
@@ -8055,6 +8056,111 @@ function deleteCurrentSelection(){
 }
 
 
+
+function flipSelectedHorizontally(){
+  const playerIndexes=[...selectedPlayers].filter(i=>page().positions[i]);
+  const ballIndexes=[...selectedBalls].filter(i=>page().balls?.[i]);
+  const textIndexes=[...selectedTexts].filter(i=>page().texts?.[i]);
+  const drawingIndexes=[...selectedDrawings].filter(i=>page().drawings?.[i]);
+
+  if(!ballIndexes.length && selectedBall!==null && page().balls?.[selectedBall]){
+    ballIndexes.push(selectedBall);
+  }
+  if(!textIndexes.length && selectedText!==null && page().texts?.[selectedText]){
+    textIndexes.push(selectedText);
+  }
+  if(!drawingIndexes.length && selectedDrawing!==null && page().drawings?.[selectedDrawing]){
+    drawingIndexes.push(selectedDrawing);
+  }
+
+  const xs=[];
+
+  playerIndexes.forEach(index=>{
+    xs.push(page().positions[index].x);
+  });
+
+  ballIndexes.forEach(index=>{
+    xs.push(Number(page().balls[index].x)||50);
+  });
+
+  textIndexes.forEach(index=>{
+    xs.push(Number(page().texts[index].x)||50);
+  });
+
+  drawingIndexes.forEach(index=>{
+    const drawing=page().drawings[index];
+    ["x1","x2","c1x","c2x"].forEach(key=>{
+      if(Number.isFinite(drawing[key])){
+        xs.push(drawing[key]/10);
+      }
+    });
+  });
+
+  if(!xs.length){
+    setStatus("Seleziona almeno un elemento da ribaltare");
+    return false;
+  }
+
+  const centerX=(Math.min(...xs)+Math.max(...xs))/2;
+  const centerDrawingX=centerX*10;
+
+  pushHistory();
+
+  playerIndexes.forEach(index=>{
+    const position=page().positions[index];
+    position.x=centerX*2-position.x;
+    position.x=Math.max(1.5,Math.min(98.5,position.x));
+  });
+
+  ballIndexes.forEach(index=>{
+    const ball=page().balls[index];
+    ball.x=centerX*2-(Number(ball.x)||50);
+    ball.x=Math.max(1.5,Math.min(98.5,ball.x));
+  });
+
+  textIndexes.forEach(index=>{
+    const text=page().texts[index];
+    text.x=centerX*2-(Number(text.x)||50);
+    text.x=Math.max(1,Math.min(99,text.x));
+  });
+
+  drawingIndexes.forEach(index=>{
+    const drawing=page().drawings[index];
+
+    ["x1","x2","c1x","c2x"].forEach(key=>{
+      if(Number.isFinite(drawing[key])){
+        drawing[key]=centerDrawingX*2-drawing[key];
+      }
+    });
+
+    clampDrawing(drawing);
+  });
+
+  renderPlayers();
+  renderBalls();
+  renderTexts();
+  renderDrawings();
+  refreshUnifiedSelectionVisuals();
+  syncDrawingControls();
+  updateLineupCounters();
+  save(false);
+
+  const total=
+    playerIndexes.length+
+    ballIndexes.length+
+    textIndexes.length+
+    drawingIndexes.length;
+
+  setStatus(
+    total===1
+      ? "Flip orizzontale applicato"
+      : `Flip orizzontale applicato a ${total} elementi`
+  );
+
+  return true;
+}
+
+
 function moveSelectedIndexesWithinArray(array,selectedSet,mode){
   const selected=[...selectedSet]
     .filter(index=>array[index]!==undefined)
@@ -8863,7 +8969,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v175",
+    appVersion:"v176",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -9770,6 +9876,10 @@ document.getElementById("touchDistributeBtn").addEventListener(
   "click",
   distributeSelectedHorizontally
 );
+document.getElementById("touchFlipHorizontalBtn").addEventListener(
+  "click",
+  flipSelectedHorizontally
+);
 
 document.getElementById("touchLockBtn").addEventListener("click",toggleFieldLock);
 document.getElementById("touchFullscreenBtn").addEventListener(
@@ -9835,7 +9945,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=175",
+        "./service-worker.js?v=176",
         { updateViaCache: "none" }
       );
 

@@ -570,3 +570,12 @@ v174 - Nuovo schema
 - Posizioni e override dei giocatori vengono riallineati alla rosa corrente per nome/numero.
 - Frecce, forme, palloni, testi e note del Layout vengono copiati nel nuovo schema.
 - Nessuna modifica alle logiche v173 di selezione e spostamento.
+
+
+v176 - Flip orizzontale
+- Aggiunto pulsante Flip accanto a Distribuisci.
+- Il flip lavora sulla selezione corrente.
+- Maglie, palloni, testi, frecce e forme vengono specchiati rispetto al centro orizzontale della selezione.
+- Le frecce cambiano correttamente direzione e le curve vengono specchiate.
+- Il testo cambia posizione senza essere scritto al contrario.
+- L'operazione è annullabile con Undo.
