@@ -588,6 +588,13 @@ v177 - Flip intero campo
 - Undo supportato.
 
 
+v179 - compatibilità Safari e iPad
+- Flip reso atomico contro attivazioni touch duplicate
+- Ridisegno del Flip distribuito su requestAnimationFrame consecutivi
+- Pointer capture protetta e rilascio sicuro su pointerup/pointercancel
+- Ponte touch limitato a Safari touch
+- Metadati PWA Apple e cache aggiornati alla v179
+
 v178 - cleanup stabilità
 - Nessuna nuova funzione.
 - Rimosso CSS morto del vecchio controllo VISTA.

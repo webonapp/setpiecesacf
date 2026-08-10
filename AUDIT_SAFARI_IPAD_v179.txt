@@ -1,0 +1,25 @@
+ACF Fiorentina - Set Pieces App v179
+Audit compatibilita Safari / iPad
+
+Interventi
+- Flip dell'intero campo protetto da attivazioni multiple nello stesso gesto.
+- Ridisegno di giocatori, palloni, testi e disegni sincronizzato su frame distinti.
+- Pointer capture resa sicura anche quando Safari rifiuta o perde la cattura.
+- Pulizia completa su pointercancel per selezione e strumenti di disegno.
+- Ponte di attivazione touch applicato solo a Safari su dispositivi touch.
+- Soppressione del click nativo tardivo estesa agli elementi figli del comando.
+- Pulsanti normalizzati con appearance e tap highlight compatibili WebKit.
+- Metadati Apple PWA aggiunti.
+- Cache Service Worker aggiornata a v179.
+
+Funzioni esistenti
+Nessuna funzione e nessun formato dati sono stati rimossi o modificati.
+Il Flip continua ad agire sull'intero campo ed e compatibile con Undo.
+
+Verifiche statiche
+- Sintassi JavaScript applicazione
+- Sintassi JavaScript Service Worker
+- ID HTML univoci
+- Riferimenti document.getElementById risolti
+- Asset manifest e app shell presenti
+- Versionamento HTML/backup/Service Worker allineato a v179
