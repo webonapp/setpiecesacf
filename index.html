@@ -1856,6 +1856,97 @@ body.export-clean-view .board-shell{
   flex:0 0 auto;
 }
 
+
+/* v174 - Nuovo schema */
+.new-scheme-launch{
+  width:100%;
+  margin-top:6px;
+  min-height:36px;
+  font-weight:850;
+}
+.new-scheme-modal{
+  width:min(480px,94vw);
+}
+.new-scheme-choice{
+  width:100%;
+  display:flex;
+  flex-direction:column;
+  align-items:flex-start;
+  gap:4px;
+  padding:13px 14px;
+  border:1px solid #35506b;
+  border-radius:10px;
+  background:#111d2a;
+  color:var(--text);
+  cursor:pointer;
+  text-align:left;
+}
+.new-scheme-choice:hover{
+  border-color:#6fa5d9;
+  background:#172638;
+}
+.new-scheme-choice strong{
+  font-size:13px;
+  font-weight:900;
+}
+.new-scheme-choice span{
+  color:var(--muted);
+  font-size:10px;
+  line-height:1.35;
+}
+.new-scheme-layout-section{
+  margin-top:14px;
+  padding-top:12px;
+  border-top:1px solid var(--line);
+}
+.new-scheme-layout-list{
+  display:flex;
+  flex-direction:column;
+  gap:7px;
+  margin-top:8px;
+  max-height:260px;
+  overflow:auto;
+}
+.new-scheme-layout-empty{
+  padding:12px;
+  border:1px dashed var(--line);
+  border-radius:9px;
+  color:var(--muted);
+  font-size:10px;
+  line-height:1.4;
+}
+.new-scheme-layout-item{
+  width:100%;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  gap:10px;
+  align-items:center;
+  padding:10px 11px;
+  border:1px solid var(--line);
+  border-radius:9px;
+  background:#0d1721;
+  color:var(--text);
+  cursor:pointer;
+  text-align:left;
+}
+.new-scheme-layout-item:hover{
+  border-color:#5f83a8;
+  background:#132131;
+}
+.new-scheme-layout-name{
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  font-size:11px;
+  font-weight:850;
+}
+.new-scheme-layout-use{
+  color:#8bd450;
+  font-size:10px;
+  font-weight:900;
+}
+
 </style>
 
 <script async src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
@@ -1981,6 +2072,7 @@ body.export-clean-view .board-shell{
   <div class="library-panel">
     <div class="library-title">Schemes</div>
     <select class="select" id="schemeSelect"></select>
+    <button type="button" class="btn primary new-scheme-launch" id="newSchemeBtn">＋ Nuovo schema</button>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px">
       <button class="btn" id="duplicatePage">Duplica</button>
       <button class="btn danger" id="deletePage">Elimina</button>
@@ -2145,6 +2237,28 @@ body.export-clean-view .board-shell{
 
 
 
+
+
+<div class="modal-backdrop" id="newSchemeModal">
+  <div class="modal new-scheme-modal">
+    <h2>Nuovo schema</h2>
+    <p>Scegli come creare il nuovo schema.</p>
+
+    <button type="button" class="new-scheme-choice blank" id="newBlankSchemeBtn">
+      <strong>＋ Schema vuoto</strong>
+      <span>Crea un nuovo campo senza giocatori o oggetti.</span>
+    </button>
+
+    <div class="new-scheme-layout-section">
+      <div class="section-title">Oppure usa un Layout</div>
+      <div class="new-scheme-layout-list" id="newSchemeLayoutList"></div>
+    </div>
+
+    <div class="modal-actions">
+      <button type="button" class="btn" id="cancelNewSchemeBtn">Annulla</button>
+    </div>
+  </div>
+</div>
 
 <div class="modal-backdrop" id="schemeRenameModal">
   <div class="modal scheme-rename-modal">
@@ -6612,6 +6726,224 @@ document.getElementById("schemeSelect").addEventListener("change",e=>{
 });
 document.getElementById("renameScheme").addEventListener("click",()=>{pushHistory();page().title=document.getElementById("schemeName").value.trim()||`Schema ${currentPage+1}`;renderSchemeSelect();save(false)});
 document.getElementById("addScheme").addEventListener("click",()=>{if(state.pages.length>=30){alert("Massimo 30 schemi");return}pushHistory();state.pages.push(emptyPage(state.pages.length));currentPage=state.pages.length-1;renderAll();save()});
+
+function closeNewSchemeModal(){
+  document.getElementById("newSchemeModal")?.classList.remove("open");
+}
+
+function makeBlankSchemeForCurrentRoster(){
+  const index=state.pages.length;
+  return {
+    title:`Schema ${index+1}`,
+    notes:"",
+    positions:Array.from({length:state.roster.length},()=>null),
+    drawings:[],
+    balls:[],
+    texts:[],
+    playerDisplayOverrides:{}
+  };
+}
+
+function normalizeLayoutPlayerKey(player){
+  const team=player?.team==="away" ? "away" : "home";
+  const label=String(
+    player?.lastName ||
+    player?.name ||
+    ""
+  )
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g,"")
+    .trim()
+    .toLowerCase();
+
+  const number=String(
+    player?.number===null || player?.number===undefined
+      ? ""
+      : player.number
+  );
+
+  return `${team}|${label}|${number}`;
+}
+
+function getLayoutSourcePage(project){
+  const data=project?.data;
+  if(!data || !Array.isArray(data.pages) || !data.pages.length)return null;
+
+  const exact=data.pages.find(projectPage=>
+    String(projectPage?.title||"").trim()===String(project.name||"").trim()
+  );
+
+  return exact || data.pages[0];
+}
+
+function makeSchemeFromLayoutProject(project){
+  const sourcePage=getLayoutSourcePage(project);
+  const sourceRoster=Array.isArray(project?.data?.roster)
+    ? project.data.roster
+    : [];
+
+  if(!sourcePage)return null;
+
+  const sourceIndexByKey=new Map();
+  sourceRoster.forEach((player,index)=>{
+    const key=normalizeLayoutPlayerKey(player);
+    if(!sourceIndexByKey.has(key)){
+      sourceIndexByKey.set(key,index);
+    }
+  });
+
+  const currentToSource=new Map();
+  state.roster.forEach((player,currentIndex)=>{
+    const sourceIndex=sourceIndexByKey.get(
+      normalizeLayoutPlayerKey(player)
+    );
+    if(Number.isInteger(sourceIndex)){
+      currentToSource.set(currentIndex,sourceIndex);
+    }
+  });
+
+  const positions=Array.from(
+    {length:state.roster.length},
+    (_,currentIndex)=>{
+      const sourceIndex=currentToSource.get(currentIndex);
+      const position=Number.isInteger(sourceIndex)
+        ? sourcePage.positions?.[sourceIndex]
+        : null;
+
+      return position &&
+        Number.isFinite(Number(position.x)) &&
+        Number.isFinite(Number(position.y))
+          ? {x:Number(position.x),y:Number(position.y)}
+          : null;
+    }
+  );
+
+  const overrides={};
+  currentToSource.forEach((sourceIndex,currentIndex)=>{
+    const sourceOverride=sourcePage.playerDisplayOverrides?.[sourceIndex];
+    if(sourceOverride && typeof sourceOverride==="object"){
+      overrides[currentIndex]=JSON.parse(JSON.stringify(sourceOverride));
+    }
+  });
+
+  return {
+    title:String(project.name||sourcePage.title||`Schema ${state.pages.length+1}`),
+    notes:String(sourcePage.notes||""),
+    positions,
+    drawings:Array.isArray(sourcePage.drawings)
+      ? JSON.parse(JSON.stringify(sourcePage.drawings))
+      : [],
+    balls:Array.isArray(sourcePage.balls)
+      ? JSON.parse(JSON.stringify(sourcePage.balls))
+      : [],
+    texts:Array.isArray(sourcePage.texts)
+      ? JSON.parse(JSON.stringify(sourcePage.texts))
+      : [],
+    playerDisplayOverrides:overrides
+  };
+}
+
+function addNewSchemeToProject(newPage,statusMessage){
+  if(state.pages.length>=30){
+    alert("Massimo 30 schemi");
+    return false;
+  }
+
+  pushHistory();
+  state.pages.push(newPage);
+  currentPage=state.pages.length-1;
+
+  clearSelectionKinds();
+  marqueeStart=null;
+  marqueeMoved=false;
+  editingTextIndex=null;
+
+  renderAll();
+  save(false);
+  closeNewSchemeModal();
+  setStatus(statusMessage);
+  return true;
+}
+
+function createBlankSchemeFromModal(){
+  addNewSchemeToProject(
+    makeBlankSchemeForCurrentRoster(),
+    "Nuovo schema vuoto creato"
+  );
+}
+
+function createSchemeFromLayoutProject(project){
+  const scheme=makeSchemeFromLayoutProject(project);
+
+  if(!scheme){
+    alert("Il Layout selezionato non contiene uno schema valido.");
+    return;
+  }
+
+  addNewSchemeToProject(
+    scheme,
+    `Layout "${project.name}" copiato`
+  );
+}
+
+function renderNewSchemeLayoutChoices(){
+  loadArchive();
+
+  const list=document.getElementById("newSchemeLayoutList");
+  if(!list)return;
+
+  list.innerHTML="";
+
+  const layoutFolder=archiveState.folders.find(folder=>folder.type==="layout");
+  const projects=Array.isArray(layoutFolder?.projects)
+    ? layoutFolder.projects
+    : [];
+
+  if(!projects.length){
+    const empty=document.createElement("div");
+    empty.className="new-scheme-layout-empty";
+    empty.textContent="Nessun Layout salvato. Puoi crearne uno dal Database ACF con “Salva nei Layout”.";
+    list.appendChild(empty);
+    return;
+  }
+
+  projects.forEach(project=>{
+    const button=document.createElement("button");
+    button.type="button";
+    button.className="new-scheme-layout-item";
+
+    const name=document.createElement("span");
+    name.className="new-scheme-layout-name";
+    name.textContent=project.name||"Layout";
+
+    const use=document.createElement("span");
+    use.className="new-scheme-layout-use";
+    use.textContent="Usa copia";
+
+    button.append(name,use);
+    button.addEventListener("click",()=>{
+      createSchemeFromLayoutProject(project);
+    });
+
+    list.appendChild(button);
+  });
+}
+
+function openNewSchemeModal(){
+  renderNewSchemeLayoutChoices();
+  document.getElementById("newSchemeModal")?.classList.add("open");
+}
+
+document.getElementById("newSchemeBtn").addEventListener("click",openNewSchemeModal);
+document.getElementById("newBlankSchemeBtn").addEventListener("click",createBlankSchemeFromModal);
+document.getElementById("cancelNewSchemeBtn").addEventListener("click",closeNewSchemeModal);
+
+document.getElementById("newSchemeModal").addEventListener("click",event=>{
+  if(event.target.id==="newSchemeModal"){
+    closeNewSchemeModal();
+  }
+});
+
 document.getElementById("deletePage").addEventListener("click",()=>{if(state.pages.length===1)return alert("Deve restare almeno uno schema");if(confirm("Eliminare lo schema corrente?")){pushHistory();state.pages.splice(currentPage,1);currentPage=Math.max(0,currentPage-1);renderAll();save()}});
 document.getElementById("duplicatePage").addEventListener("click",()=>{pushHistory();const copy=JSON.parse(JSON.stringify(page()));copy.title=page().title+" copia";state.pages.splice(currentPage+1,0,copy);currentPage++;renderAll();save()});
 let notesHistoryTimer=null;
@@ -8468,7 +8800,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v173",
+    appVersion:"v174",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -9440,7 +9772,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=173",
+        "./service-worker.js?v=174",
         { updateViaCache: "none" }
       );
 

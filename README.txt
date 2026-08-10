@@ -560,3 +560,13 @@ v173 - motore unico selezione/spostamento
 - Eliminazione mista corretta: giocatori + testi + palloni + frecce vengono eliminati/rimossi nello stesso comando.
 - Salvataggio e Undo vengono registrati una sola volta a fine drag.
 - Cambio schema azzera completamente stato di selezione e marquee.
+
+
+v174 - Nuovo schema
+- Aggiunto pulsante + Nuovo schema sopra Duplica / Elimina.
+- Apre una piccola finestra con due percorsi: Schema vuoto oppure copia da Layout.
+- I Layout vengono letti direttamente dalla cartella Layout del Database ACF.
+- La copia di un Layout aggiunge un nuovo schema senza sostituire il progetto corrente.
+- Posizioni e override dei giocatori vengono riallineati alla rosa corrente per nome/numero.
+- Frecce, forme, palloni, testi e note del Layout vengono copiati nel nuovo schema.
+- Nessuna modifica alle logiche v173 di selezione e spostamento.
