@@ -1844,6 +1844,18 @@ body.export-clean-view .board-shell{
 .backup-safety-indicator.clean .backup-safety-dot{background:#65cf84}
 @media(max-width:1200px){.backup-safety-indicator{min-width:170px;max-width:190px}}
 
+
+/* v172 - alert backup accanto alle azioni di destra */
+.topbar > #backupSafetyIndicator{
+  margin-left:auto;
+  margin-right:8px;
+  flex:0 0 auto;
+}
+.topbar > .top-actions{
+  margin-left:0;
+  flex:0 0 auto;
+}
+
 </style>
 
 <script async src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
@@ -1866,15 +1878,16 @@ body.export-clean-view .board-shell{
       <h1>ACF Fiorentina - Set Pieces App</h1>
       <small></small>
     </div></div>
-  <div id="backupSafetyIndicator" class="backup-safety-indicator dirty" aria-live="polite">
+  
+  <div class="topbar-substitution-slot">
+    <button type="button" class="btn substitution-launch-btn substitution-topbar" id="openSubstitutionBtn">Sostituzione</button>
+  </div>
+<div id="backupSafetyIndicator" class="backup-safety-indicator dirty" aria-live="polite">
     <span class="backup-safety-dot"></span>
     <div>
       <strong>BACKUP NON ESPORTATO</strong>
       <small id="backupChangeCounter">0 modifiche</small>
     </div>
-  </div>
-  <div class="topbar-substitution-slot">
-    <button type="button" class="btn substitution-launch-btn substitution-topbar" id="openSubstitutionBtn">Sostituzione</button>
   </div>
   <div class="top-actions">
     <button class="btn" id="importRosterBtn">Importa rosa</button>
@@ -2624,31 +2637,31 @@ const emptyPage=i=>({title:i===0?"ACF Fiorentina · Schema 1":`Schema ${i+1}`,no
 let state={roster:defaultRoster,pages:Array.from({length:10},(_,i)=>emptyPage(i)),playerScale:.90,snapEnabled:true,homeChestCircle:true,awayChestCircle:false,homeRosterLoaded:false,awayRosterLoaded:false,homeRosterTemplate:null};
 
 const FIORENTINA_PRESET=[
-  {number:43,firstName:"David",lastName:"De Gea",name:"David De Gea",team:"gk",color:"#e3b52d"},
-  {number:53,firstName:"Oliver",lastName:"Christensen",name:"Oliver Christensen",team:"gk",color:"#e3b52d"},
-  {number:1,firstName:"Luca",lastName:"Lezzerini",name:"Luca Lezzerini",team:"gk",color:"#e3b52d"},
-  {number:3,firstName:"Radu",lastName:"Drăgușin",name:"Radu Drăgușin",team:"home",color:"#5b3192"},
-  {number:5,firstName:"Marin",lastName:"Pongračić",name:"Marin Pongračić",team:"home",color:"#5b3192"},
-  {number:6,firstName:"Luca",lastName:"Ranieri",name:"Luca Ranieri",team:"home",color:"#5b3192"},
+  {number:43,firstName:"",lastName:"De Gea",name:"De Gea",team:"gk",color:"#e3b52d"},
+  {number:53,firstName:"",lastName:"Christensen",name:"Christensen",team:"gk",color:"#e3b52d"},
+  {number:1,firstName:"",lastName:"Lezzerini",name:"Lezzerini",team:"gk",color:"#e3b52d"},
+  {number:3,firstName:"",lastName:"Drăgușin",name:"Drăgușin",team:"home",color:"#5b3192"},
+  {number:5,firstName:"",lastName:"Pongračić",name:"Pongračić",team:"home",color:"#5b3192"},
+  {number:6,firstName:"",lastName:"Ranieri",name:"Ranieri",team:"home",color:"#5b3192"},
   {number:33,firstName:"",lastName:"Viery",name:"Viery",team:"home",color:"#5b3192"},
-  {number:21,firstName:"Víctor",lastName:"Valdepeñas",name:"Víctor Valdepeñas",team:"home",color:"#5b3192"},
-  {number:23,firstName:"Eman",lastName:"Košpo",name:"Eman Košpo",team:"home",color:"#5b3192"},
-  {number:29,firstName:"Niccolò",lastName:"Fortini",name:"Niccolò Fortini",team:"home",color:"#5b3192"},
-  {number:65,firstName:"Fabiano",lastName:"Parisi",name:"Fabiano Parisi",team:"home",color:"#5b3192"},
-  {number:20,firstName:"Álex",lastName:"Jiménez",name:"Álex Jiménez",team:"home",color:"#5b3192"},
+  {number:21,firstName:"",lastName:"Valdepeñas",name:"Valdepeñas",team:"home",color:"#5b3192"},
+  {number:23,firstName:"",lastName:"Košpo",name:"Košpo",team:"home",color:"#5b3192"},
+  {number:29,firstName:"",lastName:"Fortini",name:"Fortini",team:"home",color:"#5b3192"},
+  {number:65,firstName:"",lastName:"Parisi",name:"Parisi",team:"home",color:"#5b3192"},
+  {number:20,firstName:"",lastName:"Jiménez",name:"Jiménez",team:"home",color:"#5b3192"},
   {number:2,firstName:"",lastName:"Dodô",name:"Dodô",team:"home",color:"#5b3192"},
-  {number:17,firstName:"João",lastName:"Mário",name:"João Mário",team:"home",color:"#5b3192"},
-  {number:8,firstName:"Rolando",lastName:"Mandragora",name:"Rolando Mandragora",team:"home",color:"#5b3192"},
-  {number:32,firstName:"Christ Inao",lastName:"Oulaï",name:"Christ Inao Oulaï",team:"home",color:"#5b3192"},
-  {number:14,firstName:"Arthur",lastName:"Atta",name:"Arthur Atta",team:"home",color:"#5b3192"},
-  {number:27,firstName:"Cher",lastName:"Ndour",name:"Cher Ndour",team:"home",color:"#5b3192"},
-  {number:44,firstName:"Nicolò",lastName:"Fagioli",name:"Nicolò Fagioli",team:"home",color:"#5b3192"},
-  {number:4,firstName:"Marco",lastName:"Brescianini",name:"Marco Brescianini",team:"home",color:"#5b3192"},
-  {number:80,firstName:"Giovanni",lastName:"Fabbian",name:"Giovanni Fabbian",team:"home",color:"#5b3192"},
-  {number:11,firstName:"Albert",lastName:"Gudmundsson",name:"Albert Gudmundsson",team:"home",color:"#5b3192"},
-  {number:30,firstName:"Franco",lastName:"Mastantuono",name:"Franco Mastantuono",team:"home",color:"#5b3192"},
-  {number:9,firstName:"Moise",lastName:"Kean",name:"Moise Kean",team:"home",color:"#5b3192"},
-  {number:91,firstName:"Roberto",lastName:"Piccoli",name:"Roberto Piccoli",team:"home",color:"#5b3192"},
+  {number:17,firstName:"",lastName:"Joao Mario",name:"Joao Mario",team:"home",color:"#5b3192"},
+  {number:8,firstName:"",lastName:"Mandragora",name:"Mandragora",team:"home",color:"#5b3192"},
+  {number:32,firstName:"",lastName:"Oulai",name:"Oulai",team:"home",color:"#5b3192"},
+  {number:14,firstName:"",lastName:"Atta",name:"Atta",team:"home",color:"#5b3192"},
+  {number:27,firstName:"",lastName:"Ndour",name:"Ndour",team:"home",color:"#5b3192"},
+  {number:44,firstName:"",lastName:"Fagioli",name:"Fagioli",team:"home",color:"#5b3192"},
+  {number:4,firstName:"",lastName:"Brescianini",name:"Brescianini",team:"home",color:"#5b3192"},
+  {number:80,firstName:"",lastName:"Fabbian",name:"Fabbian",team:"home",color:"#5b3192"},
+  {number:11,firstName:"",lastName:"Gudmundsson",name:"Gudmundsson",team:"home",color:"#5b3192"},
+  {number:30,firstName:"",lastName:"Mastantuono",name:"Mastantuono",team:"home",color:"#5b3192"},
+  {number:9,firstName:"",lastName:"Kean",name:"Kean",team:"home",color:"#5b3192"},
+  {number:91,firstName:"",lastName:"Piccoli",name:"Piccoli",team:"home",color:"#5b3192"},
 ].map((p,i)=>({id:"p"+i,...p}));
 
 
@@ -3038,7 +3051,7 @@ function load(){
     }));
   }
 
-  /* v170: il template Fiorentina segue sempre il preset incluso nell'app.
+  /* v171: il template Fiorentina segue sempre il preset incluso nell'app.
      Evita che un vecchio template salvato nel browser nasconda gli aggiornamenti rosa. */
   state.homeRosterTemplate=FIORENTINA_PRESET.map((player,index)=>({
     ...player,
@@ -3046,37 +3059,91 @@ function load(){
     showLastName:player.showLastName!==false,
     showChestCircle:player.showChestCircle!==false
   }));
-  /* v170: sincronizza anche una rosa Fiorentina già caricata senza perdere le posizioni sul campo. */
-  const presetBySurname=new Map(FIORENTINA_PRESET.map(player=>[
-    String(player.lastName||"").toLowerCase(),player
-  ]));
-  const existingHomeSurnames=new Set();
-  state.roster.forEach(player=>{
-    if(player.team==="away")return;
+  /* v171: solo cognomi nella rosa, eccezioni Oulai e Joao Mario.
+     Aggiorna anche una rosa già salvata e rimuove l'eventuale doppione Joao Mario. */
+  const officialHome=FIORENTINA_PRESET.map(player=>JSON.parse(JSON.stringify(player)));
+
+  const homeByKey=new Map();
+  officialHome.forEach(player=>{
     const key=String(player.lastName||player.name||"").trim().toLowerCase();
-    existingHomeSurnames.add(key);
-    const fresh=presetBySurname.get(key);
-    if(!fresh)return;
-    player.number=fresh.number;
-    player.firstName=fresh.firstName;
-    player.lastName=fresh.lastName;
-    player.name=fresh.name;
-    player.role=fresh.role||player.role;
+    homeByKey.set(key,player);
   });
+
+  const normalizeLegacyHomeKey=value=>{
+    const raw=String(value||"").trim().toLowerCase();
+    if((raw.includes("joao") && raw.includes("mario")) || (raw.includes("joão") && raw.includes("mário"))){
+      return "joao mario";
+    }
+    if(raw==="mário" || raw==="mario")return "joao mario";
+    if(raw.includes("oulai") || raw.includes("oulaï"))return "oulai";
+    return raw;
+  };
+
+  const seenOfficial=new Set();
+  const nextRoster=[];
+  const oldToNewIndex=new Map();
+
+  state.roster.forEach((player,oldIndex)=>{
+    if(player.team==="away"){
+      oldToNewIndex.set(oldIndex,nextRoster.length);
+      nextRoster.push(player);
+      return;
+    }
+
+    const key=normalizeLegacyHomeKey(player.lastName||player.name);
+    const fresh=homeByKey.get(key);
+    if(!fresh)return;
+
+    const officialKey=String(fresh.lastName).toLowerCase();
+    if(seenOfficial.has(officialKey))return;
+
+    seenOfficial.add(officialKey);
+
+    const updated={
+      ...player,
+      number:fresh.number,
+      firstName:"",
+      lastName:fresh.lastName,
+      name:fresh.name,
+      team:fresh.team,
+      color:fresh.color,
+      role:fresh.role||player.role
+    };
+
+    oldToNewIndex.set(oldIndex,nextRoster.length);
+    nextRoster.push(updated);
+  });
+
   if(state.homeRosterLoaded){
-    FIORENTINA_PRESET.forEach(fresh=>{
-      const key=String(fresh.lastName||"").toLowerCase();
-      if(existingHomeSurnames.has(key))return;
-      const newIndex=state.roster.length;
-      state.roster.push({
-        ...JSON.parse(JSON.stringify(fresh)),
-        id:`acf-v170-${newIndex}`,
+    officialHome.forEach(fresh=>{
+      const officialKey=String(fresh.lastName).toLowerCase();
+      if(seenOfficial.has(officialKey))return;
+
+      seenOfficial.add(officialKey);
+      nextRoster.push({
+        ...fresh,
+        id:`acf-v171-${nextRoster.length}`,
         showLastName:true,
         showChestCircle:fresh.team==="gk"?true:state.homeChestCircle
       });
-      state.pages.forEach(pg=>pg.positions.push(null));
     });
   }
+
+  const oldPagesPositions=state.pages.map(pg=>
+    Array.isArray(pg.positions)?pg.positions.slice():[]
+  );
+
+  state.roster=nextRoster;
+
+  state.pages.forEach((pg,pageIndex)=>{
+    const nextPositions=Array.from({length:state.roster.length},()=>null);
+
+    oldToNewIndex.forEach((newIndex,oldIndex)=>{
+      nextPositions[newIndex]=oldPagesPositions[pageIndex]?.[oldIndex]||null;
+    });
+
+    pg.positions=nextPositions;
+  });
 
   state.pages.forEach(p=>{
     if(!Array.isArray(p.balls))p.balls=[];
@@ -8268,7 +8335,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v170",
+    appVersion:"v172",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -9240,7 +9307,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=170",
+        "./service-worker.js?v=172",
         { updateViaCache: "none" }
       );
 
