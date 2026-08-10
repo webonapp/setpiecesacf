@@ -1828,6 +1828,22 @@ body.export-clean-view .board-shell{
   overflow:hidden;
 }
 
+
+/* v167 - indicatore sicurezza backup */
+.backup-safety-indicator{
+  min-width:210px;max-width:250px;height:42px;padding:5px 10px;
+  border:1px solid;border-radius:8px;display:flex;align-items:center;gap:8px;
+  line-height:1.05;transition:background .16s ease,border-color .16s ease,color .16s ease;
+}
+.backup-safety-indicator .backup-safety-dot{width:9px;height:9px;border-radius:50%;flex:0 0 auto}
+.backup-safety-indicator strong{display:block;font-size:9px;font-weight:900;letter-spacing:.045em}
+.backup-safety-indicator small{display:block;margin-top:3px;font-size:9px;opacity:.88}
+.backup-safety-indicator.dirty{background:rgba(146,42,49,.20);border-color:#a84349;color:#ffd8da}
+.backup-safety-indicator.dirty .backup-safety-dot{background:#ef5d66}
+.backup-safety-indicator.clean{background:rgba(43,111,67,.22);border-color:#42855b;color:#d8ffe5}
+.backup-safety-indicator.clean .backup-safety-dot{background:#65cf84}
+@media(max-width:1200px){.backup-safety-indicator{min-width:170px;max-width:190px}}
+
 </style>
 
 <script async src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
@@ -1850,6 +1866,13 @@ body.export-clean-view .board-shell{
       <h1>ACF Fiorentina - Set Pieces App</h1>
       <small></small>
     </div></div>
+  <div id="backupSafetyIndicator" class="backup-safety-indicator dirty" aria-live="polite">
+    <span class="backup-safety-dot"></span>
+    <div>
+      <strong>BACKUP NON ESPORTATO</strong>
+      <small id="backupChangeCounter">0 modifiche</small>
+    </div>
+  </div>
   <div class="topbar-substitution-slot">
     <button type="button" class="btn substitution-launch-btn substitution-topbar" id="openSubstitutionBtn">Sostituzione</button>
   </div>
@@ -2879,7 +2902,38 @@ function assertProjectIntegrity(projectState){
   );
 }
 
+
+let backupSafetyReady=false;
+let backupExported=false;
+let backupModificationCount=0;
+
+function updateBackupSafetyIndicator(){
+  const box=document.getElementById("backupSafetyIndicator");
+  const counter=document.getElementById("backupChangeCounter");
+  if(!box || !counter)return;
+  const count=backupModificationCount;
+  counter.textContent=`${count} ${count===1?"modifica":"modifiche"}`;
+  box.classList.toggle("dirty",!backupExported);
+  box.classList.toggle("clean",backupExported);
+  const title=box.querySelector("strong");
+  if(title)title.textContent=backupExported?"BACKUP ESPORTATO":"BACKUP NON ESPORTATO";
+}
+
+function registerBackupModification(){
+  if(!backupSafetyReady)return;
+  backupModificationCount++;
+  backupExported=false;
+  updateBackupSafetyIndicator();
+}
+
+function registerBackupExport(){
+  backupExported=true;
+  backupModificationCount=0;
+  updateBackupSafetyIndicator();
+}
+
 function save(show=true){
+  registerBackupModification();
   state=normalizeProjectState(state);
 
   if(!assertProjectIntegrity(state)){
@@ -8154,7 +8208,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v166",
+    appVersion:"v167",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -8213,6 +8267,7 @@ async function exportBackupFile(){
           title:"Backup ACF Set Pieces",
           text:"Backup completo ACF Fiorentina Set Pieces"
         });
+        registerBackupExport();
         setStatus("Backup esportato");
         return;
       }catch(error){
@@ -8243,6 +8298,7 @@ async function exportBackupFile(){
       link.remove();
     },2500);
 
+    registerBackupExport();
     setStatus("Backup esportato");
   }catch(error){
     console.error("Errore esportazione backup:",error);
@@ -8579,6 +8635,7 @@ async function importBackupFile(file){
     syncChestCircleControls();
     updateLineupCounters();
 
+    registerBackupExport();
     setStatus("Backup importato correttamente");
     alert(
       "Backup importato correttamente.\n\n"+
@@ -9112,6 +9169,10 @@ try{
   state.snapEnabled=true;
 }
 renderAll();updateHistoryButtons();syncDrawingControls();updateSelectedNamesButton();syncChestCircleControls();
+backupSafetyReady=true;
+backupExported=false;
+backupModificationCount=0;
+updateBackupSafetyIndicator();
 </script>
 
 <script>
@@ -9119,7 +9180,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=166",
+        "./service-worker.js?v=167",
         { updateViaCache: "none" }
       );
 

@@ -530,3 +530,12 @@ v166 - ripartenza dalla v165 stabile
 - Eliminato completamente il controllo VISTA accanto a SNAP.
 - SNAP attivo al primo avvio della v166; poi resta liberamente disattivabile.
 - Nessuna modifica alla logica delle rose o alle altre funzioni della v165.
+
+
+v167 - indicatore sicurezza backup
+- Indicatore rosso nella topbar finché non viene esportato un backup.
+- Conta le modifiche effettuate dall'avvio/ultimo export.
+- Dopo Esporta backup diventa verde e torna a 0 modifiche.
+- Alla modifica successiva torna automaticamente rosso.
+- Importare un backup imposta lo stato come protetto.
+- Nessuna modifica alle rose o alla logica stabile della v166.
