@@ -1947,6 +1947,43 @@ body.export-clean-view .board-shell{
   font-weight:900;
 }
 
+
+/* v175 - icona modifica nome schema */
+.current-title-edit{
+  appearance:none;
+  border:0;
+  background:transparent;
+  color:inherit;
+  font:inherit;
+  padding:4px 7px;
+  margin:-4px -7px;
+  display:inline-flex;
+  align-items:center;
+  gap:7px;
+  border-radius:7px;
+  cursor:pointer;
+  text-align:left;
+}
+.current-title-edit:hover{
+  background:rgba(255,255,255,.055);
+}
+.current-title-edit:focus-visible{
+  outline:2px solid #7da8d6;
+  outline-offset:2px;
+}
+.current-title-pencil{
+  font-size:13px;
+  line-height:1;
+  color:#9eabb9;
+  opacity:.72;
+  transform:translateY(-1px);
+  transition:opacity .15s ease,color .15s ease;
+}
+.current-title-edit:hover .current-title-pencil{
+  color:#dce8f4;
+  opacity:1;
+}
+
 </style>
 
 <script async src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
@@ -2092,7 +2129,10 @@ body.export-clean-view .board-shell{
 
 <section class="field-wrap">
   <div class="canvas-header">
-    <div class="current-title" id="currentTitle">Schema 1</div>
+    <button type="button" class="current-title current-title-edit" id="currentTitle" title="Modifica nome schema" aria-label="Modifica nome schema">
+      <span id="currentTitleText">Schema 1</span>
+      <span class="current-title-pencil" aria-hidden="true">✎</span>
+    </button>
     <div class="presentation-mode-actions" aria-label="Modalità visualizzazione giocatori">
       <button type="button" class="btn presentation-mode-btn bench" id="benchModeBtn">PANCHINA</button>
       <button type="button" class="btn presentation-mode-btn dressing-room" id="dressingRoomModeBtn">SPOGLIATOIO</button>
@@ -3736,9 +3776,32 @@ function renderSchemeSelect(){
   const s=document.getElementById("schemeSelect");s.innerHTML="";
   state.pages.forEach((p,i)=>{const o=document.createElement("option");o.value=i;o.textContent=`${String(i+1).padStart(2,"0")} · ${p.title}`;if(i===currentPage)o.selected=true;s.appendChild(o)});
   document.getElementById("schemeName").value=page().title;
-  document.getElementById("currentTitle").textContent=page().title;
+  {
+    const currentTitleText=document.getElementById("currentTitleText");
+    if(currentTitleText)currentTitleText.textContent=page().title;
+  }
 }
 
+
+
+function openCurrentSchemeRenameModal(){
+  const modal=document.getElementById("schemeRenameModal");
+  const input=document.getElementById("schemeRenameInput");
+  if(!modal || !input)return;
+
+  input.value=page().title||`Schema ${currentPage+1}`;
+  modal.classList.add("open");
+
+  requestAnimationFrame(()=>{
+    input.focus();
+    input.select();
+  });
+}
+
+document.getElementById("currentTitle")?.addEventListener(
+  "click",
+  openCurrentSchemeRenameModal
+);
 
 let substitutionPlayerIndex=null;
 
@@ -8800,7 +8863,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v174",
+    appVersion:"v175",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -9772,7 +9835,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=174",
+        "./service-worker.js?v=175",
         { updateViaCache: "none" }
       );
 
