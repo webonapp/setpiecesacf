@@ -588,13 +588,6 @@ v177 - Flip intero campo
 - Undo supportato.
 
 
-v179 - compatibilità Safari e iPad
-- Flip reso atomico contro attivazioni touch duplicate
-- Ridisegno del Flip distribuito su requestAnimationFrame consecutivi
-- Pointer capture protetta e rilascio sicuro su pointerup/pointercancel
-- Ponte touch limitato a Safari touch
-- Metadati PWA Apple e cache aggiornati alla v179
-
 v178 - cleanup stabilità
 - Nessuna nuova funzione.
 - Rimosso CSS morto del vecchio controllo VISTA.
@@ -602,3 +595,15 @@ v178 - cleanup stabilità
 - Rimosse le seconde scorciatoie Cmd/Ctrl+C e Cmd/Ctrl+V irraggiungibili.
 - Nessuna modifica a rose, SNAP, backup, testi, selezione, drag, Nuovo schema, rinomina o Flip.
 - Audit completo JavaScript, Service Worker, ID e listener superato.
+
+
+v179 - Flip stability fix
+- Riscritto il Flip dell'intero campo.
+- Corretto bug critico: la vecchia funzione chiamava clampDrawing fuori dal suo scope.
+- Calcolo atomico su copie: niente più schema parzialmente ribaltato in caso di errore.
+- Un solo renderAll dopo il flip, più coerente tra Chrome, Safari e iPad.
+- Curve: curveOffset invertito insieme alla geometria per mantenere la curvatura corretta anche dopo modifiche successive.
+- Rollback automatico se il flip fallisce.
+- Protezione contro doppia attivazione nello stesso frame.
+- Pulsante Flip ottimizzato per touch/WebKit.
+- Nessuna modifica alle altre funzioni della v178.
