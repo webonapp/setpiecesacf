@@ -5022,6 +5022,214 @@ function toggleSelection(index){
   selectFieldPlayer(index,true);
   refreshUnifiedSelectionVisuals();
 }
+
+function getUnifiedSelectionCount(){
+  return (
+    selectedPlayers.size+
+    selectedBalls.size+
+    selectedTexts.size+
+    selectedDrawings.size
+  );
+}
+
+function isUnifiedSelectionMember(kind,index){
+  if(kind==="player")return selectedPlayers.has(index);
+  if(kind==="ball")return selectedBalls.has(index);
+  if(kind==="text")return selectedTexts.has(index);
+  if(kind==="drawing")return selectedDrawings.has(index);
+  return false;
+}
+
+function getUnifiedAnchorPercent(kind,index){
+  if(kind==="player"){
+    const pos=page().positions[index];
+    return pos ? {x:pos.x,y:pos.y} : null;
+  }
+  if(kind==="ball"){
+    const obj=page().balls?.[index];
+    return obj ? {x:Number(obj.x)||50,y:Number(obj.y)||50} : null;
+  }
+  if(kind==="text"){
+    const obj=page().texts?.[index];
+    return obj ? {x:Number(obj.x)||50,y:Number(obj.y)||50} : null;
+  }
+  if(kind==="drawing"){
+    const d=page().drawings?.[index];
+    if(!d)return null;
+    const xs=[d.x1,d.x2,d.c1x,d.c2x].filter(Number.isFinite);
+    const ys=[d.y1,d.y2,d.c1y,d.c2y].filter(Number.isFinite);
+    if(!xs.length||!ys.length)return null;
+    return {
+      x:((Math.min(...xs)+Math.max(...xs))/2)/10,
+      y:((Math.min(...ys)+Math.max(...ys))/2)/6.2
+    };
+  }
+  return null;
+}
+
+function getUnifiedDeltaBounds(initial){
+  let minDx=-Infinity,maxDx=Infinity,minDy=-Infinity,maxDy=Infinity;
+
+  initial.players.forEach(pos=>{
+    minDx=Math.max(minDx,1.5-pos.x);
+    maxDx=Math.min(maxDx,98.5-pos.x);
+    minDy=Math.max(minDy,2-pos.y);
+    maxDy=Math.min(maxDy,98-pos.y);
+  });
+
+  initial.balls.forEach(obj=>{
+    minDx=Math.max(minDx,1.5-obj.x);
+    maxDx=Math.min(maxDx,98.5-obj.x);
+    minDy=Math.max(minDy,2-obj.y);
+    maxDy=Math.min(maxDy,98-obj.y);
+  });
+
+  initial.texts.forEach(obj=>{
+    minDx=Math.max(minDx,1-obj.x);
+    maxDx=Math.min(maxDx,99-obj.x);
+    minDy=Math.max(minDy,2-obj.y);
+    maxDy=Math.min(maxDy,98-obj.y);
+  });
+
+  initial.drawings.forEach(d=>{
+    const xs=[d.x1,d.x2,d.c1x,d.c2x].filter(Number.isFinite).map(v=>v/10);
+    const ys=[d.y1,d.y2,d.c1y,d.c2y].filter(Number.isFinite).map(v=>v/6.2);
+    if(xs.length){
+      minDx=Math.max(minDx,-Math.min(...xs));
+      maxDx=Math.min(maxDx,100-Math.max(...xs));
+    }
+    if(ys.length){
+      minDy=Math.max(minDy,-Math.min(...ys));
+      maxDy=Math.min(maxDy,100-Math.max(...ys));
+    }
+  });
+
+  return {minDx,maxDx,minDy,maxDy};
+}
+
+function startUnifiedSelectionDrag({
+  event,
+  element,
+  anchorKind,
+  anchorIndex,
+  startClientX=null,
+  startClientY=null,
+  pointerIdOverride=null
+}){
+  const playerIndexes=[...selectedPlayers].filter(i=>page().positions[i]);
+  const ballIndexes=[...selectedBalls].filter(i=>page().balls?.[i]);
+  const textIndexes=[...selectedTexts].filter(i=>page().texts?.[i]);
+  const drawingIndexes=[...selectedDrawings].filter(i=>page().drawings?.[i]);
+
+  const initial={
+    players:new Map(playerIndexes.map(i=>[i,{...page().positions[i]}])),
+    balls:new Map(ballIndexes.map(i=>[i,{...page().balls[i]}])),
+    texts:new Map(textIndexes.map(i=>[i,{...page().texts[i]}])),
+    drawings:new Map(drawingIndexes.map(i=>[
+      i,
+      JSON.parse(JSON.stringify(page().drawings[i]))
+    ]))
+  };
+
+  const total=
+    initial.players.size+
+    initial.balls.size+
+    initial.texts.size+
+    initial.drawings.size;
+
+  if(!total)return false;
+
+  const anchor=getUnifiedAnchorPercent(anchorKind,anchorIndex);
+  const bounds=getUnifiedDeltaBounds(initial);
+
+  return startBoardObjectDrag({
+    event,
+    element,
+    initial:null,
+    startClientX,
+    startClientY,
+    pointerIdOverride,
+    applyPosition:(rawDx,rawDy)=>{
+      let dx=rawDx;
+      let dy=rawDy;
+      let candidate=null;
+
+      if(anchor && state.snapEnabled){
+        candidate=getSnapCandidatePercent(
+          anchor.x+rawDx,
+          anchor.y+rawDy,
+          {minX:0,maxX:100,minY:0,maxY:100},
+          {excludePlayerIndexes:playerIndexes}
+        );
+        dx=candidate.x-anchor.x;
+        dy=candidate.y-anchor.y;
+      }
+
+      dx=Math.max(bounds.minDx,Math.min(bounds.maxDx,dx));
+      dy=Math.max(bounds.minDy,Math.min(bounds.maxDy,dy));
+
+      if(candidate){
+        candidate={...candidate,x:anchor.x+dx,y:anchor.y+dy};
+        showSnapGuides(candidate);
+      }else{
+        hideSnapGuides();
+      }
+
+      initial.players.forEach((orig,i)=>{
+        page().positions[i]={x:orig.x+dx,y:orig.y+dy};
+        const el=document.querySelector(`.player[data-index="${i}"]`);
+        if(el){
+          el.style.left=page().positions[i].x+"%";
+          el.style.top=page().positions[i].y+"%";
+        }
+      });
+
+      initial.balls.forEach((orig,i)=>{
+        const obj=page().balls[i];
+        obj.x=orig.x+dx;
+        obj.y=orig.y+dy;
+        const el=document.querySelector(`#ballsLayer .ball[data-index="${i}"]`);
+        if(el){
+          el.style.left=obj.x+"%";
+          el.style.top=obj.y+"%";
+        }
+      });
+
+      initial.texts.forEach((orig,i)=>{
+        const obj=page().texts[i];
+        obj.x=orig.x+dx;
+        obj.y=orig.y+dy;
+        const el=document.querySelector(`#textsLayer .tactical-text[data-index="${i}"]`);
+        if(el){
+          el.style.left=obj.x+"%";
+          el.style.top=obj.y+"%";
+        }
+      });
+
+      initial.drawings.forEach((orig,i)=>{
+        const obj=page().drawings[i];
+        ["x1","x2","c1x","c2x"].forEach(key=>{
+          if(Number.isFinite(orig[key]))obj[key]=orig[key]+dx*10;
+        });
+        ["y1","y2","c1y","c2y"].forEach(key=>{
+          if(Number.isFinite(orig[key]))obj[key]=orig[key]+dy*6.2;
+        });
+      });
+
+      if(initial.drawings.size)renderDrawings();
+    },
+    onFinish:()=>{
+      hideSnapGuides();
+      renderPlayers();
+      renderBalls();
+      renderTexts();
+      renderDrawings();
+      refreshUnifiedSelectionVisuals();
+      syncDrawingControls();
+    }
+  });
+}
+
 function handlePlayerPointerDown(e){
   if(tool!=="move")return;
 
@@ -5060,13 +5268,17 @@ function handlePlayerPointerDown(e){
     },450);
   }
 
-  const selected=selectFieldPlayer(idx,additive);
+  const keepUnifiedGroup=
+    !additive &&
+    getUnifiedSelectionCount()>1 &&
+    selectedPlayers.has(idx);
+
+  const selected=keepUnifiedGroup
+    ? true
+    : selectFieldPlayer(idx,additive);
+
   refreshUnifiedSelectionVisuals();
 
-  /*
-    Cmd/Ctrl-click resta dedicato alla multiselezione.
-    Il trascinamento parte da un pointerdown normale, come prima.
-  */
   if(additive || !selected)return;
 
   let dragStarted=false;
@@ -5092,12 +5304,14 @@ function handlePlayerPointerDown(e){
     dragStarted=true;
     cleanupPending();
 
-    startGroupDrag({
-      originalEvent:e,
-      startX,
-      startY,
-      target,
-      pointerId
+    startUnifiedSelectionDrag({
+      event:e,
+      element:target,
+      anchorKind:"player",
+      anchorIndex:idx,
+      startClientX:startX,
+      startClientY:startY,
+      pointerIdOverride:pointerId
     });
   };
 
@@ -5228,36 +5442,26 @@ function renderBalls(){
 
 
       const additive=e.metaKey||e.ctrlKey;
-      const selected=selectObjectKind("ball",i,additive);
+      const keepUnifiedGroup=
+        !additive &&
+        getUnifiedSelectionCount()>1 &&
+        selectedBalls.has(i);
 
-      refreshSelectionVisuals();
-      refreshObjectSelectionVisuals();
+      const selected=keepUnifiedGroup
+        ? true
+        : selectObjectKind("ball",i,additive);
+
+      refreshUnifiedSelectionVisuals();
 
       if(!selected)return;
 
       el.classList.add("selected","selected-object");
 
-      const initial={...ball};
-
-      startBoardObjectDrag({
+      startUnifiedSelectionDrag({
         event:e,
         element:el,
-        initial,
-        applyPosition:(dx,dy)=>{
-          const candidate=getSnapCandidatePercent(
-            initial.x+dx,initial.y+dy,
-            {minX:1.5,maxX:98.5,minY:2,maxY:98}
-          );
-          ball.x=candidate.x;
-          ball.y=candidate.y;
-          showSnapGuides(candidate);
-          el.style.left=ball.x+"%";
-          el.style.top=ball.y+"%";
-        },
-        onFinish:()=>{
-          hideSnapGuides();
-          refreshObjectSelectionVisuals();
-        }
+        anchorKind:"ball",
+        anchorIndex:i
       });
     });
 
@@ -5303,38 +5507,26 @@ el.addEventListener("pointerdown",e=>{
       },460);
 
       const additive=e.metaKey||e.ctrlKey;
-      const selected=selectObjectKind("text",i,additive);
+      const keepUnifiedGroup=
+        !additive &&
+        getUnifiedSelectionCount()>1 &&
+        selectedTexts.has(i);
 
-      refreshSelectionVisuals();
-      refreshObjectSelectionVisuals();
+      const selected=keepUnifiedGroup
+        ? true
+        : selectObjectKind("text",i,additive);
+
+      refreshUnifiedSelectionVisuals();
 
       if(!selected)return;
 
       el.classList.add("selected","selected-object");
 
-      const initial={...item};
-
-      startBoardObjectDrag({
+      startUnifiedSelectionDrag({
         event:e,
         element:el,
-        initial,
-        applyPosition:(dx,dy)=>{
-          const candidate=getSnapCandidatePercent(
-            initial.x+dx,initial.y+dy,
-            {minX:1,maxX:99,minY:2,maxY:98}
-          );
-          item.x=candidate.x;
-          item.y=candidate.y;
-          showSnapGuides(candidate);
-          el.style.left=item.x+"%";
-          el.style.top=item.y+"%";
-        },
-        onFinish:()=>{
-          hideSnapGuides();
-          renderTexts();
-          refreshObjectSelectionVisuals();
-          save(false);
-        }
+        anchorKind:"text",
+        anchorIndex:i
       });
     });
 
@@ -5641,57 +5833,26 @@ function renderDrawings(){
       e.stopPropagation();
 
       const additive=e.metaKey||e.ctrlKey;
-      const selected=selectObjectKind("drawing",i,additive);
+      const keepUnifiedGroup=
+        !additive &&
+        getUnifiedSelectionCount()>1 &&
+        selectedDrawings.has(i);
 
-      refreshSelectionVisuals();
+      const selected=keepUnifiedGroup
+        ? true
+        : selectObjectKind("drawing",i,additive);
+
+      refreshUnifiedSelectionVisuals();
       syncDrawingControls();
       renderDrawings();
-      refreshObjectSelectionVisuals();
 
       if(!selected || !selectedDrawings.has(i))return;
 
-      const movingIndexes=[...selectedDrawings].filter(
-        index=>page().drawings[index]
-      );
-
-      const initial=new Map(
-        movingIndexes.map(index=>[
-          index,
-          JSON.parse(JSON.stringify(page().drawings[index]))
-        ])
-      );
-
-      startLogicalBoardDrag({
+      startUnifiedSelectionDrag({
         event:e,
         element:hit,
-        onDelta:(dx,dy)=>{
-          movingIndexes.forEach(index=>{
-            const original=initial.get(index);
-            const current=page().drawings[index];
-            if(!original||!current)return;
-
-            ["x1","x2","c1x","c2x"].forEach(key=>{
-              if(Number.isFinite(original[key])){
-                current[key]=original[key]+dx;
-              }
-            });
-
-            ["y1","y2","c1y","c2y"].forEach(key=>{
-              if(Number.isFinite(original[key])){
-                current[key]=original[key]+dy;
-              }
-            });
-
-            clampDrawing(current);
-          });
-
-          renderDrawings();
-        },
-        onFinish:()=>{
-          renderDrawings();
-          refreshObjectSelectionVisuals();
-          syncDrawingControls();
-        }
+        anchorKind:"drawing",
+        anchorIndex:i
       });
     });
   };
@@ -6444,6 +6605,8 @@ document.getElementById("schemeSelect").addEventListener("change",e=>{
   page().notes=document.getElementById("notes").value;
   currentPage=Number(e.target.value);
   clearSelectionKinds();
+  marqueeStart=null;
+  marqueeMoved=false;
   editingTextIndex=null;
   renderAll();
 });
@@ -7447,83 +7610,53 @@ function pasteClipboardSelection(){
 
 
 function deleteCurrentSelection(){
-  const hasObjectSelection=
-    selectedBalls.size ||
-    selectedTexts.size ||
-    selectedDrawings.size;
+  const playerIndexes=[...selectedPlayers].filter(i=>page().positions[i]);
+  const ballIndexes=[...selectedBalls].filter(i=>page().balls?.[i]);
+  const textIndexes=[...selectedTexts].filter(i=>page().texts?.[i]);
+  const drawingIndexes=[...selectedDrawings].filter(i=>page().drawings?.[i]);
 
-  if(hasObjectSelection){
-    pushHistory();
-
-    [...selectedBalls].sort((a,b)=>b-a).forEach(i=>{
-      page().balls.splice(i,1);
-    });
-    [...selectedTexts].sort((a,b)=>b-a).forEach(i=>{
-      page().texts.splice(i,1);
-    });
-    [...selectedDrawings].sort((a,b)=>b-a).forEach(i=>{
-      page().drawings.splice(i,1);
-    });
-
-    clearObjectSelections();
-    renderBalls();
-    renderTexts();
-    renderDrawings();
-    refreshObjectSelectionVisuals();
-    save(false);
-    setStatus("Oggetti selezionati eliminati");
-    return true;
+  if(
+    !playerIndexes.length &&
+    !ballIndexes.length &&
+    !textIndexes.length &&
+    !drawingIndexes.length
+  ){
+    setStatus("Nessun elemento selezionato");
+    return false;
   }
 
-  if(selectedText!==null && page().texts?.[selectedText]){
-    pushHistory();
-    page().texts.splice(selectedText,1);
-    selectedText=null;
-    renderTexts();
-    save(false);
-    setStatus("Testo eliminato");
-    return true;
-  }
+  pushHistory();
 
-  if(selectedBall!==null && page().balls?.[selectedBall]){
-    pushHistory();
-    page().balls.splice(selectedBall,1);
-    selectedBall=null;
-    renderBalls();
-    save(false);
-    setStatus("Pallone eliminato");
-    return true;
-  }
+  drawingIndexes.sort((a,b)=>b-a).forEach(i=>page().drawings.splice(i,1));
+  textIndexes.sort((a,b)=>b-a).forEach(i=>page().texts.splice(i,1));
+  ballIndexes.sort((a,b)=>b-a).forEach(i=>page().balls.splice(i,1));
 
-  if(selectedDrawing!==null && page().drawings?.[selectedDrawing]){
-    pushHistory();
-    page().drawings.splice(selectedDrawing,1);
-    selectedDrawing=null;
-    renderDrawings();
-    save(false);
-    setStatus("Elemento grafico eliminato");
-    return true;
-  }
+  playerIndexes.forEach(i=>{
+    if(page().positions[i])page().positions[i]=null;
+  });
 
-  if(selectedPlayers.size){
-    pushHistory();
+  clearSelectionKinds();
+  renderPlayers();
+  renderRoster();
+  renderBalls();
+  renderTexts();
+  renderDrawings();
+  refreshUnifiedSelectionVisuals();
+  updateLineupCounters();
+  save(false);
 
-    [...selectedPlayers].forEach(index=>{
-      if(page().positions[index])page().positions[index]=null;
-    });
+  const count=
+    playerIndexes.length+
+    ballIndexes.length+
+    textIndexes.length+
+    drawingIndexes.length;
 
-    selectedPlayers.clear();
-    renderPlayers();
-    renderRoster();
-    refreshSelectionVisuals();
-    updateLineupCounters();
-    save(false);
-    setStatus("Giocatori rimossi dallo schema e restituiti alla lista");
-    return true;
-  }
-
-  setStatus("Nessun elemento selezionato");
-  return false;
+  setStatus(
+    count===1
+      ? "Elemento eliminato"
+      : `${count} elementi eliminati`
+  );
+  return true;
 }
 
 
@@ -8335,7 +8468,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v172",
+    appVersion:"v173",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -9307,7 +9440,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=172",
+        "./service-worker.js?v=173",
         { updateViaCache: "none" }
       );
 

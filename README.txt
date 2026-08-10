@@ -548,3 +548,15 @@ v168 - stabilizzazione oggetto Testo
 - data-index aggiunto ai testi per la selezione visiva.
 - Selezione rettangolare corretta anche per i testi.
 - Nessuna modifica a rose, backup, SNAP o frecce.
+
+
+v173 - motore unico selezione/spostamento
+- Unificato il drag di maglie, palloni, testi e frecce/forme.
+- Se una multiselezione contiene tipi diversi, trascinare uno degli elementi muove l'intero gruppo.
+- Tutti gli elementi ricevono lo stesso delta di movimento.
+- SNAP calcolato una sola volta sull'intero gruppo.
+- Limiti del campo applicati al gruppo intero per evitare disallineamenti.
+- Il click su un elemento già dentro una multiselezione non distrugge più il gruppo.
+- Eliminazione mista corretta: giocatori + testi + palloni + frecce vengono eliminati/rimossi nello stesso comando.
+- Salvataggio e Undo vengono registrati una sola volta a fine drag.
+- Cambio schema azzera completamente stato di selezione e marquee.
