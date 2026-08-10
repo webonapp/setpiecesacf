@@ -5181,6 +5181,7 @@ function renderTexts(){
   (page().texts||[]).forEach((item,i)=>{
     const el=document.createElement("div");
     el.className="tactical-text"+(selectedText===i?" selected":"")+(selectedTexts.has(i)?" selected-object":"");
+    el.dataset.index=String(i);
     el.textContent=item.text;
     el.style.left=item.x+"%";
     el.style.top=item.y+"%";
@@ -5233,7 +5234,9 @@ el.addEventListener("pointerdown",e=>{
         },
         onFinish:()=>{
           hideSnapGuides();
+          renderTexts();
           refreshObjectSelectionVisuals();
+          save(false);
         }
       });
     });
@@ -6163,12 +6166,21 @@ document.getElementById("board").addEventListener("pointerdown",e=>{
     const p=boardPoint(e);
     marqueeStart=p;
     marqueeMoved=false;
-    marqueeBaseSelection=(e.metaKey||e.ctrlKey)?new Set(selectedPlayers):new Set();
-    if(!(e.metaKey||e.ctrlKey)){
+    const additive=e.metaKey||e.ctrlKey;
+    marqueeBaseSelection={
+      players:additive?new Set(selectedPlayers):new Set(),
+      balls:additive?new Set(selectedBalls):new Set(),
+      texts:additive?new Set(selectedTexts):new Set(),
+      drawings:additive?new Set(selectedDrawings):new Set()
+    };
+    if(!additive){
       selectedPlayers.clear();
       selectedBalls.clear();
       selectedTexts.clear();
       selectedDrawings.clear();
+      selectedBall=null;
+      selectedText=null;
+      selectedDrawing=null;
     }
 
     const box=document.getElementById("selectionBox");
@@ -6219,7 +6231,15 @@ document.getElementById("board").addEventListener("pointermove",e=>{
   box.style.width=((right-left)/10)+"%";
   box.style.height=((bottom-top)/6.2)+"%";
 
-  selectedPlayers=new Set(marqueeBaseSelection);
+  const base=marqueeBaseSelection && !(marqueeBaseSelection instanceof Set)
+    ? marqueeBaseSelection
+    : {players:new Set(),balls:new Set(),texts:new Set(),drawings:new Set()};
+
+  selectedPlayers=new Set(base.players||[]);
+  selectedBalls=new Set(base.balls||[]);
+  selectedTexts=new Set(base.texts||[]);
+  selectedDrawings=new Set(base.drawings||[]);
+
   page().positions.forEach((pos,i)=>{
     if(!pos)return;
     const px=pos.x*10;
@@ -6244,6 +6264,10 @@ document.getElementById("board").addEventListener("pointermove",e=>{
     const maxY=Math.max(d.y1,d.y2,d.c1y??d.y1,d.c2y??d.y2);
     if(maxX>=left&&minX<=right&&maxY>=top&&minY<=bottom)selectedDrawings.add(i);
   });
+
+  selectedBall=selectedBalls.size===1?[...selectedBalls][0]:null;
+  selectedText=selectedTexts.size===1?[...selectedTexts][0]:null;
+  selectedDrawing=selectedDrawings.size===1?[...selectedDrawings][0]:null;
 
   refreshSelectionVisuals();
   refreshObjectSelectionVisuals();
@@ -6319,7 +6343,13 @@ document.querySelectorAll(".library-icon[data-tool]").forEach(btn=>{
 });
 
 document.querySelectorAll(".tool[data-tool]").forEach(b=>b.addEventListener("click",()=>{tool=b.dataset.tool;if(tool!=="move"){selectedPlayers.clear();selectedDrawing=null;}refreshSelectionVisuals();renderDrawings();document.querySelectorAll(".tool[data-tool]").forEach(x=>x.classList.toggle("active",x===b))}));
-document.getElementById("schemeSelect").addEventListener("change",e=>{page().notes=document.getElementById("notes").value;currentPage=Number(e.target.value);selectedPlayers.clear();renderAll()});
+document.getElementById("schemeSelect").addEventListener("change",e=>{
+  page().notes=document.getElementById("notes").value;
+  currentPage=Number(e.target.value);
+  clearSelectionKinds();
+  editingTextIndex=null;
+  renderAll();
+});
 document.getElementById("renameScheme").addEventListener("click",()=>{pushHistory();page().title=document.getElementById("schemeName").value.trim()||`Schema ${currentPage+1}`;renderSchemeSelect();save(false)});
 document.getElementById("addScheme").addEventListener("click",()=>{if(state.pages.length>=30){alert("Massimo 30 schemi");return}pushHistory();state.pages.push(emptyPage(state.pages.length));currentPage=state.pages.length-1;renderAll();save()});
 document.getElementById("deletePage").addEventListener("click",()=>{if(state.pages.length===1)return alert("Deve restare almeno uno schema");if(confirm("Eliminare lo schema corrente?")){pushHistory();state.pages.splice(currentPage,1);currentPage=Math.max(0,currentPage-1);renderAll();save()}});
@@ -8208,7 +8238,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v167",
+    appVersion:"v168",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -9180,7 +9210,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=167",
+        "./service-worker.js?v=168",
         { updateViaCache: "none" }
       );
 

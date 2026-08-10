@@ -539,3 +539,12 @@ v167 - indicatore sicurezza backup
 - Alla modifica successiva torna automaticamente rosso.
 - Importare un backup imposta lo stato come protetto.
 - Nessuna modifica alle rose o alla logica stabile della v166.
+
+
+v168 - stabilizzazione oggetto Testo
+- Testi isolati correttamente per schema.
+- Cambio schema pulisce tutte le selezioni oggetto/testo.
+- Posizione testo salvata esplicitamente a fine trascinamento.
+- data-index aggiunto ai testi per la selezione visiva.
+- Selezione rettangolare corretta anche per i testi.
+- Nessuna modifica a rose, backup, SNAP o frecce.
