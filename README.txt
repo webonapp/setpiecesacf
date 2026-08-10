@@ -602,3 +602,27 @@ Base ripartita dalla v169 stabile.
 
 
 v178 - Fix eliminazione multipla mista: giocatori, frecce, palloni e testi vengono eliminati insieme con una sola azione. Un solo Undo. Render completo dopo eliminazione. Stato rosa avversaria reso truth-based.
+
+
+v179 - RESET COMPLETO SU REFRESH
+- Ogni refresh apre sempre una nuova sessione vuota.
+- Nessun progetto viene ricaricato automaticamente.
+- Per conservare il lavoro bisogna Esportare backup.
+- Per recuperarlo dopo refresh bisogna Importare backup.
+- SNAP attivo di default.
+- Rosa iniziale vuota.
+- 10 schemi iniziali vuoti.
+- Database/archivio resta separato.
+
+
+v180
+- Indicatore backup + contatore modifiche.
+- Avviso refresh/chiusura con modifiche non esportate.
+- Backup: YYMMDD_HH-MM_ACFSetPieces.json.
+- Salvataggio manuale progetto nel Database ACF.
+- Nuovo schema: vuoto / duplica corrente / crea da Layout.
+- Rinomina rapida con matita.
+- Copia/Incolla visibili.
+- Controllo integrità rapido prima del backup.
+- Reset su refresh della v179 preservato.
+- Audit sintattico e strutturale completato.
