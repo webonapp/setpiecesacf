@@ -626,3 +626,14 @@ v180
 - Controllo integrità rapido prima del backup.
 - Reset su refresh della v179 preservato.
 - Audit sintattico e strutturale completato.
+
+
+v181 - FIX COMPLETO v180
+- Causa principale trovata: listener su quickRenameSchemeBtn inesistente interrompeva il JavaScript.
+- Questo bloccava Nuovo schema e Carica rosa Fiorentina.
+- Pulsante rinomina aggiunto realmente nel DOM.
+- Listener critici resi null-safe.
+- Caricamento rosa rafforzato.
+- Tendina schemi sincronizzata e abilitata a ogni render.
+- Service Worker query corretta a v181.
+- Audit statico: nessun listener diretto punta a ID mancanti.
