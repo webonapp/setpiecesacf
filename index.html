@@ -2954,17 +2954,17 @@ function applyV94PermanentRosterUpdates(){
     .toLowerCase();
 
   const updates=new Map([
-    ["valdepenas",{number:0,lastName:"Valdepeñas"}],
-    ["kospo",{number:0,lastName:"Košpo"}],
-    ["jimenez",{number:0,lastName:"Jiménez"}],
-    ["oulai",{number:0,lastName:"Oulaï"}],
+    ["valdepenas",{number:21,lastName:"Valdepeñas"}],
+    ["kospo",{number:23,lastName:"Košpo"}],
+    ["jimenez",{number:20,lastName:"Jiménez"}],
+    ["oulai",{number:32,lastName:"Oulaï"}],
     ["ranieri",{number:6,lastName:"Ranieri"}],
     ["fortini",{number:29,lastName:"Fortini"}],
     ["mandragora",{number:8,lastName:"Mandragora"}],
     ["atta",{number:14,lastName:"Atta"}],
     ["ndour",{number:27,lastName:"Ndour"}],
-    ["kean",{number:20,lastName:"Kean"}],
-    ["piccoli",{number:9,lastName:"Piccoli"}],
+    ["kean",{number:9,lastName:"Kean"}],
+    ["piccoli",{number:91,lastName:"Piccoli"}],
     ["de gea",{lastName:"De Gea"}]
   ]);
 
@@ -3038,14 +3038,46 @@ function load(){
     }));
   }
 
-  if(!Array.isArray(state.homeRosterTemplate) || !state.homeRosterTemplate.length){
-    state.homeRosterTemplate=FIORENTINA_PRESET.map((player,index)=>({
-      ...player,
-      id:player.id||`acf-template-${index}`,
-      showLastName:player.showLastName!==false,
-      showChestCircle:player.showChestCircle!==false
-    }));
+  /* v170: il template Fiorentina segue sempre il preset incluso nell'app.
+     Evita che un vecchio template salvato nel browser nasconda gli aggiornamenti rosa. */
+  state.homeRosterTemplate=FIORENTINA_PRESET.map((player,index)=>({
+    ...player,
+    id:player.id||`acf-template-${index}`,
+    showLastName:player.showLastName!==false,
+    showChestCircle:player.showChestCircle!==false
+  }));
+  /* v170: sincronizza anche una rosa Fiorentina già caricata senza perdere le posizioni sul campo. */
+  const presetBySurname=new Map(FIORENTINA_PRESET.map(player=>[
+    String(player.lastName||"").toLowerCase(),player
+  ]));
+  const existingHomeSurnames=new Set();
+  state.roster.forEach(player=>{
+    if(player.team==="away")return;
+    const key=String(player.lastName||player.name||"").trim().toLowerCase();
+    existingHomeSurnames.add(key);
+    const fresh=presetBySurname.get(key);
+    if(!fresh)return;
+    player.number=fresh.number;
+    player.firstName=fresh.firstName;
+    player.lastName=fresh.lastName;
+    player.name=fresh.name;
+    player.role=fresh.role||player.role;
+  });
+  if(state.homeRosterLoaded){
+    FIORENTINA_PRESET.forEach(fresh=>{
+      const key=String(fresh.lastName||"").toLowerCase();
+      if(existingHomeSurnames.has(key))return;
+      const newIndex=state.roster.length;
+      state.roster.push({
+        ...JSON.parse(JSON.stringify(fresh)),
+        id:`acf-v170-${newIndex}`,
+        showLastName:true,
+        showChestCircle:fresh.team==="gk"?true:state.homeChestCircle
+      });
+      state.pages.forEach(pg=>pg.positions.push(null));
+    });
   }
+
   state.pages.forEach(p=>{
     if(!Array.isArray(p.balls))p.balls=[];
     if(!Array.isArray(p.texts))p.texts=[];
@@ -8236,7 +8268,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v169",
+    appVersion:"v170",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -9208,7 +9240,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=169",
+        "./service-worker.js?v=170",
         { updateViaCache: "none" }
       );
 

@@ -1,4 +1,4 @@
-const APP_VERSION = "169";
+const APP_VERSION = "170";
 const CACHE_NAME = `acf-set-pieces-v${APP_VERSION}`;
 
 const APP_SHELL = [
