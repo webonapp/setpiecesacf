@@ -664,3 +664,17 @@ v183 - ROSTER BUTTONS HARD FIX
 - Roster e array positions riallineati dopo ogni caricamento.
 - Render immediato dopo il click.
 - Sintassi di tutti gli script verificata.
+
+
+v184 - RESET COMPLETO ROSE
+- Rosa Fiorentina sostituita integralmente con la lista fornita il 10/08/2026.
+- 26 giocatori: 4 portieri, 11 difensori, 7 centrocampisti, 4 attaccanti.
+- Vecchie migrazioni permanenti della rosa disattivate.
+- Carica rosa Fiorentina collegato direttamente al nuovo preset.
+- Carica rosa avversari genera esattamente 11 avversari generici.
+- + Giocatore aggiunge un singolo avversario extra ad ogni pressione.
+- Rimossi i vecchi handler concorrenti delle rose.
+- Rimossa la logica v183 dei roster.
+- I tre pulsanti usano onclick diretti verso un motore isolato ACF_ROSTERS.
+- Posizioni dei giocatori già esistenti preservate quando possibile.
+- Tutti gli script e il service worker verificati sintatticamente.
