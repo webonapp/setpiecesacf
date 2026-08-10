@@ -652,3 +652,15 @@ v182 - RIGHT COLUMN STABILITY FIX
 - Fix Note dello schema.
 - Eventi catturati prima dei listener legacy per evitare doppie esecuzioni.
 - Service Worker aggiornato a v182.
+
+
+v183 - ROSTER BUTTONS HARD FIX
+- Rimossi i listener legacy dei due pulsanti rosa.
+- Rimosso il controller v182 che poteva competere con i listener principali.
+- Carica rosa Fiorentina ora ha un singolo onclick diretto.
+- Aggiungi rosa avversario ora ha un singolo onclick diretto.
+- Fiorentina viene ricostruita dal preset già incluso nell'app.
+- Avversari: esattamente 11 giocatori generici.
+- Roster e array positions riallineati dopo ogni caricamento.
+- Render immediato dopo il click.
+- Sintassi di tutti gli script verificata.
