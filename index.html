@@ -1974,6 +1974,30 @@ body.export-clean-view .board-shell{
   -webkit-tap-highlight-color:transparent;
 }
 
+
+/* v181 - Sagoma singola e barriera da 4 */
+.mannequin-tool-icon,
+.wall4-tool-icon{
+  width:42px;
+  height:42px;
+  overflow:visible;
+}
+.wall4-tool-icon{width:58px}
+.mannequin-tool-icon circle,
+.mannequin-tool-icon path:not(.legs),
+.wall4-tool-icon circle,
+.wall4-tool-icon path:not(.legs){
+  fill:#f5bf2d;
+  stroke:#a98b3a;
+  stroke-width:1;
+}
+.mannequin-tool-icon .legs,
+.wall4-tool-icon .legs{
+  fill:#f9fafb;
+  stroke:#9ca3af;
+  stroke-width:1;
+}
+
 </style>
 
 <script async src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
@@ -2028,6 +2052,21 @@ body.export-clean-view .board-shell{
       <button type="button" class="library-icon add-text-action" title="Inserisci testo">T</button>
       <button class="library-icon" data-tool="circle" title="Cerchio o ellisse">○</button>
       <button class="library-icon" data-tool="rect" title="Quadrato o rettangolo">▭</button>
+      <button type="button" class="library-icon add-mannequin-action" title="Aggiungi sagoma singola" aria-label="Aggiungi sagoma singola">
+        <svg class="mannequin-tool-icon" viewBox="0 0 48 48" aria-hidden="true">
+          <circle cx="24" cy="9" r="6"></circle>
+          <path d="M15 15 L33 15 L31 29 L17 29 Z"></path>
+          <path class="legs" d="M19 29 L23 29 L22 43 L16 43 Z M25 29 L29 29 L32 43 L26 43 Z"></path>
+        </svg>
+      </button>
+      <button type="button" class="library-icon add-wall4-action" title="Aggiungi barriera da 4" aria-label="Aggiungi barriera da 4">
+        <svg class="wall4-tool-icon" viewBox="0 0 72 48" aria-hidden="true">
+          <g transform="translate(1 0)"><circle cx="9" cy="8" r="5"></circle><path d="M2 13 L16 13 L15 28 L3 28 Z"></path><path class="legs" d="M5 28 L8 28 L7 42 L2 42 Z M10 28 L13 28 L16 42 L11 42 Z"></path></g>
+          <g transform="translate(18 0)"><circle cx="9" cy="8" r="5"></circle><path d="M2 13 L16 13 L15 28 L3 28 Z"></path><path class="legs" d="M5 28 L8 28 L7 42 L2 42 Z M10 28 L13 28 L16 42 L11 42 Z"></path></g>
+          <g transform="translate(35 0)"><circle cx="9" cy="8" r="5"></circle><path d="M2 13 L16 13 L15 28 L3 28 Z"></path><path class="legs" d="M5 28 L8 28 L7 42 L2 42 Z M10 28 L13 28 L16 42 L11 42 Z"></path></g>
+          <g transform="translate(52 0)"><circle cx="9" cy="8" r="5"></circle><path d="M2 13 L16 13 L15 28 L3 28 Z"></path><path class="legs" d="M5 28 L8 28 L7 42 L2 42 Z M10 28 L13 28 L16 42 L11 42 Z"></path></g>
+        </svg>
+      </button>
     </div>
   </div>
 
@@ -6034,6 +6073,126 @@ function renderDrawings(){
     if(selectedDrawing===i)g.classList.add("drawing-selected");
     if(selectedDrawings.has(i))g.classList.add("drawing-group-selected");
 
+
+    if(d.type==="mannequin" || d.type==="wall4"){
+      const minX=Math.min(d.x1,d.x2);
+      const maxX=Math.max(d.x1,d.x2);
+      const minY=Math.min(d.y1,d.y2);
+      const maxY=Math.max(d.y1,d.y2);
+      const width=Math.max(24,maxX-minX);
+      const height=Math.max(48,maxY-minY);
+      const figures=d.type==="wall4" ? 4 : 1;
+      const gap=figures===4 ? width*.012 : 0;
+      const figureWidth=(width-gap*(figures-1))/figures;
+
+      const addMannequinFigure=(index)=>{
+        const x=minX+index*(figureWidth+gap);
+        const centerX=x+figureWidth/2;
+
+        /*
+          Proporzioni leggermente "compresse" sulle gambe:
+          testa + busto ~65%, gambe ~35%.
+        */
+        const headR=Math.min(figureWidth*.22,height*.095);
+        const headCy=minY+headR+height*.035;
+        const shoulderY=minY+height*.19;
+        const torsoBottom=minY+height*.61;
+        const torsoHalfTop=figureWidth*.37;
+        const torsoHalfBottom=figureWidth*.30;
+
+        const head=document.createElementNS("http://www.w3.org/2000/svg","circle");
+        head.setAttribute("cx",centerX);
+        head.setAttribute("cy",headCy);
+        head.setAttribute("r",headR);
+        head.setAttribute("fill","#f5bf2d");
+        head.setAttribute("stroke","#a88a39");
+        head.setAttribute("stroke-width","1.4");
+        head.setAttribute("vector-effect","non-scaling-stroke");
+        head.setAttribute("pointer-events","none");
+
+        const torso=document.createElementNS("http://www.w3.org/2000/svg","path");
+        torso.setAttribute(
+          "d",
+          `M ${centerX-torsoHalfTop} ${shoulderY}
+           L ${centerX+torsoHalfTop} ${shoulderY}
+           L ${centerX+torsoHalfBottom} ${torsoBottom}
+           L ${centerX-torsoHalfBottom} ${torsoBottom} Z`
+        );
+        torso.setAttribute("fill","#f5bf2d");
+        torso.setAttribute("stroke","#a88a39");
+        torso.setAttribute("stroke-width","1.4");
+        torso.setAttribute("vector-effect","non-scaling-stroke");
+        torso.setAttribute("pointer-events","none");
+
+        const legTopY=torsoBottom;
+        const footY=maxY-height*.035;
+        const inner=figureWidth*.065;
+        const outer=figureWidth*.23;
+        const footOut=figureWidth*.29;
+
+        const leftLeg=document.createElementNS("http://www.w3.org/2000/svg","path");
+        leftLeg.setAttribute(
+          "d",
+          `M ${centerX-outer} ${legTopY}
+           L ${centerX-inner} ${legTopY}
+           L ${centerX-inner*.65} ${footY}
+           L ${centerX-footOut} ${footY}
+           L ${centerX-outer*.72} ${legTopY+height*.08} Z`
+        );
+
+        const rightLeg=document.createElementNS("http://www.w3.org/2000/svg","path");
+        rightLeg.setAttribute(
+          "d",
+          `M ${centerX+inner} ${legTopY}
+           L ${centerX+outer} ${legTopY}
+           L ${centerX+outer*.72} ${legTopY+height*.08}
+           L ${centerX+footOut} ${footY}
+           L ${centerX+inner*.65} ${footY} Z`
+        );
+
+        [leftLeg,rightLeg].forEach(leg=>{
+          leg.setAttribute("fill","#fafafa");
+          leg.setAttribute("stroke","#9ca3af");
+          leg.setAttribute("stroke-width","1.25");
+          leg.setAttribute("vector-effect","non-scaling-stroke");
+          leg.setAttribute("pointer-events","none");
+        });
+
+        g.append(head,torso,leftLeg,rightLeg);
+      };
+
+      for(let figureIndex=0;figureIndex<figures;figureIndex++){
+        addMannequinFigure(figureIndex);
+      }
+
+      const hit=document.createElementNS("http://www.w3.org/2000/svg","rect");
+      hit.setAttribute("x",minX);
+      hit.setAttribute("y",minY);
+      hit.setAttribute("width",width);
+      hit.setAttribute("height",height);
+      hit.setAttribute("fill","#000");
+      hit.setAttribute("fill-opacity","0.001");
+      hit.setAttribute("stroke","#000");
+      hit.setAttribute("stroke-opacity","0.001");
+      hit.setAttribute("stroke-width","12");
+      hit.setAttribute("pointer-events","all");
+      hit.style.pointerEvents="all";
+      hit.style.cursor="grab";
+      hit.style.touchAction="none";
+      hit.style.webkitTapHighlightColor="transparent";
+
+      attachMoveHandler(hit,i,d);
+      g.appendChild(hit);
+
+      if(selectedDrawing===i){
+        addHandle(g,d,"x1","y1",8);
+        addHandle(g,d,"x2","y2",8);
+      }
+
+      svg.appendChild(g);
+      return;
+    }
+
     if(d.type==="circle"||d.type==="rect"){
       const minX=Math.min(d.x1,d.x2);
       const minY=Math.min(d.y1,d.y2);
@@ -6741,6 +6900,56 @@ document.getElementById("board").addEventListener("pointerup",e=>{
     );
   }
   drawingStart=null;
+});
+
+
+function addTrainingMannequin(type){
+  if(type!=="mannequin" && type!=="wall4")return;
+
+  pushHistory();
+
+  const isWall=type==="wall4";
+  const centerX=500;
+  const centerY=310;
+  const width=isWall ? 230 : 66;
+  const height=isWall ? 145 : 150;
+
+  const drawing={
+    type,
+    x1:centerX-width/2,
+    y1:centerY-height/2,
+    x2:centerX+width/2,
+    y2:centerY+height/2,
+    color:"#f5bf2d",
+    width:2,
+    opacity:1,
+    shapeMode:"both",
+    dashStyle:0,
+    headSize:13,
+    curveOffset:0
+  };
+
+  page().drawings.push(drawing);
+
+  clearSelectionKinds();
+  selectedDrawing=page().drawings.length-1;
+  selectedDrawings.add(selectedDrawing);
+  tool="move";
+
+  renderDrawings();
+  refreshUnifiedSelectionVisuals();
+  syncDrawingControls();
+  save(false);
+
+  setStatus(isWall ? "Barriera da 4 aggiunta" : "Sagoma singola aggiunta");
+}
+
+document.querySelector(".add-mannequin-action")?.addEventListener("click",()=>{
+  addTrainingMannequin("mannequin");
+});
+
+document.querySelector(".add-wall4-action")?.addEventListener("click",()=>{
+  addTrainingMannequin("wall4");
 });
 
 document.querySelectorAll(".library-icon[data-tool]").forEach(btn=>{
@@ -8983,7 +9192,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v180",
+    appVersion:"v181",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -9959,7 +10168,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=180",
+        "./service-worker.js?v=181",
         { updateViaCache: "none" }
       );
 

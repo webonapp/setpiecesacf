@@ -607,3 +607,12 @@ v179 - Flip stability fix
 - Protezione contro doppia attivazione nello stesso frame.
 - Pulsante Flip ottimizzato per touch/WebKit.
 - Nessuna modifica alle altre funzioni della v178.
+
+
+v181 - sagome allenamento
+- Aggiunta Sagoma singola negli Objects.
+- Aggiunta Barriera da 4 negli Objects.
+- Design giallo con gambe bianche più corte.
+- Oggetti integrati nel sistema drawings: selezione, trascinamento, multiselezione, copia/incolla, elimina, Undo/Redo e Flip.
+- Ridimensionamento tramite maniglie diagonali, come gli altri oggetti grafici.
+- Compatibilità touch/pointer mantenuta.
