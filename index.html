@@ -2407,9 +2407,9 @@ body.export-clean-view .board-shell{
 /* PUNIZIONI: verticale sopra, leggermente a sinistra come riferimento. */
 .player.defensive-free-kick .defensive-marker{
   width:1.6px;
-  height:42px;
+  height:63px;
   left:42%;
-  top:-48px;
+  top:-69px;
   transform:translateX(-50%);
 }
 
@@ -2418,7 +2418,7 @@ body.export-clean-view .board-shell{
   width:64px;
   height:1.6px;
   left:50%;
-  top:58px;
+  top:68px;
   transform:translateX(-50%);
 }
 
@@ -10449,7 +10449,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v205",
+    appVersion:"v206",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -11529,7 +11529,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=205",
+        "./service-worker.js?v=206",
         { updateViaCache: "none" }
       );
 
