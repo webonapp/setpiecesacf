@@ -621,3 +621,11 @@ v182 - bugfix sagome
 - Corretto il bug mostrato nel video: dopo una modifica/ridimensionamento la sagoma veniva trasformata in una freccia.
 - Causa: il normalizzatore dei drawings accettava solo arrow/curve/circle/rect e convertiva mannequin/wall4 in arrow durante il salvataggio.
 - mannequin e wall4 sono ora tipi persistenti validi anche dopo save, import, spostamento e ridimensionamento.
+
+
+v183 - sagome senza gambe + colore
+- Rimosse completamente le gambe bianche da Sagoma singola e Barriera da 4.
+- Rimosse le gambe anche dalle icone di anteprima negli Objects.
+- Testa e busto usano ora il colore dell'oggetto.
+- Selezionando una sagoma/barriera, la palette Colore esistente permette di cambiarla in rosso, viola, blu, ecc.
+- Restano attivi selezione, drag, ridimensionamento, copia/incolla, elimina, Undo/Redo e Flip.

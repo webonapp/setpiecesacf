@@ -1991,11 +1991,11 @@ body.export-clean-view .board-shell{
   stroke:#a98b3a;
   stroke-width:1;
 }
-.mannequin-tool-icon .legs,
-.wall4-tool-icon .legs{
-  fill:#f9fafb;
-  stroke:#9ca3af;
-  stroke-width:1;
+
+
+
+.mannequin-color-help{
+  margin:-2px 0 8px;
 }
 
 </style>
@@ -2056,15 +2056,15 @@ body.export-clean-view .board-shell{
         <svg class="mannequin-tool-icon" viewBox="0 0 48 48" aria-hidden="true">
           <circle cx="24" cy="9" r="6"></circle>
           <path d="M15 15 L33 15 L31 29 L17 29 Z"></path>
-          <path class="legs" d="M19 29 L23 29 L22 43 L16 43 Z M25 29 L29 29 L32 43 L26 43 Z"></path>
+          
         </svg>
       </button>
       <button type="button" class="library-icon add-wall4-action" title="Aggiungi barriera da 4" aria-label="Aggiungi barriera da 4">
         <svg class="wall4-tool-icon" viewBox="0 0 72 48" aria-hidden="true">
-          <g transform="translate(1 0)"><circle cx="9" cy="8" r="5"></circle><path d="M2 13 L16 13 L15 28 L3 28 Z"></path><path class="legs" d="M5 28 L8 28 L7 42 L2 42 Z M10 28 L13 28 L16 42 L11 42 Z"></path></g>
-          <g transform="translate(18 0)"><circle cx="9" cy="8" r="5"></circle><path d="M2 13 L16 13 L15 28 L3 28 Z"></path><path class="legs" d="M5 28 L8 28 L7 42 L2 42 Z M10 28 L13 28 L16 42 L11 42 Z"></path></g>
-          <g transform="translate(35 0)"><circle cx="9" cy="8" r="5"></circle><path d="M2 13 L16 13 L15 28 L3 28 Z"></path><path class="legs" d="M5 28 L8 28 L7 42 L2 42 Z M10 28 L13 28 L16 42 L11 42 Z"></path></g>
-          <g transform="translate(52 0)"><circle cx="9" cy="8" r="5"></circle><path d="M2 13 L16 13 L15 28 L3 28 Z"></path><path class="legs" d="M5 28 L8 28 L7 42 L2 42 Z M10 28 L13 28 L16 42 L11 42 Z"></path></g>
+          <g transform="translate(1 0)"><circle cx="9" cy="8" r="5"></circle><path d="M2 13 L16 13 L15 28 L3 28 Z"></path></g>
+          <g transform="translate(18 0)"><circle cx="9" cy="8" r="5"></circle><path d="M2 13 L16 13 L15 28 L3 28 Z"></path></g>
+          <g transform="translate(35 0)"><circle cx="9" cy="8" r="5"></circle><path d="M2 13 L16 13 L15 28 L3 28 Z"></path></g>
+          <g transform="translate(52 0)"><circle cx="9" cy="8" r="5"></circle><path d="M2 13 L16 13 L15 28 L3 28 Z"></path></g>
         </svg>
       </button>
     </div>
@@ -2103,6 +2103,7 @@ body.export-clean-view .board-shell{
 
   <div class="library-panel">
     <div class="library-title">Object style</div>
+    <div class="library-help mannequin-color-help">Seleziona una sagoma e scegli un colore dalla palette sopra.</div>
     <label class="style-control"><span>Spessore</span><input id="drawingWidth" type="range" min="2" max="14" step="1" value="6"></label>
     <label class="style-control"><span>Punta</span><input id="drawingHead" type="range" min="8" max="22" step="1" value="13">
 <div class="drawing-choice-row" id="drawingHeadButtons" aria-label="Dimensione punta freccia">
@@ -6105,7 +6106,7 @@ function renderDrawings(){
         head.setAttribute("cx",centerX);
         head.setAttribute("cy",headCy);
         head.setAttribute("r",headR);
-        head.setAttribute("fill","#f5bf2d");
+        head.setAttribute("fill",d.color||"#f5bf2d");
         head.setAttribute("stroke","#a88a39");
         head.setAttribute("stroke-width","1.4");
         head.setAttribute("vector-effect","non-scaling-stroke");
@@ -6119,47 +6120,13 @@ function renderDrawings(){
            L ${centerX+torsoHalfBottom} ${torsoBottom}
            L ${centerX-torsoHalfBottom} ${torsoBottom} Z`
         );
-        torso.setAttribute("fill","#f5bf2d");
+        torso.setAttribute("fill",d.color||"#f5bf2d");
         torso.setAttribute("stroke","#a88a39");
         torso.setAttribute("stroke-width","1.4");
         torso.setAttribute("vector-effect","non-scaling-stroke");
         torso.setAttribute("pointer-events","none");
 
-        const legTopY=torsoBottom;
-        const footY=maxY-height*.035;
-        const inner=figureWidth*.065;
-        const outer=figureWidth*.23;
-        const footOut=figureWidth*.29;
-
-        const leftLeg=document.createElementNS("http://www.w3.org/2000/svg","path");
-        leftLeg.setAttribute(
-          "d",
-          `M ${centerX-outer} ${legTopY}
-           L ${centerX-inner} ${legTopY}
-           L ${centerX-inner*.65} ${footY}
-           L ${centerX-footOut} ${footY}
-           L ${centerX-outer*.72} ${legTopY+height*.08} Z`
-        );
-
-        const rightLeg=document.createElementNS("http://www.w3.org/2000/svg","path");
-        rightLeg.setAttribute(
-          "d",
-          `M ${centerX+inner} ${legTopY}
-           L ${centerX+outer} ${legTopY}
-           L ${centerX+outer*.72} ${legTopY+height*.08}
-           L ${centerX+footOut} ${footY}
-           L ${centerX+inner*.65} ${footY} Z`
-        );
-
-        [leftLeg,rightLeg].forEach(leg=>{
-          leg.setAttribute("fill","#fafafa");
-          leg.setAttribute("stroke","#9ca3af");
-          leg.setAttribute("stroke-width","1.25");
-          leg.setAttribute("vector-effect","non-scaling-stroke");
-          leg.setAttribute("pointer-events","none");
-        });
-
-        g.append(head,torso,leftLeg,rightLeg);
+        g.append(head,torso);
       };
 
       for(let figureIndex=0;figureIndex<figures;figureIndex++){
@@ -9193,7 +9160,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v182",
+    appVersion:"v183",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -10169,7 +10136,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=182",
+        "./service-worker.js?v=183",
         { updateViaCache: "none" }
       );
 
