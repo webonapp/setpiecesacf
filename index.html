@@ -2779,20 +2779,21 @@ let state={roster:defaultRoster,pages:Array.from({length:10},(_,i)=>emptyPage(i)
 const FIORENTINA_PRESET=[
   {number:43,firstName:"",lastName:"De Gea",name:"De Gea",team:"gk",color:"#e3b52d"},
   {number:53,firstName:"",lastName:"Christensen",name:"Christensen",team:"gk",color:"#e3b52d"},
-  {number:1,firstName:"",lastName:"Lezzerini",name:"Lezzerini",team:"gk",color:"#e3b52d"},
+  {number:19,firstName:"",lastName:"Lezzerini",name:"Lezzerini",team:"gk",color:"#e3b52d"},
+  {number:50,firstName:"",lastName:"Fei",name:"Fei",team:"gk",color:"#e3b52d"},
   {number:3,firstName:"",lastName:"Drăgușin",name:"Drăgușin",team:"home",color:"#5b3192"},
   {number:5,firstName:"",lastName:"Pongračić",name:"Pongračić",team:"home",color:"#5b3192"},
   {number:6,firstName:"",lastName:"Ranieri",name:"Ranieri",team:"home",color:"#5b3192"},
   {number:33,firstName:"",lastName:"Viery",name:"Viery",team:"home",color:"#5b3192"},
   {number:21,firstName:"",lastName:"Valdepeñas",name:"Valdepeñas",team:"home",color:"#5b3192"},
-  {number:23,firstName:"",lastName:"Košpo",name:"Košpo",team:"home",color:"#5b3192"},
+  {number:71,firstName:"",lastName:"Košpo",name:"Košpo",team:"home",color:"#5b3192"},
   {number:29,firstName:"",lastName:"Fortini",name:"Fortini",team:"home",color:"#5b3192"},
   {number:65,firstName:"",lastName:"Parisi",name:"Parisi",team:"home",color:"#5b3192"},
   {number:20,firstName:"",lastName:"Jiménez",name:"Jiménez",team:"home",color:"#5b3192"},
   {number:2,firstName:"",lastName:"Dodô",name:"Dodô",team:"home",color:"#5b3192"},
   {number:17,firstName:"",lastName:"Joao Mario",name:"Joao Mario",team:"home",color:"#5b3192"},
   {number:8,firstName:"",lastName:"Mandragora",name:"Mandragora",team:"home",color:"#5b3192"},
-  {number:32,firstName:"",lastName:"Oulai",name:"Oulai",team:"home",color:"#5b3192"},
+  {number:42,firstName:"",lastName:"Oulai",name:"Oulai",team:"home",color:"#5b3192"},
   {number:14,firstName:"",lastName:"Atta",name:"Atta",team:"home",color:"#5b3192"},
   {number:27,firstName:"",lastName:"Ndour",name:"Ndour",team:"home",color:"#5b3192"},
   {number:44,firstName:"",lastName:"Fagioli",name:"Fagioli",team:"home",color:"#5b3192"},
@@ -2802,6 +2803,8 @@ const FIORENTINA_PRESET=[
   {number:30,firstName:"",lastName:"Mastantuono",name:"Mastantuono",team:"home",color:"#5b3192"},
   {number:9,firstName:"",lastName:"Kean",name:"Kean",team:"home",color:"#5b3192"},
   {number:91,firstName:"",lastName:"Piccoli",name:"Piccoli",team:"home",color:"#5b3192"},
+  {number:70,firstName:"",lastName:"Croci",name:"Croci",team:"home",color:"#5b3192"},
+  {number:72,firstName:"",lastName:"Mazzeo",name:"Mazzeo",team:"home",color:"#5b3192"},
 ].map((p,i)=>({id:"p"+i,...p}));
 
 
@@ -3108,7 +3111,7 @@ function applyV94PermanentRosterUpdates(){
 
   const updates=new Map([
     ["valdepenas",{number:21,lastName:"Valdepeñas"}],
-    ["kospo",{number:23,lastName:"Košpo"}],
+    ["kospo",{number:71,lastName:"Košpo"}],
     ["jimenez",{number:20,lastName:"Jiménez"}],
     ["oulai",{number:32,lastName:"Oulaï"}],
     ["ranieri",{number:6,lastName:"Ranieri"}],
@@ -8980,7 +8983,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v179",
+    appVersion:"v180",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -9956,7 +9959,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=179",
+        "./service-worker.js?v=180",
         { updateViaCache: "none" }
       );
 
