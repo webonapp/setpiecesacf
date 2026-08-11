@@ -2325,6 +2325,118 @@ body.export-clean-view .board-shell{
   }
 }
 
+
+/* v205 - modalità DIFENSIVE isolata */
+.defensive-mode-control{
+  position:relative;
+  display:flex;
+  align-items:center;
+  flex:0 0 auto;
+}
+.presentation-mode-btn.defensive{
+  border-color:#5b6673;
+  background:#202832;
+}
+.presentation-mode-btn.defensive.active{
+  border-color:#9be85d!important;
+  background:#8bd450!important;
+  color:#071008!important;
+  box-shadow:0 0 0 2px rgba(139,212,80,.2);
+}
+.defensive-caret{
+  display:inline-block;
+  margin-left:5px;
+  font-size:9px;
+  line-height:1;
+}
+.defensive-mode-menu{
+  position:absolute;
+  top:calc(100% + 6px);
+  left:50%;
+  transform:translateX(-50%);
+  min-width:138px;
+  padding:5px;
+  border:1px solid #425066;
+  border-radius:8px;
+  background:#101923;
+  box-shadow:0 12px 28px rgba(0,0,0,.34);
+  z-index:10030;
+}
+.defensive-mode-menu[hidden]{
+  display:none!important;
+}
+.defensive-mode-option{
+  display:block;
+  width:100%;
+  min-height:34px;
+  border:0;
+  border-radius:6px;
+  padding:7px 10px;
+  background:transparent;
+  color:#e8edf3;
+  font-size:10px;
+  font-weight:900;
+  letter-spacing:.055em;
+  text-align:left;
+  cursor:pointer;
+  touch-action:manipulation;
+  -webkit-tap-highlight-color:transparent;
+}
+.defensive-mode-option:hover,
+.defensive-mode-option:focus-visible{
+  background:#1b2a3a;
+  outline:none;
+}
+.defensive-mode-option.active{
+  background:#8bd450;
+  color:#071008;
+}
+
+/*
+  Marker DIFENSIVE: è figlio della maglia, quindi segue automaticamente
+  drag, scala individuale/globale, allineamenti, distribuzione e Flip.
+*/
+.player .defensive-marker{
+  position:absolute;
+  display:block;
+  pointer-events:none;
+  background:#9b9da3;
+  z-index:-1;
+}
+
+/* PUNIZIONI: verticale sopra, leggermente a sinistra come riferimento. */
+.player.defensive-free-kick .defensive-marker{
+  width:1.6px;
+  height:42px;
+  left:42%;
+  top:-48px;
+  transform:translateX(-50%);
+}
+
+/* CORNER: orizzontale sotto, centrata rispetto alla maglia. */
+.player.defensive-corner .defensive-marker{
+  width:64px;
+  height:1.6px;
+  left:50%;
+  top:58px;
+  transform:translateX(-50%);
+}
+
+/* In DIFENSIVE il giocatore resta riconoscibile dalla maglia, senza etichette. */
+.player.defensive-corner .player-tag,
+.player.defensive-free-kick .player-tag{
+  display:none!important;
+}
+
+@media(max-width:1200px){
+  .presentation-mode-btn.defensive{
+    min-width:84px!important;
+  }
+  .defensive-mode-menu{
+    min-width:122px;
+  }
+}
+
 </style>
 
 <script async src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
@@ -2351,6 +2463,33 @@ body.export-clean-view .board-shell{
   <div class="topbar-presentation-slot" aria-label="Modalità visualizzazione giocatori">
     <div class="presentation-mode-actions">
       <button type="button" class="btn presentation-mode-btn bench" id="benchModeBtn">PANCHINA</button>
+
+      <div class="defensive-mode-control" id="defensiveModeControl">
+        <button type="button"
+                class="btn presentation-mode-btn defensive"
+                id="defensiveModeBtn"
+                aria-haspopup="menu"
+                aria-expanded="false">
+          DIFENSIVE <span class="defensive-caret" aria-hidden="true">▾</span>
+        </button>
+        <div class="defensive-mode-menu" id="defensiveModeMenu" role="menu" hidden>
+          <button type="button"
+                  class="defensive-mode-option"
+                  id="defensiveCornerBtn"
+                  role="menuitem"
+                  data-defensive-mode="corner">
+            CORNER
+          </button>
+          <button type="button"
+                  class="defensive-mode-option"
+                  id="defensiveFreeKickBtn"
+                  role="menuitem"
+                  data-defensive-mode="freeKick">
+            PUNIZIONI
+          </button>
+        </div>
+      </div>
+
       <button type="button" class="btn presentation-mode-btn dressing-room" id="dressingRoomModeBtn">SPOGLIATOIO</button>
       <button type="button" class="btn presentation-mode-btn preparation" id="preparationModeBtn">PREPARAZIONE</button>
     </div>
@@ -3190,7 +3329,7 @@ function defaultPositions(count=state?.roster?.length || defaultRoster.length){
   return Array.from({length:count},()=>null);
 }
 const emptyPage=i=>({title:i===0?"ACF Fiorentina · Schema 1":`Schema ${i+1}`,notes:"",positions:defaultPositions(defaultRoster.length),drawings:[],balls:[],texts:[],playerDisplayOverrides:{}});
-let state={roster:defaultRoster,pages:Array.from({length:10},(_,i)=>emptyPage(i)),playerScale:.75,snapEnabled:true,homeChestCircle:true,awayChestCircle:false,homeRosterLoaded:false,awayRosterLoaded:false,homeRosterTemplate:null};
+let state={roster:defaultRoster,pages:Array.from({length:10},(_,i)=>emptyPage(i)),playerScale:.75,snapEnabled:true,homeChestCircle:true,awayChestCircle:false,homeRosterLoaded:false,awayRosterLoaded:false,homeRosterTemplate:null,defensiveDisplay:null};
 
 const FIORENTINA_PRESET=[
   {number:43,firstName:"",lastName:"De Gea",name:"De Gea",team:"gk",color:"#e3b52d"},
@@ -3423,6 +3562,11 @@ function normalizeProjectState(projectState){
 
   if(typeof safe.snapEnabled!=="boolean")safe.snapEnabled=true;
   safe.snapStep=clampNumber(safe.snapStep,1,20,5);
+
+  safe.defensiveDisplay=
+    safe.defensiveDisplay==="corner" || safe.defensiveDisplay==="freeKick"
+      ? safe.defensiveDisplay
+      : null;
 
   if(!["normal","bench","locker"].includes(safe.presentationMode)){
     safe.presentationMode="normal";
@@ -5223,6 +5367,17 @@ function renderPlayers(){
     el.style.transform=`translate(-50%,-50%) scale(${appliedScale})`;
     el.dataset.index=i;
 
+    const defensiveDisplay=
+      state.defensiveDisplay==="corner" || state.defensiveDisplay==="freeKick"
+        ? state.defensiveDisplay
+        : null;
+
+    if(defensiveDisplay==="corner"){
+      el.classList.add("defensive-corner");
+    }else if(defensiveDisplay==="freeKick"){
+      el.classList.add("defensive-free-kick");
+    }
+
     const solidColor=pl.color||(pl.team==="home"?"#5b3192":pl.team==="away"?"#d64b62":"#e3b52d");
     const striped=Boolean(pl.pattern&&patternMap[pl.pattern]);
     const clipId=`jerseyClip-${currentPage}-${i}`;
@@ -5267,6 +5422,7 @@ function renderPlayers(){
     const effectiveShowNumber=schemaShowNumber;
 
     const visibleNumber=(
+      !defensiveDisplay &&
       effectiveShowNumber &&
       effectiveShowCircle &&
       pl.number!==0 &&
@@ -5310,7 +5466,12 @@ function renderPlayers(){
         ${visibleNumber}
       </svg>`;
 
+    const defensiveMarker=defensiveDisplay
+      ? '<span class="defensive-marker" aria-hidden="true"></span>'
+      : "";
+
     el.innerHTML=`
+      ${defensiveMarker}
       ${jerseySvg}
       <div class="player-tag${
         effectiveShowOpponentLine
@@ -5847,15 +6008,48 @@ function updatePresentationModeButtons(){
   const bench=document.getElementById("benchModeBtn");
   const dressing=document.getElementById("dressingRoomModeBtn");
   const preparation=document.getElementById("preparationModeBtn");
+  const defensive=document.getElementById("defensiveModeBtn");
+  const defensiveCorner=document.getElementById("defensiveCornerBtn");
+  const defensiveFreeKick=document.getElementById("defensiveFreeKickBtn");
 
-  bench?.classList.toggle("active",state.presentationMode==="bench");
-  dressing?.classList.toggle("active",state.presentationMode==="locker");
-  preparation?.classList.toggle("active",state.presentationMode==="normal");
+  const defensiveActive=
+    state.defensiveDisplay==="corner" ||
+    state.defensiveDisplay==="freeKick";
+
+  bench?.classList.toggle(
+    "active",
+    !defensiveActive && state.presentationMode==="bench"
+  );
+  dressing?.classList.toggle(
+    "active",
+    !defensiveActive && state.presentationMode==="locker"
+  );
+  preparation?.classList.toggle(
+    "active",
+    !defensiveActive && state.presentationMode==="normal"
+  );
+
+  defensive?.classList.toggle("active",defensiveActive);
+  defensiveCorner?.classList.toggle(
+    "active",
+    state.defensiveDisplay==="corner"
+  );
+  defensiveFreeKick?.classList.toggle(
+    "active",
+    state.defensiveDisplay==="freeKick"
+  );
+
   syncViewPresetControl();
 }
 
 
 function applyGlobalPlayerDisplayMode(mode){
+  /*
+    Le tre modalità storiche restano identiche.
+    Se una di esse viene scelta, disattiviamo soltanto il layer DIFENSIVE.
+  */
+  state.defensiveDisplay=null;
+
   const normalizedMode=
     mode==="bench"
       ? "bench"
@@ -10255,7 +10449,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v204",
+    appVersion:"v205",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -11129,6 +11323,101 @@ document.getElementById("opponentBlankLine").addEventListener("change",event=>{
 });
 
 
+
+function setDefensiveMenuOpen(open){
+  const button=document.getElementById("defensiveModeBtn");
+  const menu=document.getElementById("defensiveModeMenu");
+  if(!button || !menu)return;
+
+  menu.hidden=!open;
+  button.setAttribute("aria-expanded",String(open));
+}
+
+function toggleDefensiveMenu(){
+  const menu=document.getElementById("defensiveModeMenu");
+  if(!menu)return;
+  setDefensiveMenuOpen(menu.hidden);
+}
+
+function applyDefensiveDisplay(mode){
+  if(mode!=="corner" && mode!=="freeKick")return;
+
+  if(state.defensiveDisplay===mode){
+    setDefensiveMenuOpen(false);
+    updatePresentationModeButtons();
+    return;
+  }
+
+  pushHistory();
+
+  /*
+    Defensive è un layer di visualizzazione dedicato.
+    Non riscrive nome, numero, linea locale o altri override del giocatore.
+  */
+  state.defensiveDisplay=mode;
+
+  renderPlayers();
+  renderRoster();
+  syncRosterDisplayOptions();
+  syncChestCircleControls();
+  updatePresentationModeButtons();
+  save(false);
+  setDefensiveMenuOpen(false);
+
+  setStatus(
+    mode==="corner"
+      ? "DIFENSIVE · CORNER"
+      : "DIFENSIVE · PUNIZIONI"
+  );
+}
+
+document.getElementById("defensiveModeBtn").addEventListener(
+  "click",
+  event=>{
+    event.preventDefault();
+    event.stopPropagation();
+    toggleDefensiveMenu();
+  }
+);
+
+document.getElementById("defensiveCornerBtn").addEventListener(
+  "click",
+  event=>{
+    event.preventDefault();
+    event.stopPropagation();
+    applyDefensiveDisplay("corner");
+  }
+);
+
+document.getElementById("defensiveFreeKickBtn").addEventListener(
+  "click",
+  event=>{
+    event.preventDefault();
+    event.stopPropagation();
+    applyDefensiveDisplay("freeKick");
+  }
+);
+
+document.addEventListener("pointerdown",event=>{
+  const control=document.getElementById("defensiveModeControl");
+  const menu=document.getElementById("defensiveModeMenu");
+
+  if(
+    menu &&
+    !menu.hidden &&
+    control &&
+    !control.contains(event.target)
+  ){
+    setDefensiveMenuOpen(false);
+  }
+});
+
+document.addEventListener("keydown",event=>{
+  if(event.key==="Escape"){
+    setDefensiveMenuOpen(false);
+  }
+});
+
 document.getElementById("benchModeBtn").addEventListener(
   "click",
   ()=>applyGlobalPlayerDisplayMode("bench")
@@ -11240,7 +11529,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=204",
+        "./service-worker.js?v=205",
         { updateViaCache: "none" }
       );
 

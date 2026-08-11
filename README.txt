@@ -778,3 +778,14 @@ v203 - inversione grafica header
 - Sostituzione spostata nella barra grigia del campo.
 - ID, listener e funzioni JavaScript invariati.
 - Nessuna modifica a sostituzioni, modalità di presentazione, selezione, backup o strumenti.
+
+
+v205 - modalità DIFENSIVE
+- Nuovo pulsante DIFENSIVE accanto a PANCHINA.
+- Menu a tendina con CORNER e PUNIZIONI.
+- PUNIZIONI: linea verticale grigia sopra la maglia, leggermente spostata a sinistra.
+- CORNER: linea orizzontale grigia sotto la maglia.
+- Il marker è figlio grafico della maglia: segue drag, scala, allineamenti, Distribuisci e Flip senza nuovi oggetti.
+- In DIFENSIVE nome e numero vengono nascosti solo graficamente; gli override originali non vengono modificati.
+- Panchina, Spogliatoio e Preparazione disattivano il layer DIFENSIVE senza cambiare la loro logica storica.
+- Nessuna modifica a coordinate, selezione, sostituzioni multiple, backup, rose, SNAP, sagome o archivio.
