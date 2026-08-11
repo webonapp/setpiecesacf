@@ -673,3 +673,12 @@ v189 - barriera più snella
 - Numeri spostati più in alto, senza sovrapporsi alla testa.
 - Numeri ingranditi del 10%.
 - Tutte le altre funzioni restano invariate.
+
+
+v190 - integrazione completa sagome
+- Doppio clic/doppio tap su sagoma o singolo elemento della barriera apre l'editor numero.
+- Sagoma singola e barriera restano selezionabili come oggetti.
+- Orizzontale, Verticale e Distribuisci ora includono anche sagome/barriere selezionate, anche insieme ai giocatori.
+- Flip dell'intero campo inverte anche l'ordine dei numeri della barriera.
+- Numero mantenuto fuori dalla sagoma e sopra la testa.
+- Nessuna modifica a rose, backup, testi, SNAP o archivio.

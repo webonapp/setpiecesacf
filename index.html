@@ -2214,8 +2214,8 @@ body.export-clean-view .board-shell{
 
     <span class="touch-command-divider"></span>
 
-    <button type="button" class="touch-command" id="touchAlignHorizontalBtn" title="Allinea orizzontalmente">Orizzontale</button>
-    <button type="button" class="touch-command" id="touchAlignVerticalBtn" title="Allinea verticalmente">Verticale</button>
+    <button type="button" class="touch-command" id="touchAlignHorizontalBtn" title="Allinea orizzontalmente giocatori e sagome selezionati">Orizzontale</button>
+    <button type="button" class="touch-command" id="touchAlignVerticalBtn" title="Allinea verticalmente giocatori e sagome selezionati">Verticale</button>
     <button type="button" class="touch-command" id="touchDistributeBtn" title="Distribuisci uniformemente">Distribuisci</button>
     <button type="button" class="touch-command" id="touchFlipHorizontalBtn" title="Flip orizzontale di tutto il campo" aria-label="Flip orizzontale di tutto il campo">Flip</button>
 
@@ -6320,7 +6320,7 @@ function renderDrawings(){
 
           label.textContent=value;
           label.setAttribute("x",centerX);
-          label.setAttribute("y",Math.max(minY+7,headCy-headR-height*.145));
+          label.setAttribute("y",headCy-headR-Math.max(7,height*.10));
           label.setAttribute("text-anchor","middle");
           label.setAttribute("dominant-baseline","middle");
           label.setAttribute("fill","#111827");
@@ -8231,29 +8231,120 @@ toggleSidebar.addEventListener("click",()=>{
 
 
 
-function alignSelectedHorizontally(){
-  const ids=[...selectedPlayers];
-  if(ids.length<2)return;
-  pushHistory();
-  const active=ids.filter(i=>page().positions[i]);
-  if(active.length<2)return;
-  const avgY=active.reduce((sum,i)=>sum+page().positions[i].y,0)/active.length;
-  active.forEach(i=>page().positions[i].y=avgY);
+
+function getSelectedAlignmentItems(){
+  const items=[];
+
+  selectedPlayers.forEach(index=>{
+    const position=page().positions?.[index];
+    if(!position)return;
+
+    items.push({
+      kind:"player",
+      index,
+      x:Number(position.x),
+      y:Number(position.y)
+    });
+  });
+
+  selectedDrawings.forEach(index=>{
+    const drawing=page().drawings?.[index];
+    if(!drawing || (drawing.type!=="mannequin" && drawing.type!=="wall4"))return;
+
+    const x1=Number(drawing.x1);
+    const x2=Number(drawing.x2);
+    const y1=Number(drawing.y1);
+    const y2=Number(drawing.y2);
+
+    if(
+      !Number.isFinite(x1) ||
+      !Number.isFinite(x2) ||
+      !Number.isFinite(y1) ||
+      !Number.isFinite(y2)
+    )return;
+
+    items.push({
+      kind:"drawing",
+      index,
+      x:((x1+x2)/2)/10,
+      y:((y1+y2)/2)/6.2
+    });
+  });
+
+  return items.filter(item=>
+    Number.isFinite(item.x) &&
+    Number.isFinite(item.y)
+  );
+}
+
+function moveAlignmentItemTo(item,targetX,targetY){
+  if(item.kind==="player"){
+    const position=page().positions[item.index];
+    if(!position)return;
+
+    if(Number.isFinite(targetX))position.x=targetX;
+    if(Number.isFinite(targetY))position.y=targetY;
+    return;
+  }
+
+  const drawing=page().drawings?.[item.index];
+  if(!drawing)return;
+
+  const currentX=((Number(drawing.x1)+Number(drawing.x2))/2)/10;
+  const currentY=((Number(drawing.y1)+Number(drawing.y2))/2)/6.2;
+
+  const dx=Number.isFinite(targetX) ? (targetX-currentX)*10 : 0;
+  const dy=Number.isFinite(targetY) ? (targetY-currentY)*6.2 : 0;
+
+  ["x1","x2","c1x","c2x"].forEach(key=>{
+    if(Number.isFinite(Number(drawing[key]))){
+      drawing[key]=Number(drawing[key])+dx;
+    }
+  });
+
+  ["y1","y2","c1y","c2y"].forEach(key=>{
+    if(Number.isFinite(Number(drawing[key]))){
+      drawing[key]=Number(drawing[key])+dy;
+    }
+  });
+}
+
+function finishAlignmentCommand(status){
   renderPlayers();
-  refreshSelectionVisuals();
+  renderDrawings();
+  refreshUnifiedSelectionVisuals();
   updateLineupCounters();
+  syncRosterDisplayOptions();
   save(false);
-  setStatus("Giocatori allineati in orizzontale");
+  setStatus(status);
+}
+
+function alignSelectedHorizontally(){
+  const items=getSelectedAlignmentItems();
+
+  if(items.length<2){
+    setStatus("Seleziona almeno 2 elementi");
+    return;
+  }
+
+  const avgY=items.reduce((sum,item)=>sum+item.y,0)/items.length;
+
+  pushHistory();
+
+  items.forEach(item=>{
+    moveAlignmentItemTo(item,null,avgY);
+  });
+
+  finishAlignmentCommand("Elementi allineati in orizzontale");
 }
 
 
 function distributeSelectedHorizontally(){
-  const active=[...selectedPlayers]
-    .filter(index=>page().positions[index])
-    .sort((a,b)=>page().positions[a].x-page().positions[b].x);
+  const items=getSelectedAlignmentItems()
+    .sort((a,b)=>a.x-b.x);
 
-  if(active.length<2){
-    setStatus("Seleziona almeno 2 giocatori");
+  if(items.length<2){
+    setStatus("Seleziona almeno 2 elementi");
     return;
   }
 
@@ -8261,86 +8352,81 @@ function distributeSelectedHorizontally(){
   const boardRect=board.getBoundingClientRect();
 
   if(!boardRect.width){
-    setStatus("Impossibile distribuire i giocatori");
+    setStatus("Impossibile distribuire gli elementi");
     return;
   }
 
   /*
-    Distanza visiva desiderata tra i centri delle maglie.
-    64 px produce uno spazio simile all'esempio mostrato,
-    evitando che maglie e cognomi si sovrappongano.
+    Spaziatura uniforme tra i centri.
+    Vale allo stesso modo per maglie, sagome singole e barriere.
   */
   const desiredPixelSpacing=51;
   const minimumPercentSpacing=(desiredPixelSpacing/boardRect.width)*100;
 
-  const currentFirstX=page().positions[active[0]].x;
-  const currentLastX=page().positions[active[active.length-1]].x;
+  const currentFirstX=items[0].x;
+  const currentLastX=items[items.length-1].x;
   const currentSpan=Math.max(0,currentLastX-currentFirstX);
-  const requiredSpan=minimumPercentSpacing*(active.length-1);
+  const requiredSpan=minimumPercentSpacing*(items.length-1);
 
   let startX;
   let spacing;
 
   if(currentSpan>=requiredSpan){
-    // Se lo spazio disponibile è già sufficiente, distribuisce tra gli estremi.
     startX=currentFirstX;
-    spacing=currentSpan/(active.length-1);
+    spacing=currentSpan/(items.length-1);
   }else{
-    // Se i giocatori sono troppo vicini, allarga il gruppo mantenendolo centrato.
-    const centerX=active.reduce(
-      (sum,index)=>sum+page().positions[index].x,
+    const centerX=items.reduce(
+      (sum,item)=>sum+item.x,
       0
-    )/active.length;
+    )/items.length;
 
     spacing=minimumPercentSpacing;
     startX=centerX-(requiredSpan/2);
 
-    // Mantiene tutto il gruppo dentro il campo.
     const minAllowed=2.5;
     const maxAllowed=97.5;
     const endX=startX+requiredSpan;
 
-    if(startX<minAllowed){
-      startX=minAllowed;
-    }
-    if(endX>maxAllowed){
-      startX=maxAllowed-requiredSpan;
-    }
+    if(startX<minAllowed)startX=minAllowed;
+    if(endX>maxAllowed)startX=maxAllowed-requiredSpan;
 
-    // Se il gruppo è più largo del campo, usa tutto lo spazio disponibile.
     if(startX<minAllowed){
       startX=minAllowed;
-      spacing=(maxAllowed-minAllowed)/(active.length-1);
+      spacing=(maxAllowed-minAllowed)/(items.length-1);
     }
   }
 
   pushHistory();
 
-  active.forEach((index,position)=>{
-    page().positions[index].x=
-      Math.max(2.5,Math.min(97.5,startX+(spacing*position)));
+  items.forEach((item,position)=>{
+    const targetX=Math.max(
+      2.5,
+      Math.min(97.5,startX+(spacing*position))
+    );
+
+    moveAlignmentItemTo(item,targetX,null);
   });
 
-  renderPlayers();
-  refreshSelectionVisuals();
-  updateLineupCounters();
-  save(false);
-  setStatus("Giocatori distanziati uniformemente");
+  finishAlignmentCommand("Elementi distanziati uniformemente");
 }
 
 function alignSelectedVertically(){
-  const ids=[...selectedPlayers];
-  if(ids.length<2)return;
+  const items=getSelectedAlignmentItems();
+
+  if(items.length<2){
+    setStatus("Seleziona almeno 2 elementi");
+    return;
+  }
+
+  const avgX=items.reduce((sum,item)=>sum+item.x,0)/items.length;
+
   pushHistory();
-  const active=ids.filter(i=>page().positions[i]);
-  if(active.length<2)return;
-  const avgX=active.reduce((sum,i)=>sum+page().positions[i].x,0)/active.length;
-  active.forEach(i=>page().positions[i].x=avgX);
-  renderPlayers();
-  refreshSelectionVisuals();
-  updateLineupCounters();
-  save(false);
-  setStatus("Giocatori allineati in verticale");
+
+  items.forEach(item=>{
+    moveAlignmentItemTo(item,avgX,null);
+  });
+
+  finishAlignmentCommand("Elementi allineati in verticale");
 }
 
 
@@ -8656,6 +8742,14 @@ function flipSelectedHorizontally(){
       Number.isFinite(Number(copy.curveOffset))
     ){
       copy.curveOffset=-Number(copy.curveOffset);
+    }
+
+    /*
+      La barriera viene specchiata anche semanticamente:
+      1-2-3-4 diventa 4-3-2-1.
+    */
+    if(copy.type==="wall4" && Array.isArray(copy.numbers)){
+      copy.numbers=[...copy.numbers].reverse();
     }
 
     clampFlippedDrawingInPlace(copy);
@@ -9504,7 +9598,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v189",
+    appVersion:"v190",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -10486,7 +10580,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=189",
+        "./service-worker.js?v=190",
         { updateViaCache: "none" }
       );
 
