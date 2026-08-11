@@ -732,3 +732,16 @@ v198 - bugfix e pulizia generale
 - Sagome/barriere renderizzate sulle coordinate reali, senza minimi grafici nascosti 24x48.
 - Service Worker verificato: updateViaCache none, skipWaiting, clients.claim, versioni allineate.
 - Audit JavaScript, Service Worker e ID superato.
+
+
+v199 - deep stability bugfix
+- Migrazione rosa legacy resa canonica: usa FIORENTINA_PRESET, niente più vecchio Oulai 32/Oulaï.
+- Tutti i fallback dimensione giocatori portati al 75%.
+- Rimosso il collegamento DOM al vecchio menu VISTA eliminato.
+- Progetto corrente non viene più persistito automaticamente in localStorage: refresh manuale = reset.
+- L'aggiornamento automatico del Service Worker usa un recovery temporaneo di sessione per non perdere lavoro durante il solo reload tecnico.
+- Import backup normalizzato con lo schema corrente e non salvato automaticamente come progetto persistente.
+- Navigazione fullscreen non incrementa più il contatore modifiche.
+- Rimossa la save beforeunload che generava salvataggi/dirty count non intenzionali.
+- Archivio/Database ACF resta persistente.
+- Audit JS, Service Worker, ID e listener completato.

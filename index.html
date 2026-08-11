@@ -1641,27 +1641,8 @@ body.is-dragging .player.selected{
 
 
 
-#viewPresetSelect{
-  min-width:148px;
-  max-width:190px;
-  height:30px;
-  border:1px solid rgba(255,255,255,.15);
-  border-radius:7px;
-  background:#20242a;
-  color:#fff;
-  font:inherit;
-  font-size:11px;
-  font-weight:800;
-  padding:0 26px 0 9px;
-  outline:none;
-  touch-action:manipulation;
-}
-#viewPresetSelect:focus{
-  border-color:#8bd450;
-  box-shadow:0 0 0 2px rgba(139,212,80,.16);
-}
+
 @media(max-width:1100px){
-  #viewPresetSelect{min-width:126px;max-width:150px;font-size:10px}
 }
 @media(max-width:820px){
   .touch-command-bar{flex-wrap:wrap!important}
@@ -2497,6 +2478,32 @@ body.export-clean-view .board-shell{
 
 <script>
 const STORAGE_KEY="setPieceBoardPro_v165";
+const UPDATE_RECOVERY_KEY="setPieceBoardPro_updateRecovery_v199";
+
+function safeSessionGet(key){
+  try{
+    return window.sessionStorage ? window.sessionStorage.getItem(key) : null;
+  }catch(_){
+    return null;
+  }
+}
+
+function safeSessionSet(key,value){
+  try{
+    if(window.sessionStorage){
+      window.sessionStorage.setItem(key,value);
+      return true;
+    }
+  }catch(_){}
+  return false;
+}
+
+function safeSessionRemove(key){
+  try{
+    if(window.sessionStorage)window.sessionStorage.removeItem(key);
+  }catch(_){}
+}
+
 
 function safeStorageGet(key){
   try{
@@ -2947,7 +2954,7 @@ function normalizePlayerRecord(player,index=0){
   safe.individualScale=
     safe.individualScale===null || safe.individualScale===undefined
       ? null
-      : clampNumber(safe.individualScale,.5,2,.9);
+      : clampNumber(safe.individualScale,.5,2,.75);
 
   if(typeof safe.showLastName!=="boolean")safe.showLastName=team!=="away";
   if(typeof safe.showChestCircle!=="boolean")safe.showChestCircle=team!=="away";
@@ -3073,7 +3080,7 @@ function normalizeProjectState(projectState){
   const safe=projectState && typeof projectState==="object" ? projectState : {};
 
   safe.schemaVersion=PROJECT_SCHEMA_VERSION;
-  safe.playerScale=clampNumber(safe.playerScale,.65,1.65,.90);
+  safe.playerScale=clampNumber(safe.playerScale,.65,1.65,.75);
 
   if(typeof safe.snapEnabled!=="boolean")safe.snapEnabled=true;
   safe.snapStep=clampNumber(safe.snapStep,1,20,5);
@@ -3173,14 +3180,23 @@ function save(show=true){
   state=normalizeProjectState(state);
 
   if(!assertProjectIntegrity(state)){
-    console.error("Salvataggio annullato: stato progetto non valido");
+    console.error("Stato progetto non valido");
     setStatus("Errore integrità progetto");
     return false;
   }
 
-  const saved=safeStorageSet(STORAGE_KEY,JSON.stringify(state));
-  if(show)setStatus(saved ? "Progetto salvato" : "Salvataggio non riuscito");
-  return saved;
+  /*
+    Il progetto resta in memoria.
+    La persistenza volontaria è il backup esportato.
+    Puliamo eventuali salvataggi automatici delle versioni precedenti.
+  */
+  safeStorageRemove(STORAGE_KEY);
+
+  if(show){
+    setStatus("Modifiche registrate · esporta backup per conservarle");
+  }
+
+  return true;
 }
 
 function applyV94PermanentRosterUpdates(){
@@ -3190,20 +3206,17 @@ function applyV94PermanentRosterUpdates(){
     .trim()
     .toLowerCase();
 
-  const updates=new Map([
-    ["valdepenas",{number:21,lastName:"Valdepeñas"}],
-    ["kospo",{number:71,lastName:"Košpo"}],
-    ["jimenez",{number:20,lastName:"Jiménez"}],
-    ["oulai",{number:32,lastName:"Oulaï"}],
-    ["ranieri",{number:6,lastName:"Ranieri"}],
-    ["fortini",{number:29,lastName:"Fortini"}],
-    ["mandragora",{number:8,lastName:"Mandragora"}],
-    ["atta",{number:14,lastName:"Atta"}],
-    ["ndour",{number:27,lastName:"Ndour"}],
-    ["kean",{number:9,lastName:"Kean"}],
-    ["piccoli",{number:91,lastName:"Piccoli"}],
-    ["de gea",{lastName:"De Gea"}]
-  ]);
+  /*
+    v199:
+    niente più numeri hardcoded legacy.
+    Il preset incluso nell'app è l'unica fonte canonica.
+  */
+  const canonical=new Map(
+    FIORENTINA_PRESET.map(player=>[
+      normalize(player.lastName||player.name),
+      player
+    ])
+  );
 
   const apply=list=>{
     if(!Array.isArray(list))return;
@@ -3212,21 +3225,15 @@ function applyV94PermanentRosterUpdates(){
       if(!player || player.team==="away")return;
 
       const key=normalize(player.lastName||player.name);
-      const update=updates.get(key);
-      if(!update)return;
+      const fresh=canonical.get(key);
+      if(!fresh)return;
 
-      if(Object.prototype.hasOwnProperty.call(update,"number")){
-        player.number=update.number;
-      }
-
-      if(key==="de gea"){
-        player.firstName="";
-        player.lastName="De Gea";
-        player.name="De Gea";
-      }else{
-        player.lastName=update.lastName;
-        player.name=[player.firstName,update.lastName].filter(Boolean).join(" ");
-      }
+      player.number=fresh.number;
+      player.firstName="";
+      player.lastName=fresh.lastName;
+      player.name=fresh.name;
+      player.team=fresh.team;
+      player.color=fresh.color;
     });
   };
 
@@ -3235,11 +3242,33 @@ function applyV94PermanentRosterUpdates(){
 }
 
 function load(){
+  /*
+    Refresh manuale = progetto pulito.
+    L'unica eccezione è una ricarica automatica causata da un
+    aggiornamento del service worker: in quel caso recuperiamo una
+    sola volta lo stato dalla sessione e poi lo cancelliamo.
+  */
   try{
-    const raw=safeStorageGet(STORAGE_KEY);
-    if(raw)state=JSON.parse(raw);
-  }catch(e){}
-  if(!state.playerScale)state.playerScale=.90;
+    const recoveryRaw=safeSessionGet(UPDATE_RECOVERY_KEY);
+
+    if(recoveryRaw){
+      const recovery=JSON.parse(recoveryRaw);
+
+      if(recovery?.state && typeof recovery.state==="object"){
+        state=recovery.state;
+      }
+
+      if(Number.isFinite(Number(recovery?.currentPage))){
+        currentPage=Math.max(0,Number(recovery.currentPage));
+      }
+    }
+  }catch(error){
+    console.warn("Recovery aggiornamento non disponibile:",error);
+  }finally{
+    safeSessionRemove(UPDATE_RECOVERY_KEY);
+    safeStorageRemove(STORAGE_KEY);
+  }
+  if(!state.playerScale)state.playerScale=.75;
   if(!["normal","bench","locker"].includes(state.presentationMode)){
     state.presentationMode="normal";
   }
@@ -3563,14 +3592,11 @@ function getViewPreset(id=state.viewPreset){
 
 
 function syncViewPresetControl(){
-  const select=document.getElementById("viewPresetSelect");
-  if(!select)return;
-
-  const normalizedId=normalizeViewPresetId(state.viewPreset);
-  if(select.value!==normalizedId)select.value=normalizedId;
-
-  const preset=getViewPreset(normalizedId);
-  select.title=preset?.description||"Preset di visualizzazione";
+  /*
+    v199: il vecchio menu VISTA non esiste più.
+    Manteniamo questa funzione come no-op per compatibilità con i
+    percorsi interni dei preset/presentation mode.
+  */
 }
 
 function syncViewPresetFromPresentationMode(){
@@ -9583,7 +9609,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v198",
+    appVersion:"v199",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -9958,7 +9984,7 @@ async function importBackupFile(file){
       return;
     }
 
-    state=importedState;
+    state=normalizeProjectState(importedState);
     archiveState=importedArchive;
 
     if(
@@ -9990,7 +10016,13 @@ async function importBackupFile(file){
       fixLegacyOpponentTenName();
     }
 
-    safeStorageSet(STORAGE_KEY,JSON.stringify(state));
+    state=normalizeProjectState(state);
+
+    /*
+      L'archivio resta persistente; il progetto corrente no.
+      Per conservarlo tra refresh si usa Esporta backup.
+    */
+    safeStorageRemove(STORAGE_KEY);
     safeStorageSet(ARCHIVE_KEY,JSON.stringify(archiveState));
 
     selectedPlayers.clear();
@@ -10521,7 +10553,6 @@ function goToFullscreenScheme(direction){
   currentPage=target;
   clearAllSelections();
   renderAll();
-  save(false);
   updateFullscreenNavigation();
 }
 
@@ -10541,14 +10572,13 @@ document.addEventListener("keydown",event=>{
 });
 
 installLogicalBoardRenderer();
-window.addEventListener("beforeunload",()=>save(false));
 load();
 try{
   const SNAP_DEFAULT_MARKER="setPieceBoardPro_snapDefault_v166";
   if(!safeStorageGet(SNAP_DEFAULT_MARKER)){
     state.snapEnabled=true;
     safeStorageSet(SNAP_DEFAULT_MARKER,"1");
-    save(false);
+    state=normalizeProjectState(state);
   }
 }catch(_){
   state.snapEnabled=true;
@@ -10565,7 +10595,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=198",
+        "./service-worker.js?v=199",
         { updateViaCache: "none" }
       );
 
@@ -10576,11 +10606,25 @@ if ("serviceWorker" in navigator) {
         refreshing = true;
 
         /*
-          Il nuovo service worker ha già preso il controllo:
-          salva prima lo stato corrente e ricarica una sola volta.
+          Il nuovo service worker ha già preso il controllo.
+          Conserviamo lo stato SOLO per questa ricarica automatica:
+          non crea un salvataggio permanente e non cambia il comportamento
+          del refresh manuale, che resta un reset.
         */
         try {
-          if (typeof save === "function") save(false);
+          if (
+            typeof safeSessionSet === "function" &&
+            typeof state === "object"
+          ) {
+            safeSessionSet(
+              UPDATE_RECOVERY_KEY,
+              JSON.stringify({
+                state,
+                currentPage
+              })
+            );
+          }
+
           if (typeof saveArchive === "function") saveArchive();
         } catch (_) {}
 
