@@ -682,3 +682,11 @@ v190 - integrazione completa sagome
 - Flip dell'intero campo inverte anche l'ordine dei numeri della barriera.
 - Numero mantenuto fuori dalla sagoma e sopra la testa.
 - Nessuna modifica a rose, backup, testi, SNAP o archivio.
+
+
+v191 - sagome più basse e barriera unita
+- Larghezza invariata rispetto alla v190.
+- Altezza iniziale ridotta del 35%.
+- I corpi delle 4 sagome della barriera ora si toccano lateralmente.
+- Numero abbassato di circa il 15%, restando sopra la testa.
+- Nessuna modifica a doppio tap, selezione, allineamenti, Distribuisci, Flip o modifica numeri.

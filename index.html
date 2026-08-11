@@ -6279,8 +6279,8 @@ function renderDrawings(){
         const shoulderY=minY+height*.19;
         const headCy=shoulderY-headR;
         const torsoBottom=minY+height*.61;
-        const torsoHalfTop=figureWidth*.31;
-        const torsoHalfBottom=figureWidth*.25;
+        const torsoHalfTop=figureWidth*(figures===4 ? .50 : .31);
+        const torsoHalfBottom=figureWidth*(figures===4 ? .50 : .25);
 
         const head=document.createElementNS("http://www.w3.org/2000/svg","circle");
         head.setAttribute("cx",centerX);
@@ -6320,7 +6320,7 @@ function renderDrawings(){
 
           label.textContent=value;
           label.setAttribute("x",centerX);
-          label.setAttribute("y",headCy-headR-Math.max(7,height*.10));
+          label.setAttribute("y",headCy-headR-Math.max(5.8,height*.085));
           label.setAttribute("text-anchor","middle");
           label.setAttribute("dominant-baseline","middle");
           label.setAttribute("fill","#111827");
@@ -7221,7 +7221,7 @@ function addTrainingMannequin(type){
   const centerX=500;
   const centerY=310;
   const width=isWall ? 88 : 40;
-  const height=isWall ? 86 : 90;
+  const height=isWall ? 55.9 : 58.5;
 
   const drawing={
     type,
@@ -9598,7 +9598,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v190",
+    appVersion:"v191",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -10580,7 +10580,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=190",
+        "./service-worker.js?v=191",
         { updateViaCache: "none" }
       );
 
