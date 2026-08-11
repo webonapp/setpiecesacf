@@ -664,3 +664,12 @@ v188 - barriera compatta
 - Numeri spostati chiaramente sopra le teste.
 - Numeri leggermente più piccoli per non appesantire la grafica.
 - Restano invariati doppio tap/clic per modifica numero, colore, ridimensionamento proporzionale, drag, Flip e salvataggio.
+
+
+v189 - barriera più snella
+- Le 4 sagome hanno la stessa proporzione visiva della sagoma singola.
+- Altezza invariata rispetto alla v188: nessun aumento verticale.
+- Barriera più stretta, con sagome che continuano a toccarsi.
+- Numeri spostati più in alto, senza sovrapporsi alla testa.
+- Numeri ingranditi del 10%.
+- Tutte le altre funzioni restano invariate.
