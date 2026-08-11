@@ -704,3 +704,11 @@ v194 - dimensioni default
 - Maglie giocatori: dimensione globale di default impostata al 75%.
 - Sagoma singola e barriera: dimensione iniziale ridotta per corrispondere visivamente alla scala mostrata accanto a maglie al 75%.
 - Proporzioni e tutte le funzioni delle sagome/barriere restano invariate.
+
+
+v195 - Distribuisci compatto
+- Distribuisci non usa più gli estremi esistenti del gruppo.
+- Imposta una distanza minima e compatta di circa 34 px tra i centri.
+- Con maglie al 75% gli elementi risultano quasi a contatto senza sovrapporsi.
+- Il gruppo resta centrato e dentro il campo.
+- Funziona anche con sagome/barriere selezionate.

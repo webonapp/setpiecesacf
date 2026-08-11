@@ -8363,57 +8363,63 @@ function distributeSelectedHorizontally(){
   }
 
   /*
-    Spaziatura uniforme tra i centri.
-    Vale allo stesso modo per maglie, sagome singole e barriere.
+    v195:
+    Distribuzione COMPATTA.
+    Non usa più gli estremi attuali del gruppo, perché questo poteva
+    allargare enormemente i giocatori quando erano già distanti.
+    La distanza è volutamente minima: quasi a contatto, ma senza
+    sovrapposizione visiva con le maglie al 75%.
   */
-  const desiredPixelSpacing=51;
-  const minimumPercentSpacing=(desiredPixelSpacing/boardRect.width)*100;
+  const compactPixelSpacing=34;
+  const spacing=(compactPixelSpacing/boardRect.width)*100;
+  const requiredSpan=spacing*(items.length-1);
 
-  const currentFirstX=items[0].x;
-  const currentLastX=items[items.length-1].x;
-  const currentSpan=Math.max(0,currentLastX-currentFirstX);
-  const requiredSpan=minimumPercentSpacing*(items.length-1);
+  const centerX=items.reduce(
+    (sum,item)=>sum+item.x,
+    0
+  )/items.length;
 
-  let startX;
-  let spacing;
+  let startX=centerX-(requiredSpan/2);
 
-  if(currentSpan>=requiredSpan){
-    startX=currentFirstX;
-    spacing=currentSpan/(items.length-1);
-  }else{
-    const centerX=items.reduce(
-      (sum,item)=>sum+item.x,
-      0
-    )/items.length;
+  const minAllowed=2.5;
+  const maxAllowed=97.5;
 
-    spacing=minimumPercentSpacing;
-    startX=centerX-(requiredSpan/2);
+  if(startX<minAllowed){
+    startX=minAllowed;
+  }
 
-    const minAllowed=2.5;
-    const maxAllowed=97.5;
-    const endX=startX+requiredSpan;
+  if(startX+requiredSpan>maxAllowed){
+    startX=maxAllowed-requiredSpan;
+  }
 
-    if(startX<minAllowed)startX=minAllowed;
-    if(endX>maxAllowed)startX=maxAllowed-requiredSpan;
+  /*
+    Solo nel caso estremo in cui molti elementi non entrino nel campo,
+    riduce ulteriormente la distanza invece di farli uscire.
+  */
+  const availableSpan=maxAllowed-minAllowed;
+  const finalSpacing=requiredSpan>availableSpan
+    ? availableSpan/(items.length-1)
+    : spacing;
 
-    if(startX<minAllowed){
-      startX=minAllowed;
-      spacing=(maxAllowed-minAllowed)/(items.length-1);
-    }
+  if(requiredSpan>availableSpan){
+    startX=minAllowed;
   }
 
   pushHistory();
 
   items.forEach((item,position)=>{
     const targetX=Math.max(
-      2.5,
-      Math.min(97.5,startX+(spacing*position))
+      minAllowed,
+      Math.min(
+        maxAllowed,
+        startX+(finalSpacing*position)
+      )
     );
 
     moveAlignmentItemTo(item,targetX,null);
   });
 
-  finishAlignmentCommand("Elementi distanziati uniformemente");
+  finishAlignmentCommand("Elementi distribuiti a distanza minima");
 }
 
 function alignSelectedVertically(){
@@ -9604,7 +9610,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v194",
+    appVersion:"v195",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -10586,7 +10592,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=194",
+        "./service-worker.js?v=195",
         { updateViaCache: "none" }
       );
 
