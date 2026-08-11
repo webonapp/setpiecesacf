@@ -2931,6 +2931,16 @@ function normalizeDrawingRecord(drawing){
   const safe=drawing && typeof drawing==="object" ? drawing : {};
   const allowedTypes=new Set(["arrow","curve","circle","rect","mannequin","wall4"]);
   // v182: preserva i nuovi tipi durante save/import/normalizzazione.
+  if(safe.type==="mannequin"){
+    if(safe.number===undefined || safe.number===null) safe.number="5";
+    if(typeof safe.showNumber!=="boolean") safe.showNumber=true;
+  }
+  if(safe.type==="wall4"){
+    if(!Array.isArray(safe.numbers) || safe.numbers.length!==4){
+      safe.numbers=["1","2","3","4"];
+    }
+    if(typeof safe.showNumber!=="boolean") safe.showNumber=true;
+  }
 
   safe.type=allowedTypes.has(safe.type) ? safe.type : "arrow";
   safe.x1=clampNumber(safe.x1,0,1000,100);
@@ -3738,6 +3748,14 @@ function getSelectedPlayerIndexesForNumberToggle(){
   return [...indexes];
 }
 
+function getSelectedMannequinIndexesForNumberToggle(){
+  return [...selectedDrawings].filter(index=>{
+    const drawing=page().drawings?.[index];
+    return drawing && (drawing.type==="mannequin" || drawing.type==="wall4");
+  });
+}
+
+
 function getSelectedPlayerIndexesForBlankLine(){
   return getSelectedPlayerIndexesForNumberToggle();
 }
@@ -3748,27 +3766,35 @@ function syncRosterDisplayOptions(){
 
   if(numbers){
     const indexes=getSelectedPlayerIndexesForNumberToggle();
-    numbers.disabled=indexes.length===0;
-    const numberValues=indexes.map(index=>
-      getEffectivePlayerDisplayValue(
-        index,
-        "showShirtNumber",
-        state.roster[index].showShirtNumber===true
+    const mannequinIndexes=getSelectedMannequinIndexesForNumberToggle();
+
+    numbers.disabled=indexes.length===0 && mannequinIndexes.length===0;
+
+    const numberValues=[
+      ...indexes.map(index=>
+        getEffectivePlayerDisplayValue(
+          index,
+          "showShirtNumber",
+          state.roster[index].showShirtNumber===true
+        )
+      ),
+      ...mannequinIndexes.map(index=>
+        page().drawings[index].showNumber!==false
       )
-    );
+    ];
 
     numbers.indeterminate=
-      indexes.length>0 &&
+      numberValues.length>0 &&
       numberValues.some(Boolean) &&
       numberValues.some(value=>!value);
 
     numbers.checked=
-      indexes.length>0 &&
+      numberValues.length>0 &&
       numberValues.every(Boolean);
 
-    numbers.title=indexes.length
-      ? "Mostra o nasconde il numero nei giocatori selezionati"
-      : "Seleziona almeno un giocatore";
+    numbers.title=numberValues.length
+      ? "Mostra o nasconde il numero negli elementi selezionati"
+      : "Seleziona almeno un giocatore o una sagoma";
   }
 
   if(blankLine){
@@ -6095,12 +6121,12 @@ function renderDrawings(){
           Proporzioni leggermente "compresse" sulle gambe:
           testa + busto ~65%, gambe ~35%.
         */
-        const headR=Math.min(figureWidth*(figures===4 ? .24 : .22),height*.095);
+        const headR=Math.min(figureWidth*(figures===4 ? .20 : .20),height*.09);
         const headCy=minY+headR+height*.035;
         const shoulderY=minY+height*.19;
         const torsoBottom=minY+height*.61;
-        const torsoHalfTop=figureWidth*(figures===4 ? .47 : .37);
-        const torsoHalfBottom=figureWidth*(figures===4 ? .41 : .30);
+        const torsoHalfTop=figureWidth*(figures===4 ? .31 : .31);
+        const torsoHalfBottom=figureWidth*(figures===4 ? .25 : .25);
 
         const head=document.createElementNS("http://www.w3.org/2000/svg","circle");
         head.setAttribute("cx",centerX);
@@ -6127,6 +6153,33 @@ function renderDrawings(){
         torso.setAttribute("pointer-events","none");
 
         g.append(head,torso);
+
+        if(d.showNumber!==false){
+          const label=document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "text"
+          );
+
+          const value=d.type==="wall4"
+            ? String((Array.isArray(d.numbers)?d.numbers[index]:null) ?? (index+1))
+            : String(d.number ?? "5");
+
+          label.textContent=value;
+          label.setAttribute("x",centerX);
+          label.setAttribute("y",minY+height*.88);
+          label.setAttribute("text-anchor","middle");
+          label.setAttribute("dominant-baseline","middle");
+          label.setAttribute("fill","#111827");
+          label.setAttribute("font-size",String(Math.max(18,Math.min(34,height*.18))));
+          label.setAttribute("font-weight","800");
+          label.setAttribute("font-family","Arial, Helvetica, sans-serif");
+          label.setAttribute("pointer-events","none");
+          label.setAttribute("paint-order","stroke");
+          label.setAttribute("stroke","#ffffff");
+          label.setAttribute("stroke-width","2.2");
+          label.setAttribute("stroke-linejoin","round");
+          g.appendChild(label);
+        }
       };
 
       for(let figureIndex=0;figureIndex<figures;figureIndex++){
@@ -6150,6 +6203,77 @@ function renderDrawings(){
       hit.style.webkitTapHighlightColor="transparent";
 
       attachMoveHandler(hit,i,d);
+
+      const editMannequinNumberAtEvent=event=>{
+        event.preventDefault();
+        event.stopPropagation();
+
+        const rect=svg.getBoundingClientRect();
+        const svgX=(
+          (event.clientX-rect.left) /
+          Math.max(1,rect.width)
+        )*1000;
+
+        let targetIndex=0;
+        if(d.type==="wall4"){
+          const local=(svgX-minX)/Math.max(1,width);
+          targetIndex=Math.max(
+            0,
+            Math.min(3,Math.floor(local*4))
+          );
+        }
+
+        const currentValue=d.type==="wall4"
+          ? String((Array.isArray(d.numbers)?d.numbers[targetIndex]:null) ?? (targetIndex+1))
+          : String(d.number ?? "5");
+
+        const value=prompt(
+          d.type==="wall4"
+            ? `Numero sagoma ${targetIndex+1}:`
+            : "Numero sagoma:",
+          currentValue
+        );
+
+        if(value===null)return;
+
+        const clean=value.trim().slice(0,3);
+        if(!clean)return;
+
+        pushHistory();
+
+        if(d.type==="wall4"){
+          if(!Array.isArray(d.numbers)){
+            d.numbers=["1","2","3","4"];
+          }
+          d.numbers[targetIndex]=clean;
+        }else{
+          d.number=clean;
+        }
+
+        renderDrawings();
+        save(false);
+        setStatus("Numero sagoma aggiornato");
+      };
+
+      hit.addEventListener("dblclick",editMannequinNumberAtEvent);
+
+      let lastMannequinTap=0;
+      hit.addEventListener("pointerup",event=>{
+        if(event.pointerType==="mouse")return;
+
+        const now=performance.now();
+        if(now-lastMannequinTap<430){
+          lastMannequinTap=0;
+          editMannequinNumberAtEvent(event);
+          return;
+        }
+
+        lastMannequinTap=now;
+        setTimeout(()=>{
+          if(lastMannequinTap===now)lastMannequinTap=0;
+        },460);
+      });
+
       g.appendChild(hit);
 
       if(selectedDrawing===i){
@@ -6970,7 +7094,7 @@ function addTrainingMannequin(type){
   const isWall=type==="wall4";
   const centerX=500;
   const centerY=310;
-  const width=isWall ? 230 : 66;
+  const width=isWall ? 180 : 58;
   const height=isWall ? 145 : 150;
 
   const drawing={
@@ -6985,7 +7109,10 @@ function addTrainingMannequin(type){
     shapeMode:"both",
     dashStyle:0,
     headSize:13,
-    curveOffset:0
+    curveOffset:0,
+    showNumber:true,
+    number:isWall ? null : "5",
+    numbers:isWall ? ["1","2","3","4"] : null
   };
 
   page().drawings.push(drawing);
@@ -9251,7 +9378,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v184",
+    appVersion:"v185",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -10057,11 +10184,12 @@ document.getElementById("board").addEventListener("dblclick",event=>{
 
 document.getElementById("showShirtNumbers").addEventListener("change",event=>{
   const indexes=getSelectedPlayerIndexesForNumberToggle();
+  const mannequinIndexes=getSelectedMannequinIndexesForNumberToggle();
 
-  if(!indexes.length){
+  if(!indexes.length && !mannequinIndexes.length){
     event.target.checked=false;
     event.target.indeterminate=false;
-    setStatus("Seleziona almeno un giocatore");
+    setStatus("Seleziona almeno un giocatore o una sagoma");
     return;
   }
 
@@ -10072,15 +10200,20 @@ document.getElementById("showShirtNumbers").addEventListener("change",event=>{
     override.showShirtNumber=event.target.checked;
   });
 
+  mannequinIndexes.forEach(index=>{
+    page().drawings[index].showNumber=event.target.checked;
+  });
+
   renderPlayers();
   renderRoster();
+  renderDrawings();
   syncRosterDisplayOptions();
   save(false);
 
   setStatus(
     event.target.checked
-      ? "Numero mostrato nei selezionati dello schema corrente"
-      : "Numero nascosto nei selezionati dello schema corrente"
+      ? "Numero mostrato negli elementi selezionati"
+      : "Numero nascosto negli elementi selezionati"
   );
 });
 document.getElementById("opponentBlankLine").addEventListener("change",event=>{
@@ -10227,7 +10360,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=184",
+        "./service-worker.js?v=185",
         { updateViaCache: "none" }
       );
 

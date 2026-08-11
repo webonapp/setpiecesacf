@@ -636,3 +636,13 @@ v184 - ridimensionamento proporzionale sagome
 - Le due maniglie diagonali usano una scala unica, quindi non è più possibile schiacciare o allungare la sagoma.
 - Le quattro sagome della barriera sono più ravvicinate: busti più larghi e teste leggermente più compatte nel gruppo.
 - Colore, drag, copia/incolla, elimina, Undo/Redo e Flip restano invariati.
+
+
+v185 - numeri sagome
+- Barriera da 4: numeri 1, 2, 3, 4 sotto le sagome.
+- Sagoma singola: numero 5 sotto.
+- Il checkbox "Numero nei selezionati" ora funziona anche per sagoma singola e barriera selezionate.
+- Doppio clic/doppio tap su una sagoma permette di modificare il numero.
+- Nella barriera, il doppio clic modifica la sagoma corrispondente.
+- Sagome rese più snelle e barriera più compatta.
+- Ridimensionamento proporzionale, colore, drag, copia/incolla, elimina, Undo/Redo e Flip invariati.
