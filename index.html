@@ -2103,7 +2103,7 @@ body.export-clean-view .board-shell{
 
   <div class="library-panel">
     <div class="library-title">Object style</div>
-    <div class="library-help mannequin-color-help">Seleziona una sagoma e scegli un colore dalla palette sopra.</div>
+    <div class="library-help mannequin-color-help">Seleziona una sagoma: colore dalla palette sopra e ridimensionamento proporzionale dalle maniglie.</div>
     <label class="style-control"><span>Spessore</span><input id="drawingWidth" type="range" min="2" max="14" step="1" value="6"></label>
     <label class="style-control"><span>Punta</span><input id="drawingHead" type="range" min="8" max="22" step="1" value="13">
 <div class="drawing-choice-row" id="drawingHeadButtons" aria-label="Dimensione punta freccia">
@@ -6084,7 +6084,7 @@ function renderDrawings(){
       const width=Math.max(24,maxX-minX);
       const height=Math.max(48,maxY-minY);
       const figures=d.type==="wall4" ? 4 : 1;
-      const gap=figures===4 ? width*.012 : 0;
+      const gap=figures===4 ? 0 : 0;
       const figureWidth=(width-gap*(figures-1))/figures;
 
       const addMannequinFigure=(index)=>{
@@ -6095,12 +6095,12 @@ function renderDrawings(){
           Proporzioni leggermente "compresse" sulle gambe:
           testa + busto ~65%, gambe ~35%.
         */
-        const headR=Math.min(figureWidth*.22,height*.095);
+        const headR=Math.min(figureWidth*(figures===4 ? .24 : .22),height*.095);
         const headCy=minY+headR+height*.035;
         const shoulderY=minY+height*.19;
         const torsoBottom=minY+height*.61;
-        const torsoHalfTop=figureWidth*.37;
-        const torsoHalfBottom=figureWidth*.30;
+        const torsoHalfTop=figureWidth*(figures===4 ? .47 : .37);
+        const torsoHalfBottom=figureWidth*(figures===4 ? .41 : .30);
 
         const head=document.createElementNS("http://www.w3.org/2000/svg","circle");
         head.setAttribute("cx",centerX);
@@ -6153,8 +6153,99 @@ function renderDrawings(){
       g.appendChild(hit);
 
       if(selectedDrawing===i){
-        addHandle(g,d,"x1","y1",8);
-        addHandle(g,d,"x2","y2",8);
+        const addAspectRatioHandle=(corner)=>{
+          const handle=document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "circle"
+          );
+
+          const isTopLeft=corner==="tl";
+          const movingXKey=isTopLeft ? "x1" : "x2";
+          const movingYKey=isTopLeft ? "y1" : "y2";
+          const anchorXKey=isTopLeft ? "x2" : "x1";
+          const anchorYKey=isTopLeft ? "y2" : "y1";
+
+          handle.classList.add("drawing-handle");
+          handle.setAttribute("cx",d[movingXKey]);
+          handle.setAttribute("cy",d[movingYKey]);
+          handle.setAttribute("r",8);
+          handle.style.touchAction="none";
+          handle.style.webkitTapHighlightColor="transparent";
+
+          handle.addEventListener("pointerdown",event=>{
+            event.preventDefault();
+            event.stopPropagation();
+
+            const startMovingX=finiteNumber(d[movingXKey],0);
+            const startMovingY=finiteNumber(d[movingYKey],0);
+            const anchorX=finiteNumber(d[anchorXKey],0);
+            const anchorY=finiteNumber(d[anchorYKey],0);
+
+            const vx=startMovingX-anchorX;
+            const vy=startMovingY-anchorY;
+            const lengthSq=Math.max(1,vx*vx+vy*vy);
+
+            startLogicalBoardDrag({
+              event,
+              element:handle,
+              onDelta:(dx,dy)=>{
+                const rawX=startMovingX+dx;
+                const rawY=startMovingY+dy;
+
+                /*
+                  Proietta il puntatore sulla diagonale originale:
+                  larghezza e altezza crescono/riducono sempre insieme.
+                */
+                let scale=(
+                  (rawX-anchorX)*vx+
+                  (rawY-anchorY)*vy
+                )/lengthSq;
+
+                scale=Math.max(.18,Math.min(4.5,scale));
+
+                let nextX=anchorX+vx*scale;
+                let nextY=anchorY+vy*scale;
+
+                nextX=Math.max(0,Math.min(1000,nextX));
+                nextY=Math.max(0,Math.min(620,nextY));
+
+                /*
+                  Se il bordo del campo limita un asse, ricalcoliamo
+                  la scala per mantenere comunque le proporzioni.
+                */
+                const sx=Math.abs(vx)>0.001
+                  ? (nextX-anchorX)/vx
+                  : scale;
+                const sy=Math.abs(vy)>0.001
+                  ? (nextY-anchorY)/vy
+                  : scale;
+
+                scale=Math.max(
+                  .18,
+                  Math.min(
+                    4.5,
+                    Math.abs(sx)<Math.abs(sy) ? sx : sy
+                  )
+                );
+
+                d[movingXKey]=anchorX+vx*scale;
+                d[movingYKey]=anchorY+vy*scale;
+
+                renderDrawings();
+              },
+              onFinish:()=>{
+                renderDrawings();
+                refreshObjectSelectionVisuals();
+                syncDrawingControls();
+              }
+            });
+          });
+
+          g.appendChild(handle);
+        };
+
+        addAspectRatioHandle("tl");
+        addAspectRatioHandle("br");
       }
 
       svg.appendChild(g);
@@ -9160,7 +9251,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v183",
+    appVersion:"v184",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -10136,7 +10227,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=183",
+        "./service-worker.js?v=184",
         { updateViaCache: "none" }
       );
 

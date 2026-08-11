@@ -629,3 +629,10 @@ v183 - sagome senza gambe + colore
 - Testa e busto usano ora il colore dell'oggetto.
 - Selezionando una sagoma/barriera, la palette Colore esistente permette di cambiarla in rosso, viola, blu, ecc.
 - Restano attivi selezione, drag, ridimensionamento, copia/incolla, elimina, Undo/Redo e Flip.
+
+
+v184 - ridimensionamento proporzionale sagome
+- Sagoma singola e barriera da 4 mantengono sempre il rapporto larghezza/altezza durante il ridimensionamento.
+- Le due maniglie diagonali usano una scala unica, quindi non è più possibile schiacciare o allungare la sagoma.
+- Le quattro sagome della barriera sono più ravvicinate: busti più larghi e teste leggermente più compatte nel gruppo.
+- Colore, drag, copia/incolla, elimina, Undo/Redo e Flip restano invariati.
