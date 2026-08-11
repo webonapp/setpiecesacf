@@ -2928,7 +2928,8 @@ function normalizePlayerRecord(player,index=0){
 
 function normalizeDrawingRecord(drawing){
   const safe=drawing && typeof drawing==="object" ? drawing : {};
-  const allowedTypes=new Set(["arrow","curve","circle","rect"]);
+  const allowedTypes=new Set(["arrow","curve","circle","rect","mannequin","wall4"]);
+  // v182: preserva i nuovi tipi durante save/import/normalizzazione.
 
   safe.type=allowedTypes.has(safe.type) ? safe.type : "arrow";
   safe.x1=clampNumber(safe.x1,0,1000,100);
@@ -9192,7 +9193,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v181",
+    appVersion:"v182",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -10168,7 +10169,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=181",
+        "./service-worker.js?v=182",
         { updateViaCache: "none" }
       );
 

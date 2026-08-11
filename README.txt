@@ -616,3 +616,8 @@ v181 - sagome allenamento
 - Oggetti integrati nel sistema drawings: selezione, trascinamento, multiselezione, copia/incolla, elimina, Undo/Redo e Flip.
 - Ridimensionamento tramite maniglie diagonali, come gli altri oggetti grafici.
 - Compatibilità touch/pointer mantenuta.
+
+v182 - bugfix sagome
+- Corretto il bug mostrato nel video: dopo una modifica/ridimensionamento la sagoma veniva trasformata in una freccia.
+- Causa: il normalizzatore dei drawings accettava solo arrow/curve/circle/rect e convertiva mannequin/wall4 in arrow durante il salvataggio.
+- mannequin e wall4 sono ora tipi persistenti validi anche dopo save, import, spostamento e ridimensionamento.
