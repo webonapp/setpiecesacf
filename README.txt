@@ -646,3 +646,5 @@ v185 - numeri sagome
 - Nella barriera, il doppio clic modifica la sagoma corrispondente.
 - Sagome rese più snelle e barriera più compatta.
 - Ridimensionamento proporzionale, colore, drag, copia/incolla, elimina, Undo/Redo e Flip invariati.
+
+v186: testa collegata al corpo; numeri 50% più piccoli e ravvicinati; sagome 25% più basse. Nessun'altra funzione modificata.

@@ -6121,9 +6121,9 @@ function renderDrawings(){
           Proporzioni leggermente "compresse" sulle gambe:
           testa + busto ~65%, gambe ~35%.
         */
-        const headR=Math.min(figureWidth*(figures===4 ? .20 : .20),height*.09);
-        const headCy=minY+headR+height*.035;
+        const headR=Math.min(figureWidth*.20,height*.09);
         const shoulderY=minY+height*.19;
+        const headCy=shoulderY-headR;
         const torsoBottom=minY+height*.61;
         const torsoHalfTop=figureWidth*(figures===4 ? .31 : .31);
         const torsoHalfBottom=figureWidth*(figures===4 ? .25 : .25);
@@ -6166,17 +6166,17 @@ function renderDrawings(){
 
           label.textContent=value;
           label.setAttribute("x",centerX);
-          label.setAttribute("y",minY+height*.88);
+          label.setAttribute("y",torsoBottom+height*.075);
           label.setAttribute("text-anchor","middle");
           label.setAttribute("dominant-baseline","middle");
           label.setAttribute("fill","#111827");
-          label.setAttribute("font-size",String(Math.max(18,Math.min(34,height*.18))));
+          label.setAttribute("font-size",String(Math.max(9,Math.min(17,height*.09))));
           label.setAttribute("font-weight","800");
           label.setAttribute("font-family","Arial, Helvetica, sans-serif");
           label.setAttribute("pointer-events","none");
           label.setAttribute("paint-order","stroke");
           label.setAttribute("stroke","#ffffff");
-          label.setAttribute("stroke-width","2.2");
+          label.setAttribute("stroke-width","1.1");
           label.setAttribute("stroke-linejoin","round");
           g.appendChild(label);
         }
@@ -7094,8 +7094,8 @@ function addTrainingMannequin(type){
   const isWall=type==="wall4";
   const centerX=500;
   const centerY=310;
-  const width=isWall ? 180 : 58;
-  const height=isWall ? 145 : 150;
+  const width=isWall ? 135 : 43.5;
+  const height=isWall ? 108.75 : 112.5;
 
   const drawing={
     type,
@@ -9378,7 +9378,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v185",
+    appVersion:"v186",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -10360,7 +10360,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=185",
+        "./service-worker.js?v=186",
         { updateViaCache: "none" }
       );
 
