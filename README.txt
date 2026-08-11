@@ -698,3 +698,9 @@ v192 - barriera ridisegnata
 - Stessa altezza della sagoma singola.
 - I busti delle quattro sagome si toccano lateralmente senza deformazioni.
 - Doppio tap/clic, numeri, selezione, ridimensionamento, allineamenti, Distribuisci e Flip restano invariati.
+
+
+v194 - dimensioni default
+- Maglie giocatori: dimensione globale di default impostata al 75%.
+- Sagoma singola e barriera: dimensione iniziale ridotta per corrispondere visivamente alla scala mostrata accanto a maglie al 75%.
+- Proporzioni e tutte le funzioni delle sagome/barriere restano invariate.

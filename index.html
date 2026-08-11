@@ -2143,8 +2143,8 @@ body.export-clean-view .board-shell{
 
   <div class="library-panel">
     <div class="library-title">Player size</div>
-    <input id="playerScale" type="range" min="0.65" max="1.65" step="0.05" value="0.90" style="width:100%">
-    <div id="playerScaleValue" class="library-help" style="text-align:right">90%</div>
+    <input id="playerScale" type="range" min="0.65" max="1.65" step="0.05" value="0.75" style="width:100%">
+    <div id="playerScaleValue" class="library-help" style="text-align:right">75%</div>
 <div id="playerScaleMode" class="player-size-mode"><strong>Dimensione globale</strong><br>Seleziona una sola maglietta per modificarne soltanto la dimensione.</div>
   </div>
 
@@ -2844,7 +2844,7 @@ function defaultPositions(count=state?.roster?.length || defaultRoster.length){
   return Array.from({length:count},()=>null);
 }
 const emptyPage=i=>({title:i===0?"ACF Fiorentina · Schema 1":`Schema ${i+1}`,notes:"",positions:defaultPositions(defaultRoster.length),drawings:[],balls:[],texts:[],playerDisplayOverrides:{}});
-let state={roster:defaultRoster,pages:Array.from({length:10},(_,i)=>emptyPage(i)),playerScale:.90,snapEnabled:true,homeChestCircle:true,awayChestCircle:false,homeRosterLoaded:false,awayRosterLoaded:false,homeRosterTemplate:null};
+let state={roster:defaultRoster,pages:Array.from({length:10},(_,i)=>emptyPage(i)),playerScale:.75,snapEnabled:true,homeChestCircle:true,awayChestCircle:false,homeRosterLoaded:false,awayRosterLoaded:false,homeRosterTemplate:null};
 
 const FIORENTINA_PRESET=[
   {number:43,firstName:"",lastName:"De Gea",name:"De Gea",team:"gk",color:"#e3b52d"},
@@ -4542,7 +4542,7 @@ function renderPlayers(){
     el.className="player"+(selectedPlayers.has(i)?" selected":"")+(pl.team==="away"?" opponent":"");
     el.style.left=pos.x+"%";
     el.style.top=pos.y+"%";
-    const appliedScale=pl.individualScale ?? state.playerScale ?? .90;
+    const appliedScale=pl.individualScale ?? state.playerScale ?? .75;
     el.style.transform=`translate(-50%,-50%) scale(${appliedScale})`;
     el.dataset.index=i;
 
@@ -6960,7 +6960,7 @@ function renderAll(){
     if(scaleValue)scaleValue.textContent=Math.round(value*100)+"%";
     if(scaleMode)scaleMode.innerHTML=`<strong>Dimensione singola</strong><br>${escapeHtml(player.lastName||player.name||"Giocatore")}`;
   }else{
-    const value=state.playerScale||.85;
+    const value=state.playerScale||.75;
     if(scaleInput)scaleInput.value=value;
     if(scaleValue)scaleValue.textContent=Math.round(value*100)+"%";
     if(scaleMode)scaleMode.innerHTML="<strong>Dimensione globale</strong><br>Seleziona una sola maglietta per modificarne soltanto la dimensione.";
@@ -7226,8 +7226,8 @@ function addTrainingMannequin(type){
   const isWall=type==="wall4";
   const centerX=500;
   const centerY=310;
-  const width=isWall ? 160 : 40;
-  const height=isWall ? 88.67 : 88.67;
+  const width=isWall ? 96 : 24;
+  const height=isWall ? 53.2 : 53.2;
 
   const drawing={
     type,
@@ -9604,7 +9604,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v193",
+    appVersion:"v194",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -10586,7 +10586,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=193",
+        "./service-worker.js?v=194",
         { updateViaCache: "none" }
       );
 
