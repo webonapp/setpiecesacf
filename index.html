@@ -2250,6 +2250,81 @@ body.export-clean-view .board-shell{
   }
 }
 
+
+/* v204 - rifinitura grafica posizioni header, nessuna logica modificata */
+.topbar{
+  position:relative!important;
+  min-height:58px!important;
+}
+.topbar-presentation-slot{
+  position:absolute!important;
+  left:50%!important;
+  top:50%!important;
+  transform:translate(-50%,-50%)!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  margin:0!important;
+}
+.topbar-presentation-slot .presentation-mode-actions{
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  gap:10px!important;
+  margin:0!important;
+  padding:0!important;
+}
+
+.canvas-header{
+  position:relative!important;
+  min-height:58px!important;
+  display:grid!important;
+  grid-template-columns:minmax(150px,1fr) auto minmax(150px,1fr)!important;
+  align-items:center!important;
+  padding:0 14px!important;
+}
+.canvas-substitution-slot{
+  grid-column:2!important;
+  align-self:center!important;
+  justify-self:center!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  margin:0!important;
+  padding:0!important;
+  transform:none!important;
+}
+.canvas-substitution-slot .substitution-launch-btn{
+  position:static!important;
+  transform:none!important;
+  margin:0!important;
+  top:auto!important;
+  left:auto!important;
+}
+.canvas-header .current-title{
+  grid-column:1!important;
+  align-self:center!important;
+}
+.canvas-header .lineup-counters{
+  grid-column:3!important;
+  align-self:center!important;
+  justify-self:end!important;
+}
+
+@media(max-width:850px){
+  .topbar{
+    min-height:unset!important;
+  }
+  .topbar-presentation-slot{
+    position:static!important;
+    transform:none!important;
+  }
+  .canvas-header{
+    min-height:unset!important;
+    padding:8px 10px!important;
+  }
+}
+
 </style>
 
 <script async src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
@@ -10180,7 +10255,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v203",
+    appVersion:"v204",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -11165,7 +11240,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=203",
+        "./service-worker.js?v=204",
         { updateViaCache: "none" }
       );
 
