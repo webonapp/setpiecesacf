@@ -2073,6 +2073,45 @@ body.export-clean-view .board-shell{
   }
 }
 
+
+
+/* v201 - topbar cleanup + compact backup status */
+.topbar > .top-actions{
+  margin-left:auto;
+  flex:0 0 auto;
+}
+.topbar > #backupSafetyIndicator{
+  margin-left:8px;
+  margin-right:0;
+  flex:0 0 auto;
+}
+.backup-safety-indicator{
+  min-width:0!important;
+  max-width:none!important;
+  width:auto!important;
+  height:28px!important;
+  padding:0 10px!important;
+  border-radius:7px!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  gap:0!important;
+  white-space:nowrap;
+}
+.backup-safety-indicator strong{
+  display:block!important;
+  margin:0!important;
+  font-size:9px!important;
+  font-weight:900!important;
+  letter-spacing:.08em!important;
+  line-height:1!important;
+}
+.backup-safety-indicator .backup-safety-dot,
+.backup-safety-indicator small,
+.backup-counter-hidden{
+  display:none!important;
+}
+
 </style>
 
 <script async src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
@@ -2099,19 +2138,14 @@ body.export-clean-view .board-shell{
   <div class="topbar-substitution-slot">
     <button type="button" class="btn substitution-launch-btn substitution-topbar" id="openSubstitutionBtn">Sostituzione</button>
   </div>
-<div id="backupSafetyIndicator" class="backup-safety-indicator dirty" aria-live="polite">
-    <span class="backup-safety-dot"></span>
-    <div>
-      <strong>BACKUP NON ESPORTATO</strong>
-      <small id="backupChangeCounter">0 modifiche</small>
-    </div>
-  </div>
-  <div class="top-actions">
-    <button class="btn" id="importRosterBtn">Importa rosa</button>
+<div class="top-actions">
     <button class="btn" id="exportPdf">Esporta PDF</button>
     <button class="btn" id="exportPng">Esporta PNG</button>
-    <button class="btn" id="importJson">Importa progetto</button>
-    <button class="btn primary" id="saveBtn">Salva</button>
+  </div>
+  <div id="backupSafetyIndicator" class="backup-safety-indicator dirty" aria-live="polite"
+       title="Backup non esportato">
+    <strong>BACKUP</strong>
+    <span id="backupChangeCounter" class="backup-counter-hidden">0 modifiche</span>
   </div>
 </header>
 
@@ -2281,8 +2315,6 @@ body.export-clean-view .board-shell{
     <button type="button" class="touch-command" id="touchAlignVerticalBtn" title="Allinea verticalmente giocatori e sagome selezionati">Verticale</button>
     <button type="button" class="touch-command" id="touchDistributeBtn" title="Distribuisci uniformemente">Distribuisci</button>
     <button type="button" class="touch-command" id="touchFlipHorizontalBtn" title="Flip orizzontale di tutto il campo" aria-label="Flip orizzontale di tutto il campo">Flip</button>
-
-    <span class="touch-command-divider"></span><button type="button" class="touch-command" id="touchLockBtn" aria-pressed="false" title="Blocca modifiche sul campo">Blocca</button>
     <button type="button" class="touch-command primary" id="touchFullscreenBtn" title="Mostra solo il campo">Campo intero</button>
     <span class="touch-command-divider preset-divider"></span>
     <label class="snap-control" title="Aggancio intelligente a griglia, centro campo e allineamento giocatori">
@@ -3245,13 +3277,22 @@ let backupModificationCount=0;
 function updateBackupSafetyIndicator(){
   const box=document.getElementById("backupSafetyIndicator");
   const counter=document.getElementById("backupChangeCounter");
-  if(!box || !counter)return;
+  if(!box)return;
+
   const count=backupModificationCount;
-  counter.textContent=`${count} ${count===1?"modifica":"modifiche"}`;
+  if(counter){
+    counter.textContent=`${count} ${count===1?"modifica":"modifiche"}`;
+  }
+
   box.classList.toggle("dirty",!backupExported);
   box.classList.toggle("clean",backupExported);
+
   const title=box.querySelector("strong");
-  if(title)title.textContent=backupExported?"BACKUP ESPORTATO":"BACKUP NON ESPORTATO";
+  if(title)title.textContent="BACKUP";
+
+  box.title=backupExported
+    ? "Backup esportato"
+    : `Backup non esportato · ${count} ${count===1?"modifica":"modifiche"}`;
 }
 
 function registerBackupModification(){
@@ -8047,10 +8088,6 @@ playerScaleInput.addEventListener("input",()=>{
   scaleHistoryTimer=setTimeout(()=>scaleHistoryTimer=null,350);
 });
 
-document.getElementById("saveBtn").addEventListener("click",()=>{
-  updateHomeRosterTemplate();
-  save(true);
-});
 document.getElementById("clearDraw").addEventListener("click",()=>{pushHistory();page().drawings=[];renderDrawings();save(false)});
 document.getElementById("applyPreset").addEventListener("click",()=>{
   const v=document.getElementById("presetSelect").value;if(!v)return;pushHistory();const P=page().positions;
@@ -8384,7 +8421,6 @@ document.getElementById("exportPdf").addEventListener("click",async()=>{
   }
 });
 
-document.getElementById("importJson").addEventListener("click",()=>document.getElementById("projectFile").click());
 document.getElementById("projectFile").addEventListener("change",async e=>{const f=e.target.files[0];if(!f)return;try{const obj=JSON.parse(await f.text());if(obj.roster&&obj.pages){
   pushHistory();
   state=normalizeProjectState(obj);
@@ -8508,7 +8544,6 @@ document.querySelectorAll(".edit-text-action").forEach(button=>{
   });
 });
 
-document.getElementById("importRosterBtn").addEventListener("click",()=>modal.classList.add("open"));
 document.getElementById("closeModal").addEventListener("click",()=>modal.classList.remove("open"));
 modal.addEventListener("click",e=>{if(e.target===modal)modal.classList.remove("open")});
 
@@ -10005,7 +10040,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v200",
+    appVersion:"v201",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -10929,7 +10964,6 @@ document.getElementById("touchFlipHorizontalBtn").addEventListener(
   flipSelectedHorizontally
 );
 
-document.getElementById("touchLockBtn").addEventListener("click",toggleFieldLock);
 document.getElementById("touchFullscreenBtn").addEventListener(
   "click",
   toggleFieldViewMode
@@ -10991,7 +11025,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=200",
+        "./service-worker.js?v=201",
         { updateViaCache: "none" }
       );
 

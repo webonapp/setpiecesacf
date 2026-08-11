@@ -759,3 +759,14 @@ v200 - sostituzioni multiple
 - Algoritmo simultaneo evita effetti a cascata tra sostituzioni.
 - Un solo pushHistory/Undo per l'intero batch.
 - Nessuna modifica a renderer, drag, Flip, sagome, backup, rose, SNAP o archivio.
+
+
+v201 - pulizia interfaccia
+- Rimossi dalla topbar: Importa rosa, Importa progetto, Salva.
+- Mantenuti Esporta PDF ed Esporta PNG.
+- Rimosso il comando Blocca dalla barra inferiore.
+- Indicatore backup ridotto a pill compatta "BACKUP" all'estrema destra.
+- Rosso = backup non esportato; verde = backup esportato.
+- Numero modifiche conservato internamente e nel tooltip, non più mostrato nella pill.
+- Rimossi/null-safe i listener collegati ai controlli eliminati.
+- Nessuna modifica alla logica delle sostituzioni multiple o agli altri strumenti.
