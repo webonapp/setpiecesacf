@@ -6271,32 +6271,22 @@ function renderDrawings(){
         Nella barriera i centri vengono distanziati proprio di quella misura,
         così i corpi si toccano senza deformare la figura.
       */
-      const singleReferenceWidth=d.type==="wall4"
-        ? width/(4*.62)
-        : width;
-
-      const bodyTouchSpacing=singleReferenceWidth*.62;
-      const wallVisualWidth=bodyTouchSpacing*figures;
-      const firstCenterX=d.type==="wall4"
-        ? minX+(singleReferenceWidth*.31)
-        : minX+(singleReferenceWidth/2);
+      const figureWidth=d.type==="wall4" ? width/4 : width;
+      const firstCenterX=minX+(figureWidth/2);
 
       const addMannequinFigure=(index)=>{
-        const figureWidth=singleReferenceWidth;
-        const centerX=d.type==="wall4"
-          ? firstCenterX+(index*bodyTouchSpacing)
-          : firstCenterX;
+        const centerX=firstCenterX+(index*figureWidth);
 
         /*
           Proporzioni leggermente "compresse" sulle gambe:
           testa + busto ~65%, gambe ~35%.
         */
-        const headR=Math.min(figureWidth*.20,height*.09);
-        const shoulderY=minY+height*.19;
+        const headR=figureWidth*.325;
+        const shoulderY=minY+height*.30;
         const headCy=shoulderY-headR;
-        const torsoBottom=minY+height*.61;
-        const torsoHalfTop=figureWidth*.31;
-        const torsoHalfBottom=figureWidth*.25;
+        const torsoBottom=minY+height;
+        const torsoHalfTop=figureWidth*.50;
+        const torsoHalfBottom=figureWidth*.40;
 
         const head=document.createElementNS("http://www.w3.org/2000/svg","circle");
         head.setAttribute("cx",centerX);
@@ -7236,8 +7226,8 @@ function addTrainingMannequin(type){
   const isWall=type==="wall4";
   const centerX=500;
   const centerY=310;
-  const width=isWall ? 99.2 : 40;
-  const height=isWall ? 58.5 : 58.5;
+  const width=isWall ? 160 : 40;
+  const height=isWall ? 88.67 : 88.67;
 
   const drawing={
     type,
@@ -9614,7 +9604,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v192",
+    appVersion:"v193",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -10596,7 +10586,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=192",
+        "./service-worker.js?v=193",
         { updateViaCache: "none" }
       );
 
