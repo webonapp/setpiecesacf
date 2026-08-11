@@ -770,3 +770,11 @@ v201 - pulizia interfaccia
 - Numero modifiche conservato internamente e nel tooltip, non più mostrato nella pill.
 - Rimossi/null-safe i listener collegati ai controlli eliminati.
 - Nessuna modifica alla logica delle sostituzioni multiple o agli altri strumenti.
+
+
+v203 - inversione grafica header
+- Modifica esclusivamente estetica.
+- PANCHINA / SPOGLIATOIO / PREPARAZIONE spostati nella barra superiore blu.
+- Sostituzione spostata nella barra grigia del campo.
+- ID, listener e funzioni JavaScript invariati.
+- Nessuna modifica a sostituzioni, modalità di presentazione, selezione, backup o strumenti.

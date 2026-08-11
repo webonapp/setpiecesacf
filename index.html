@@ -2116,6 +2116,140 @@ body.export-clean-view .board-shell{
 /* v202 - hidden deve prevalere sul display della summary */
 #singleSubstitutionSummary[hidden],
 #multiSubstitutionWrap[hidden]{display:none!important;}
+
+/* v203 - inversione puramente grafica delle due righe */
+.topbar{
+  position:relative!important;
+}
+
+.topbar-presentation-slot{
+  position:absolute;
+  left:50%;
+  top:50%;
+  transform:translate(-50%,-50%);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  z-index:6;
+  min-width:0;
+}
+
+.topbar-presentation-slot .presentation-mode-actions{
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  gap:8px!important;
+  grid-column:auto!important;
+  min-width:0!important;
+  flex-wrap:nowrap!important;
+}
+
+.canvas-header{
+  display:grid!important;
+  grid-template-columns:minmax(150px,1fr) auto minmax(150px,1fr)!important;
+  align-items:center!important;
+  column-gap:18px!important;
+  padding-inline:14px!important;
+}
+
+.canvas-header .current-title{
+  grid-column:1!important;
+}
+
+.canvas-substitution-slot{
+  grid-column:2!important;
+  justify-self:center!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+}
+
+.canvas-substitution-slot .substitution-launch-btn{
+  position:static!important;
+  min-width:190px!important;
+  min-height:38px!important;
+  margin:0!important;
+  padding:8px 22px!important;
+  border-radius:10px!important;
+  font-size:12px!important;
+  font-weight:900!important;
+  letter-spacing:.03em!important;
+  white-space:nowrap!important;
+}
+
+.canvas-header .lineup-counters{
+  grid-column:3!important;
+  justify-self:end!important;
+}
+
+@media(max-width:1200px){
+  .topbar-presentation-slot .presentation-mode-actions{
+    gap:5px!important;
+  }
+  .topbar-presentation-slot .presentation-mode-btn{
+    min-width:84px!important;
+    padding-inline:7px!important;
+    font-size:9px!important;
+  }
+  .canvas-header{
+    grid-template-columns:minmax(120px,1fr) auto minmax(120px,1fr)!important;
+    column-gap:10px!important;
+  }
+  .canvas-substitution-slot .substitution-launch-btn{
+    min-width:150px!important;
+    padding-inline:14px!important;
+    font-size:11px!important;
+  }
+}
+
+@media(max-width:850px){
+  .topbar{
+    display:grid!important;
+    grid-template-columns:1fr auto!important;
+    grid-template-areas:
+      "brand actions"
+      "modes modes"!important;
+    row-gap:8px!important;
+  }
+  .topbar .brand{grid-area:brand!important}
+  .topbar .top-actions{grid-area:actions!important}
+
+  .topbar-presentation-slot{
+    grid-area:modes!important;
+    position:static!important;
+    transform:none!important;
+    justify-self:center!important;
+    width:100%!important;
+  }
+
+  .topbar-presentation-slot .presentation-mode-actions{
+    max-width:100%!important;
+    overflow-x:auto!important;
+    scrollbar-width:none!important;
+  }
+  .topbar-presentation-slot .presentation-mode-actions::-webkit-scrollbar{
+    display:none!important;
+  }
+
+  .canvas-header{
+    grid-template-columns:1fr auto!important;
+    grid-template-areas:
+      "title counters"
+      "substitution substitution"!important;
+    row-gap:8px!important;
+  }
+  .canvas-header .current-title{
+    grid-area:title!important;
+  }
+  .canvas-header .lineup-counters{
+    grid-area:counters!important;
+  }
+  .canvas-substitution-slot{
+    grid-area:substitution!important;
+    justify-self:center!important;
+  }
+}
+
 </style>
 
 <script async src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
@@ -2139,8 +2273,12 @@ body.export-clean-view .board-shell{
       <small></small>
     </div></div>
   
-  <div class="topbar-substitution-slot">
-    <button type="button" class="btn substitution-launch-btn substitution-topbar" id="openSubstitutionBtn">Sostituzione</button>
+  <div class="topbar-presentation-slot" aria-label="Modalità visualizzazione giocatori">
+    <div class="presentation-mode-actions">
+      <button type="button" class="btn presentation-mode-btn bench" id="benchModeBtn">PANCHINA</button>
+      <button type="button" class="btn presentation-mode-btn dressing-room" id="dressingRoomModeBtn">SPOGLIATOIO</button>
+      <button type="button" class="btn presentation-mode-btn preparation" id="preparationModeBtn">PREPARAZIONE</button>
+    </div>
   </div>
 <div class="top-actions">
     <button class="btn" id="exportPdf">Esporta PDF</button>
@@ -2276,10 +2414,8 @@ body.export-clean-view .board-shell{
       <span id="currentTitleText">Schema 1</span>
       <span class="current-title-pencil" aria-hidden="true">✎</span>
     </button>
-    <div class="presentation-mode-actions" aria-label="Modalità visualizzazione giocatori">
-      <button type="button" class="btn presentation-mode-btn bench" id="benchModeBtn">PANCHINA</button>
-      <button type="button" class="btn presentation-mode-btn dressing-room" id="dressingRoomModeBtn">SPOGLIATOIO</button>
-      <button type="button" class="btn presentation-mode-btn preparation" id="preparationModeBtn">PREPARAZIONE</button>
+    <div class="canvas-substitution-slot">
+      <button type="button" class="btn substitution-launch-btn substitution-topbar" id="openSubstitutionBtn">Sostituzione</button>
     </div>
     <div class="status" id="status" aria-live="polite"></div>
     <div class="lineup-counters" aria-label="Giocatori in campo">
@@ -10044,7 +10180,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v202",
+    appVersion:"v203",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -11029,7 +11165,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=202",
+        "./service-worker.js?v=203",
         { updateViaCache: "none" }
       );
 
