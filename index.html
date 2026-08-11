@@ -1991,6 +1991,88 @@ body.export-clean-view .board-shell{
   grid-column:1;
 }
 
+
+/* v200 - sostituzioni multiple */
+.multi-substitution-modal{
+  width:min(720px,96vw);
+}
+.multi-substitution-wrap{
+  margin-top:12px;
+}
+.multi-substitution-head,
+.multi-substitution-row{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 28px minmax(0,1fr) 32px;
+  gap:8px;
+  align-items:center;
+}
+.multi-substitution-head{
+  padding:0 6px 6px;
+  color:var(--muted);
+  font-size:9px;
+  font-weight:850;
+  text-transform:uppercase;
+  letter-spacing:.045em;
+}
+.multi-substitution-head span:nth-child(1){grid-column:1}
+.multi-substitution-head span:nth-child(2){grid-column:3}
+.multi-substitution-list{
+  display:flex;
+  flex-direction:column;
+  gap:7px;
+  max-height:min(390px,52vh);
+  overflow:auto;
+  padding-right:2px;
+}
+.multi-substitution-row{
+  padding:8px;
+  border:1px solid var(--line);
+  border-radius:9px;
+  background:#0d1721;
+}
+.multi-substitution-out{
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  font-size:11px;
+  font-weight:850;
+}
+.multi-substitution-row .substitution-arrow{
+  text-align:center;
+}
+.multi-substitution-row .select{
+  min-width:0;
+  width:100%;
+}
+.multi-substitution-remove{
+  width:30px;
+  height:30px;
+  padding:0;
+  display:grid;
+  place-items:center;
+  border-radius:7px;
+  font-size:14px;
+}
+.multi-substitution-footer{
+  margin-top:9px;
+  color:var(--muted);
+  font-size:10px;
+  line-height:1.35;
+}
+.multi-substitution-row select option:disabled{
+  color:#66717d;
+}
+@media(max-width:700px){
+  .multi-substitution-head{
+    display:none;
+  }
+  .multi-substitution-row{
+    grid-template-columns:minmax(0,1fr) 24px minmax(0,1fr) 30px;
+    padding:7px;
+  }
+}
+
 </style>
 
 <script async src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
@@ -2342,14 +2424,14 @@ body.export-clean-view .board-shell{
 </div>
 
 <div class="modal-backdrop" id="substitutionModal">
-  <div class="modal substitution-modal">
-    <h2>Sostituzione giocatore</h2>
-    <p>
+  <div class="modal substitution-modal multi-substitution-modal">
+    <h2 id="substitutionModalTitle">Sostituzione giocatore</h2>
+    <p id="substitutionModalDescription">
       Sostituisci il giocatore selezionato con un giocatore disponibile nella lista.
       La modifica verrà applicata a tutti gli schemi del progetto.
     </p>
 
-    <div class="substitution-summary">
+    <div class="substitution-summary" id="singleSubstitutionSummary">
       <div>
         <span>Giocatore selezionato</span>
         <strong id="substitutionSelectedPlayer">—</strong>
@@ -2359,6 +2441,16 @@ body.export-clean-view .board-shell{
         <span>Giocatore in entrata</span>
         <select class="select" id="substitutionReplacementSelect"></select>
       </label>
+    </div>
+
+    <div class="multi-substitution-wrap" id="multiSubstitutionWrap" hidden>
+      <div class="multi-substitution-head">
+        <span>Giocatore in uscita</span>
+        <span>Giocatore in entrata</span>
+        <span></span>
+      </div>
+      <div class="multi-substitution-list" id="multiSubstitutionList"></div>
+      <div class="multi-substitution-footer" id="multiSubstitutionFooter"></div>
     </div>
 
     <div class="modal-actions">
@@ -3913,6 +4005,7 @@ document.getElementById("currentTitle")?.addEventListener(
 );
 
 let substitutionPlayerIndex=null;
+let substitutionBatchRows=[];
 
 function playerDisplayLabel(player){
   if(!player)return "Giocatore";
@@ -3926,48 +4019,85 @@ function playerDisplayLabel(player){
   return number + (player.lastName||player.name||"Giocatore");
 }
 
+function getSelectedFieldPlayerIndexes(){
+  return [...selectedPlayers]
+    .filter(index=>state.roster[index] && page().positions[index])
+    .sort((a,b)=>a-b);
+}
+
 function getSingleSelectedFieldPlayer(){
-  const indexes=[...selectedPlayers].filter(index=>page().positions[index]);
+  const indexes=getSelectedFieldPlayerIndexes();
   return indexes.length===1 ? indexes[0] : null;
+}
+
+function getBatchReplacementCandidates(outgoingIndexes){
+  const outgoingSet=new Set(outgoingIndexes);
+
+  /*
+    Candidati = giocatori che NON stanno attualmente sul campo e che
+    non fanno parte del gruppo selezionato in uscita.
+    Mantiene la logica storica della sostituzione singola.
+  */
+  return state.roster
+    .map((_,index)=>index)
+    .filter(index=>
+      !outgoingSet.has(index) &&
+      !page().positions[index]
+    );
 }
 
 function updateSubstitutionButton(){
   const button=document.getElementById("openSubstitutionBtn");
   if(!button)return;
 
-  const selectedIndex=getSingleSelectedFieldPlayer();
-  const hasAvailablePlayer=state.roster.some((_,index)=>
-    index!==selectedIndex && !page().positions[index]
-  );
+  const selectedIndexes=getSelectedFieldPlayerIndexes();
+  const available=getBatchReplacementCandidates(selectedIndexes);
 
-  button.disabled=selectedIndex===null || !hasAvailablePlayer;
-  button.title=selectedIndex===null
-    ? "Seleziona una sola maglia presente nel campo"
-    : (
-        hasAvailablePlayer
-          ? "Sostituisci il giocatore selezionato in tutti gli schemi"
-          : "Non ci sono giocatori disponibili nella lista"
-      );
+  button.disabled=
+    selectedIndexes.length===0 ||
+    available.length===0;
+
+  if(!selectedIndexes.length){
+    button.title="Seleziona una o più maglie presenti nel campo";
+  }else if(!available.length){
+    button.title="Non ci sono giocatori disponibili nella lista";
+  }else if(selectedIndexes.length===1){
+    button.title="Sostituisci il giocatore selezionato in tutti gli schemi";
+  }else{
+    button.title=`Gestisci ${selectedIndexes.length} sostituzioni in tutti gli schemi`;
+  }
 }
 
-function openSubstitutionModal(){
-  const selectedIndex=getSingleSelectedFieldPlayer();
+function setSubstitutionModalMode(mode){
+  const title=document.getElementById("substitutionModalTitle");
+  const description=document.getElementById("substitutionModalDescription");
+  const single=document.getElementById("singleSubstitutionSummary");
+  const multi=document.getElementById("multiSubstitutionWrap");
+  const confirm=document.getElementById("confirmSubstitutionBtn");
 
-  if(selectedIndex===null){
-    alert("Seleziona una sola maglia presente nel campo.");
-    return;
-  }
+  const isMulti=mode==="multi";
 
-  const availableIndexes=state.roster
-    .map((_,index)=>index)
-    .filter(index=>index!==selectedIndex && !page().positions[index]);
+  single.hidden=isMulti;
+  multi.hidden=!isMulti;
 
-  if(!availableIndexes.length){
-    alert("Non ci sono giocatori disponibili nella lista laterale.");
-    return;
-  }
+  title.textContent=isMulti
+    ? "Sostituzioni multiple"
+    : "Sostituzione giocatore";
 
+  description.textContent=isMulti
+    ? "Associa un giocatore in entrata a ogni giocatore selezionato. Le sostituzioni verranno applicate contemporaneamente a tutti gli schemi."
+    : "Sostituisci il giocatore selezionato con un giocatore disponibile nella lista. La modifica verrà applicata a tutti gli schemi del progetto.";
+
+  confirm.textContent=isMulti
+    ? "Conferma tutte le sostituzioni"
+    : "Conferma sostituzione";
+}
+
+function openSingleSubstitutionModal(selectedIndex,availableIndexes){
   substitutionPlayerIndex=selectedIndex;
+  substitutionBatchRows=[];
+
+  setSubstitutionModalMode("single");
 
   const selectedPlayer=state.roster[selectedIndex];
   const selectedLabel=document.getElementById("substitutionSelectedPlayer");
@@ -3987,12 +4117,270 @@ function openSubstitutionModal(){
   requestAnimationFrame(()=>select.focus());
 }
 
+function getSelectedBatchIncomingIndexes(){
+  return substitutionBatchRows
+    .map(row=>Number(row.incomingIndex))
+    .filter(Number.isInteger);
+}
+
+function refreshBatchSelectOptions(){
+  const selectedIncoming=new Set(getSelectedBatchIncomingIndexes());
+
+  substitutionBatchRows.forEach(row=>{
+    const select=document.querySelector(
+      `[data-batch-sub-row="${row.outgoingIndex}"] .multi-substitution-select`
+    );
+
+    if(!select)return;
+
+    [...select.options].forEach(option=>{
+      const value=Number(option.value);
+
+      option.disabled=
+        Number.isInteger(value) &&
+        value!==Number(row.incomingIndex) &&
+        selectedIncoming.has(value);
+    });
+  });
+
+  const confirm=document.getElementById("confirmSubstitutionBtn");
+  if(confirm){
+    confirm.disabled=
+      substitutionBatchRows.length===0 ||
+      substitutionBatchRows.some(row=>!Number.isInteger(Number(row.incomingIndex)));
+  }
+
+  const footer=document.getElementById("multiSubstitutionFooter");
+  if(footer){
+    const count=substitutionBatchRows.length;
+    footer.textContent=
+      `${count} ${count===1?"sostituzione":"sostituzioni"} · `+
+      `applicate contemporaneamente a ${state.pages.length} schemi`;
+  }
+}
+
+function renderBatchSubstitutionRows(availableIndexes){
+  const list=document.getElementById("multiSubstitutionList");
+  list.innerHTML="";
+
+  substitutionBatchRows.forEach(row=>{
+    const wrapper=document.createElement("div");
+    wrapper.className="multi-substitution-row";
+    wrapper.dataset.batchSubRow=String(row.outgoingIndex);
+
+    const outgoing=document.createElement("div");
+    outgoing.className="multi-substitution-out";
+    outgoing.textContent=playerDisplayLabel(state.roster[row.outgoingIndex]);
+
+    const arrow=document.createElement("div");
+    arrow.className="substitution-arrow";
+    arrow.textContent="⇄";
+
+    const select=document.createElement("select");
+    select.className="select multi-substitution-select";
+    select.setAttribute("aria-label",`Sostituto di ${outgoing.textContent}`);
+
+    const placeholder=document.createElement("option");
+    placeholder.value="";
+    placeholder.textContent="Scegli giocatore…";
+    select.appendChild(placeholder);
+
+    availableIndexes.forEach(index=>{
+      const option=document.createElement("option");
+      option.value=String(index);
+      option.textContent=playerDisplayLabel(state.roster[index]);
+      select.appendChild(option);
+    });
+
+    if(Number.isInteger(Number(row.incomingIndex))){
+      select.value=String(row.incomingIndex);
+    }
+
+    select.addEventListener("change",()=>{
+      row.incomingIndex=
+        select.value==="" ? null : Number(select.value);
+
+      refreshBatchSelectOptions();
+    });
+
+    const remove=document.createElement("button");
+    remove.type="button";
+    remove.className="btn danger multi-substitution-remove";
+    remove.title="Rimuovi questa sostituzione";
+    remove.setAttribute("aria-label","Rimuovi questa sostituzione");
+    remove.textContent="×";
+
+    remove.addEventListener("click",()=>{
+      substitutionBatchRows=substitutionBatchRows.filter(
+        item=>item!==row
+      );
+
+      renderBatchSubstitutionRows(availableIndexes);
+
+      if(!substitutionBatchRows.length){
+        closeSubstitutionModal();
+        setStatus("Nessuna sostituzione selezionata");
+      }
+    });
+
+    wrapper.append(outgoing,arrow,select,remove);
+    list.appendChild(wrapper);
+  });
+
+  refreshBatchSelectOptions();
+}
+
+function openBatchSubstitutionModal(selectedIndexes,availableIndexes){
+  substitutionPlayerIndex=null;
+
+  /*
+    Precompila in ordine con i primi giocatori disponibili.
+    L'utente può cambiare ogni associazione liberamente.
+  */
+  substitutionBatchRows=selectedIndexes.map((outgoingIndex,index)=>({
+    outgoingIndex,
+    incomingIndex:availableIndexes[index] ?? null
+  }));
+
+  setSubstitutionModalMode("multi");
+  renderBatchSubstitutionRows(availableIndexes);
+
+  document.getElementById("substitutionModal").classList.add("open");
+
+  requestAnimationFrame(()=>{
+    document
+      .querySelector(".multi-substitution-select")
+      ?.focus();
+  });
+}
+
+function openSubstitutionModal(){
+  const selectedIndexes=getSelectedFieldPlayerIndexes();
+
+  if(!selectedIndexes.length){
+    alert("Seleziona una o più maglie presenti nel campo.");
+    return;
+  }
+
+  const availableIndexes=getBatchReplacementCandidates(selectedIndexes);
+
+  if(!availableIndexes.length){
+    alert("Non ci sono giocatori disponibili nella lista laterale.");
+    return;
+  }
+
+  if(selectedIndexes.length===1){
+    openSingleSubstitutionModal(
+      selectedIndexes[0],
+      availableIndexes
+    );
+    return;
+  }
+
+  openBatchSubstitutionModal(
+    selectedIndexes,
+    availableIndexes
+  );
+}
+
 function closeSubstitutionModal(){
   document.getElementById("substitutionModal").classList.remove("open");
   substitutionPlayerIndex=null;
+  substitutionBatchRows=[];
+  document.getElementById("confirmSubstitutionBtn").disabled=false;
 }
 
-function confirmGlobalSubstitution(){
+function applyGlobalSubstitutionPairs(pairs){
+  if(!Array.isArray(pairs) || !pairs.length)return false;
+
+  const outgoingSet=new Set(pairs.map(pair=>pair.outgoingIndex));
+  const incomingSet=new Set(pairs.map(pair=>pair.incomingIndex));
+
+  if(
+    outgoingSet.size!==pairs.length ||
+    incomingSet.size!==pairs.length
+  ){
+    alert("Ogni giocatore può essere usato una sola volta.");
+    return false;
+  }
+
+  if([...outgoingSet].some(index=>incomingSet.has(index))){
+    alert("Un giocatore in uscita non può essere usato anche come giocatore in entrata.");
+    return false;
+  }
+
+  const valid=pairs.every(pair=>
+    Number.isInteger(pair.outgoingIndex) &&
+    Number.isInteger(pair.incomingIndex) &&
+    state.roster[pair.outgoingIndex] &&
+    state.roster[pair.incomingIndex]
+  );
+
+  if(!valid){
+    alert("Una o più sostituzioni non sono valide.");
+    return false;
+  }
+
+  pushHistory();
+
+  /*
+    Applicazione simultanea.
+    Prima fotografiamo tutte le posizioni coinvolte nello schema,
+    poi eseguiamo gli scambi. Così A→D, B→E, C→F non può produrre
+    effetti a cascata dovuti all'ordine delle righe.
+  */
+  state.pages.forEach(projectPage=>{
+    const original=new Map();
+
+    pairs.forEach(pair=>{
+      original.set(
+        pair.outgoingIndex,
+        projectPage.positions[pair.outgoingIndex]
+          ? {...projectPage.positions[pair.outgoingIndex]}
+          : null
+      );
+
+      original.set(
+        pair.incomingIndex,
+        projectPage.positions[pair.incomingIndex]
+          ? {...projectPage.positions[pair.incomingIndex]}
+          : null
+      );
+    });
+
+    pairs.forEach(pair=>{
+      const outgoingPosition=original.get(pair.outgoingIndex);
+      const incomingPosition=original.get(pair.incomingIndex);
+
+      projectPage.positions[pair.outgoingIndex]=incomingPosition
+        ? {...incomingPosition}
+        : null;
+
+      projectPage.positions[pair.incomingIndex]=outgoingPosition
+        ? {...outgoingPosition}
+        : null;
+    });
+  });
+
+  selectedPlayers.clear();
+  selectedRosterPlayers.clear();
+
+  pairs.forEach(pair=>{
+    if(page().positions[pair.incomingIndex]){
+      selectedPlayers.add(pair.incomingIndex);
+    }
+  });
+
+  renderAll();
+  refreshSelectionVisuals();
+  updateLineupCounters();
+  updateSubstitutionButton();
+  save(false);
+
+  return true;
+}
+
+function confirmSingleGlobalSubstitution(){
   if(substitutionPlayerIndex===null)return;
 
   const replacementIndex=Number(
@@ -4008,49 +4396,54 @@ function confirmGlobalSubstitution(){
     return;
   }
 
-  const outgoingIndex=substitutionPlayerIndex;
-  const outgoingPlayer=state.roster[outgoingIndex];
+  const outgoingPlayer=state.roster[substitutionPlayerIndex];
   const incomingPlayer=state.roster[replacementIndex];
 
-  pushHistory();
+  const success=applyGlobalSubstitutionPairs([{
+    outgoingIndex:substitutionPlayerIndex,
+    incomingIndex:replacementIndex
+  }]);
 
-  /*
-    Scambio globale delle posizioni:
-    - in ogni schema, il giocatore entrante prende la posizione dell'uscente;
-    - se l'entrante era già presente in un altro schema, le due posizioni vengono scambiate;
-    - roster, frecce, testi e altri oggetti restano invariati.
-  */
-  state.pages.forEach(projectPage=>{
-    const outgoingPosition=projectPage.positions[outgoingIndex] || null;
-    const incomingPosition=projectPage.positions[replacementIndex] || null;
+  if(!success)return;
 
-    projectPage.positions[outgoingIndex]=incomingPosition
-      ? {...incomingPosition}
-      : null;
-
-    projectPage.positions[replacementIndex]=outgoingPosition
-      ? {...outgoingPosition}
-      : null;
-  });
-
-  selectedPlayers.clear();
-  selectedRosterPlayers.clear();
-
-  if(page().positions[replacementIndex]){
-    selectedPlayers.add(replacementIndex);
-  }
-
-  renderAll();
-  refreshSelectionVisuals();
-  updateLineupCounters();
-  updateSubstitutionButton();
-  save(false);
   closeSubstitutionModal();
 
   setStatus(
     `${outgoingPlayer.lastName||outgoingPlayer.name||"Giocatore"} sostituito con `+
     `${incomingPlayer.lastName||incomingPlayer.name||"Giocatore"} in tutti gli schemi`
   );
+}
+
+function confirmBatchGlobalSubstitution(){
+  if(!substitutionBatchRows.length)return;
+
+  const pairs=substitutionBatchRows.map(row=>({
+    outgoingIndex:Number(row.outgoingIndex),
+    incomingIndex:Number(row.incomingIndex)
+  }));
+
+  if(pairs.some(pair=>!Number.isInteger(pair.incomingIndex))){
+    alert("Seleziona un giocatore in entrata per ogni riga.");
+    return;
+  }
+
+  const success=applyGlobalSubstitutionPairs(pairs);
+  if(!success)return;
+
+  const count=pairs.length;
+  closeSubstitutionModal();
+
+  setStatus(
+    `${count} ${count===1?"sostituzione applicata":"sostituzioni applicate"} in tutti gli schemi`
+  );
+}
+
+function confirmGlobalSubstitution(){
+  if(substitutionBatchRows.length>0){
+    confirmBatchGlobalSubstitution();
+  }else{
+    confirmSingleGlobalSubstitution();
+  }
 }
 
 document.getElementById("openSubstitutionBtn").addEventListener(
@@ -4078,7 +4471,10 @@ document.getElementById("substitutionModal").addEventListener("keydown",event=>{
   if(event.key==="Escape"){
     event.preventDefault();
     closeSubstitutionModal();
-  }else if(event.key==="Enter"){
+  }else if(
+    event.key==="Enter" &&
+    !event.target.matches("select")
+  ){
     event.preventDefault();
     confirmGlobalSubstitution();
   }
@@ -9609,7 +10005,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v199",
+    appVersion:"v200",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -10595,7 +10991,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=199",
+        "./service-worker.js?v=200",
         { updateViaCache: "none" }
       );
 

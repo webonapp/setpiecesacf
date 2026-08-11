@@ -745,3 +745,17 @@ v199 - deep stability bugfix
 - Rimossa la save beforeunload che generava salvataggi/dirty count non intenzionali.
 - Archivio/Database ACF resta persistente.
 - Audit JS, Service Worker, ID e listener completato.
+
+
+v200 - sostituzioni multiple
+- Modifica isolata costruita sulla v199 stabile.
+- 1 giocatore selezionato: comportamento storico della sostituzione singola invariato.
+- 2+ giocatori selezionati: apre una lista di sostituzioni multiple.
+- Ogni riga associa giocatore in uscita e giocatore in entrata.
+- Le righe vengono precompilate con i primi giocatori disponibili e restano modificabili.
+- Un giocatore in entrata già scelto viene disabilitato nelle altre righe.
+- Possibilità di rimuovere singole righe con ×.
+- Conferma unica applica tutte le sostituzioni contemporaneamente a tutti gli schemi.
+- Algoritmo simultaneo evita effetti a cascata tra sostituzioni.
+- Un solo pushHistory/Undo per l'intero batch.
+- Nessuna modifica a renderer, drag, Flip, sagome, backup, rose, SNAP o archivio.
