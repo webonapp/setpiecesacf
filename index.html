@@ -8345,6 +8345,61 @@ function alignSelectedHorizontally(){
 }
 
 
+function getAlignmentItemVisualWidthPx(item){
+  if(item.kind==="player"){
+    const el=document.querySelector(
+      `.player[data-index="${item.index}"]`
+    );
+
+    const width=el?.getBoundingClientRect?.().width;
+    if(Number.isFinite(width) && width>0)return width;
+
+    /*
+      Fallback coerente con la scala effettiva della maglia.
+      La jersey SVG ha una larghezza nominale vicina a 56 px.
+    */
+    const player=state.roster[item.index];
+    const scale=Number(
+      player?.individualScale ??
+      state.playerScale ??
+      .75
+    );
+
+    return 56*Math.max(.4,scale);
+  }
+
+  if(item.kind==="drawing"){
+    const el=document.querySelector(
+      `[data-drawing-index="${item.index}"]`
+    );
+
+    const width=el?.getBoundingClientRect?.().width;
+    if(Number.isFinite(width) && width>0)return width;
+
+    const drawing=page().drawings?.[item.index];
+    if(drawing){
+      const logicalWidth=Math.abs(
+        Number(drawing.x2)-Number(drawing.x1)
+      );
+
+      const boardWidth=document
+        .getElementById("board")
+        ?.getBoundingClientRect?.()
+        .width;
+
+      if(
+        Number.isFinite(logicalWidth) &&
+        Number.isFinite(boardWidth) &&
+        boardWidth>0
+      ){
+        return (logicalWidth/1000)*boardWidth;
+      }
+    }
+  }
+
+  return 40;
+}
+
 function distributeSelectedHorizontally(){
   const items=getSelectedAlignmentItems()
     .sort((a,b)=>a.x-b.x);
@@ -8363,63 +8418,79 @@ function distributeSelectedHorizontally(){
   }
 
   /*
-    v195:
-    Distribuzione COMPATTA.
-    Non usa più gli estremi attuali del gruppo, perché questo poteva
-    allargare enormemente i giocatori quando erano già distanti.
-    La distanza è volutamente minima: quasi a contatto, ma senza
-    sovrapposizione visiva con le maglie al 75%.
+    v196:
+    distanza = larghezza visiva reale di ogni elemento + 6 px.
+    Quindi due maglie non possono toccarsi, ma restano molto vicine.
+    Funziona anche se le maglie hanno scale individuali diverse.
   */
-  const compactPixelSpacing=34;
-  const spacing=(compactPixelSpacing/boardRect.width)*100;
-  const requiredSpan=spacing*(items.length-1);
+  const visualGapPx=6;
+  const widths=items.map(getAlignmentItemVisualWidthPx);
 
-  const centerX=items.reduce(
+  const totalWidthPx=
+    widths.reduce((sum,width)=>sum+width,0) +
+    visualGapPx*(items.length-1);
+
+  const currentCenterPercent=items.reduce(
     (sum,item)=>sum+item.x,
     0
   )/items.length;
 
-  let startX=centerX-(requiredSpan/2);
+  const currentCenterPx=
+    (currentCenterPercent/100)*boardRect.width;
 
-  const minAllowed=2.5;
-  const maxAllowed=97.5;
+  let cursorPx=
+    currentCenterPx-(totalWidthPx/2);
 
-  if(startX<minAllowed){
-    startX=minAllowed;
-  }
+  const targetCentersPx=widths.map((width,index)=>{
+    const center=cursorPx+(width/2);
+    cursorPx+=width;
 
-  if(startX+requiredSpan>maxAllowed){
-    startX=maxAllowed-requiredSpan;
-  }
+    if(index<widths.length-1){
+      cursorPx+=visualGapPx;
+    }
+
+    return center;
+  });
 
   /*
-    Solo nel caso estremo in cui molti elementi non entrino nel campo,
-    riduce ulteriormente la distanza invece di farli uscire.
+    Mantiene l'intero gruppo nel campo senza cambiare le distanze.
   */
-  const availableSpan=maxAllowed-minAllowed;
-  const finalSpacing=requiredSpan>availableSpan
-    ? availableSpan/(items.length-1)
-    : spacing;
+  const minEdgePx=boardRect.width*.025;
+  const maxEdgePx=boardRect.width*.975;
 
-  if(requiredSpan>availableSpan){
-    startX=minAllowed;
+  const firstEdge=
+    targetCentersPx[0]-(widths[0]/2);
+
+  const lastIndex=targetCentersPx.length-1;
+  const lastEdge=
+    targetCentersPx[lastIndex]+(widths[lastIndex]/2);
+
+  let shiftPx=0;
+
+  if(firstEdge<minEdgePx){
+    shiftPx=minEdgePx-firstEdge;
+  }
+
+  if(lastEdge+shiftPx>maxEdgePx){
+    shiftPx+=maxEdgePx-(lastEdge+shiftPx);
   }
 
   pushHistory();
 
-  items.forEach((item,position)=>{
-    const targetX=Math.max(
-      minAllowed,
-      Math.min(
-        maxAllowed,
-        startX+(finalSpacing*position)
-      )
-    );
+  items.forEach((item,index)=>{
+    const targetX=
+      ((targetCentersPx[index]+shiftPx)/boardRect.width)*100;
 
-    moveAlignmentItemTo(item,targetX,null);
+    moveAlignmentItemTo(
+      item,
+      Math.max(2.5,Math.min(97.5,targetX)),
+      null
+    );
   });
 
-  finishAlignmentCommand("Elementi distribuiti a distanza minima");
+  finishAlignmentCommand(
+    `Elementi distribuiti · ${visualGapPx}px di spazio`
+  );
 }
 
 function alignSelectedVertically(){
@@ -9610,7 +9681,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v195",
+    appVersion:"v196",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -10592,7 +10663,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=195",
+        "./service-worker.js?v=196",
         { updateViaCache: "none" }
       );
 

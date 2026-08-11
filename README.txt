@@ -712,3 +712,11 @@ v195 - Distribuisci compatto
 - Con maglie al 75% gli elementi risultano quasi a contatto senza sovrapporsi.
 - Il gruppo resta centrato e dentro il campo.
 - Funziona anche con sagome/barriere selezionate.
+
+
+v196 - Distribuisci con distanza visiva reale
+- La distanza non è più fissa tra i centri.
+- Viene misurata la larghezza visiva reale di ogni maglia/sagoma.
+- Tra due elementi viene lasciato uno spazio di 6 px.
+- Gli elementi non si toccano e non si sovrappongono, ma restano quasi affiancati.
+- Compatibile con maglie di dimensioni diverse e sagome/barriere.
