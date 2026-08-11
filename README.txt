@@ -656,3 +656,11 @@ v187 - editor numeri sagome
 - Numero modificabile da 0 a 999 e salvato con Undo.
 - Numeri spostati sopra la testa delle sagome.
 - Nessuna modifica a drag, ridimensionamento proporzionale, colore, Flip, rose o backup.
+
+
+v188 - barriera compatta
+- Le 4 sagome della barriera ora si toccano lateralmente.
+- Barriera e sagoma singola più basse.
+- Numeri spostati chiaramente sopra le teste.
+- Numeri leggermente più piccoli per non appesantire la grafica.
+- Restano invariati doppio tap/clic per modifica numero, colore, ridimensionamento proporzionale, drag, Flip e salvataggio.

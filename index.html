@@ -6264,7 +6264,7 @@ function renderDrawings(){
       const width=Math.max(24,maxX-minX);
       const height=Math.max(48,maxY-minY);
       const figures=d.type==="wall4" ? 4 : 1;
-      const gap=figures===4 ? 0 : 0;
+      const gap=0;
       const figureWidth=(width-gap*(figures-1))/figures;
 
       const addMannequinFigure=(index)=>{
@@ -6279,8 +6279,8 @@ function renderDrawings(){
         const shoulderY=minY+height*.19;
         const headCy=shoulderY-headR;
         const torsoBottom=minY+height*.61;
-        const torsoHalfTop=figureWidth*(figures===4 ? .31 : .31);
-        const torsoHalfBottom=figureWidth*(figures===4 ? .25 : .25);
+        const torsoHalfTop=figureWidth*(figures===4 ? .50 : .31);
+        const torsoHalfBottom=figureWidth*(figures===4 ? .46 : .25);
 
         const head=document.createElementNS("http://www.w3.org/2000/svg","circle");
         head.setAttribute("cx",centerX);
@@ -6320,11 +6320,11 @@ function renderDrawings(){
 
           label.textContent=value;
           label.setAttribute("x",centerX);
-          label.setAttribute("y",Math.max(minY+6,headCy-headR-height*.055));
+          label.setAttribute("y",Math.max(minY+8,headCy-headR-height*.10));
           label.setAttribute("text-anchor","middle");
           label.setAttribute("dominant-baseline","middle");
           label.setAttribute("fill","#111827");
-          label.setAttribute("font-size",String(Math.max(9,Math.min(17,height*.09))));
+          label.setAttribute("font-size",String(Math.max(8,Math.min(14,height*.075))));
           label.setAttribute("font-weight","800");
           label.setAttribute("font-family","Arial, Helvetica, sans-serif");
           label.setAttribute("pointer-events","none");
@@ -7220,8 +7220,8 @@ function addTrainingMannequin(type){
   const isWall=type==="wall4";
   const centerX=500;
   const centerY=310;
-  const width=isWall ? 135 : 43.5;
-  const height=isWall ? 108.75 : 112.5;
+  const width=isWall ? 118 : 40;
+  const height=isWall ? 86 : 90;
 
   const drawing={
     type,
@@ -9504,7 +9504,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v187",
+    appVersion:"v188",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -10486,7 +10486,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=187",
+        "./service-worker.js?v=188",
         { updateViaCache: "none" }
       );
 
