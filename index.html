@@ -1998,6 +1998,18 @@ body.export-clean-view .board-shell{
   margin:-2px 0 8px;
 }
 
+
+/* v187 - editor numero sagome */
+.mannequin-number-modal{
+  width:min(420px,94vw);
+}
+.mannequin-number-grid{
+  grid-template-columns:1fr;
+}
+.mannequin-number-grid .player-profile-number{
+  grid-column:1;
+}
+
 </style>
 
 <script async src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
@@ -2393,6 +2405,24 @@ body.export-clean-view .board-shell{
     <div class="modal-actions">
       <button type="button" class="btn" id="cancelTextEditor">Annulla</button>
       <button type="button" class="btn primary" id="saveTextEditor">Salva</button>
+    </div>
+  </div>
+</div>
+
+
+<div class="modal-backdrop" id="mannequinNumberModal">
+  <div class="modal player-profile-modal mannequin-number-modal">
+    <h2 id="mannequinNumberModalTitle">Modifica numero sagoma</h2>
+    <p id="mannequinNumberModalDescription">Modifica il numero della sagoma selezionata.</p>
+    <div class="player-profile-grid mannequin-number-grid">
+      <label class="player-profile-field player-profile-number">
+        <span>Numero</span>
+        <input class="input" id="mannequinNumberInput" type="number" min="0" max="999" inputmode="numeric">
+      </label>
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn" id="cancelMannequinNumber">Annulla</button>
+      <button type="button" class="btn primary" id="saveMannequinNumber">Salva</button>
     </div>
   </div>
 </div>
@@ -5917,6 +5947,130 @@ function applyDrawingStrokeStyle(element,d){
   element.setAttribute("vector-effect","non-scaling-stroke");
 }
 
+
+let mannequinNumberEditTarget=null;
+
+function closeMannequinNumberModal(){
+  mannequinNumberEditTarget=null;
+  document.getElementById("mannequinNumberModal")?.classList.remove("open");
+}
+
+function openMannequinNumberModal(drawingIndex,figureIndex=0){
+  const drawing=page().drawings?.[drawingIndex];
+  if(!drawing || (drawing.type!=="mannequin" && drawing.type!=="wall4"))return;
+
+  const safeFigureIndex=drawing.type==="wall4"
+    ? Math.max(0,Math.min(3,Number(figureIndex)||0))
+    : 0;
+
+  mannequinNumberEditTarget={
+    drawingIndex,
+    figureIndex:safeFigureIndex
+  };
+
+  const currentValue=drawing.type==="wall4"
+    ? String((Array.isArray(drawing.numbers)?drawing.numbers[safeFigureIndex]:null) ?? (safeFigureIndex+1))
+    : String(drawing.number ?? "5");
+
+  const title=document.getElementById("mannequinNumberModalTitle");
+  const description=document.getElementById("mannequinNumberModalDescription");
+  const input=document.getElementById("mannequinNumberInput");
+
+  if(title){
+    title.textContent=drawing.type==="wall4"
+      ? `Modifica numero sagoma ${safeFigureIndex+1}`
+      : "Modifica numero sagoma";
+  }
+
+  if(description){
+    description.textContent=drawing.type==="wall4"
+      ? `Stai modificando la sagoma ${safeFigureIndex+1} della barriera.`
+      : "Modifica il numero della sagoma singola.";
+  }
+
+  if(input)input.value=currentValue;
+
+  document.getElementById("mannequinNumberModal")?.classList.add("open");
+
+  requestAnimationFrame(()=>{
+    input?.focus();
+    input?.select();
+  });
+}
+
+function saveMannequinNumberModal(){
+  if(!mannequinNumberEditTarget)return;
+
+  const drawing=page().drawings?.[mannequinNumberEditTarget.drawingIndex];
+  const input=document.getElementById("mannequinNumberInput");
+
+  if(!drawing || !input)return;
+
+  const raw=String(input.value||"").trim();
+  const parsed=Number(raw);
+
+  if(
+    raw==="" ||
+    !Number.isFinite(parsed) ||
+    parsed<0 ||
+    parsed>999
+  ){
+    alert("Inserisci un numero valido da 0 a 999.");
+    input.focus();
+    return;
+  }
+
+  const clean=String(Math.round(parsed));
+
+  pushHistory();
+
+  if(drawing.type==="wall4"){
+    if(!Array.isArray(drawing.numbers) || drawing.numbers.length!==4){
+      drawing.numbers=["1","2","3","4"];
+    }
+    drawing.numbers[mannequinNumberEditTarget.figureIndex]=clean;
+  }else{
+    drawing.number=clean;
+  }
+
+  renderDrawings();
+  save(false);
+  closeMannequinNumberModal();
+  setStatus("Numero sagoma aggiornato");
+}
+
+document.getElementById("saveMannequinNumber")?.addEventListener(
+  "click",
+  saveMannequinNumberModal
+);
+
+document.getElementById("cancelMannequinNumber")?.addEventListener(
+  "click",
+  closeMannequinNumberModal
+);
+
+document.getElementById("mannequinNumberModal")?.addEventListener(
+  "click",
+  event=>{
+    if(event.target.id==="mannequinNumberModal"){
+      closeMannequinNumberModal();
+    }
+  }
+);
+
+document.getElementById("mannequinNumberModal")?.addEventListener(
+  "keydown",
+  event=>{
+    if(event.key==="Escape"){
+      event.preventDefault();
+      closeMannequinNumberModal();
+    }else if(event.key==="Enter"){
+      event.preventDefault();
+      saveMannequinNumberModal();
+    }
+  }
+);
+
 function renderDrawings(){
   const svg=document.getElementById("drawLayer");
   if(!svg)return;
@@ -6166,7 +6320,7 @@ function renderDrawings(){
 
           label.textContent=value;
           label.setAttribute("x",centerX);
-          label.setAttribute("y",torsoBottom+height*.075);
+          label.setAttribute("y",Math.max(minY+6,headCy-headR-height*.055));
           label.setAttribute("text-anchor","middle");
           label.setAttribute("dominant-baseline","middle");
           label.setAttribute("fill","#111827");
@@ -6215,6 +6369,7 @@ function renderDrawings(){
         )*1000;
 
         let targetIndex=0;
+
         if(d.type==="wall4"){
           const local=(svgX-minX)/Math.max(1,width);
           targetIndex=Math.max(
@@ -6223,36 +6378,7 @@ function renderDrawings(){
           );
         }
 
-        const currentValue=d.type==="wall4"
-          ? String((Array.isArray(d.numbers)?d.numbers[targetIndex]:null) ?? (targetIndex+1))
-          : String(d.number ?? "5");
-
-        const value=prompt(
-          d.type==="wall4"
-            ? `Numero sagoma ${targetIndex+1}:`
-            : "Numero sagoma:",
-          currentValue
-        );
-
-        if(value===null)return;
-
-        const clean=value.trim().slice(0,3);
-        if(!clean)return;
-
-        pushHistory();
-
-        if(d.type==="wall4"){
-          if(!Array.isArray(d.numbers)){
-            d.numbers=["1","2","3","4"];
-          }
-          d.numbers[targetIndex]=clean;
-        }else{
-          d.number=clean;
-        }
-
-        renderDrawings();
-        save(false);
-        setStatus("Numero sagoma aggiornato");
+        openMannequinNumberModal(i,targetIndex);
       };
 
       hit.addEventListener("dblclick",editMannequinNumberAtEvent);
@@ -9378,7 +9504,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v186",
+    appVersion:"v187",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -10360,7 +10486,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=186",
+        "./service-worker.js?v=187",
         { updateViaCache: "none" }
       );
 

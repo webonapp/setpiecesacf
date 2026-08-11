@@ -648,3 +648,11 @@ v185 - numeri sagome
 - Ridimensionamento proporzionale, colore, drag, copia/incolla, elimina, Undo/Redo e Flip invariati.
 
 v186: testa collegata al corpo; numeri 50% più piccoli e ravvicinati; sagome 25% più basse. Nessun'altra funzione modificata.
+
+
+v187 - editor numeri sagome
+- Doppio clic e doppio tap su sagoma singola/barriera aprono una finestra di modifica in stile Anagrafica giocatore.
+- Nella barriera da 4 viene identificata la singola sagoma toccata.
+- Numero modificabile da 0 a 999 e salvato con Undo.
+- Numeri spostati sopra la testa delle sagome.
+- Nessuna modifica a drag, ridimensionamento proporzionale, colore, Flip, rose o backup.
