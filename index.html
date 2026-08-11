@@ -2116,7 +2116,7 @@ body.export-clean-view .board-shell{
   <div class="library-panel">
     <div class="library-title">Object style</div>
     <div class="library-help mannequin-color-help">Seleziona una sagoma: colore dalla palette sopra e ridimensionamento proporzionale dalle maniglie.</div>
-    <label class="style-control"><span>Spessore</span><input id="drawingWidth" type="range" min="2" max="14" step="1" value="6"></label>
+    <label class="style-control"><span>Spessore</span><input id="drawingWidth" type="range" min="2" max="14" step="1" value="9"></label>
     <label class="style-control"><span>Punta</span><input id="drawingHead" type="range" min="8" max="22" step="1" value="13">
 <div class="drawing-choice-row" id="drawingHeadButtons" aria-label="Dimensione punta freccia">
   <button type="button" class="drawing-choice-btn" data-head-size="10">Piccola</button>
@@ -9681,7 +9681,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v196",
+    appVersion:"v197",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -10663,7 +10663,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=196",
+        "./service-worker.js?v=197",
         { updateViaCache: "none" }
       );
 
