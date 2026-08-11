@@ -690,3 +690,11 @@ v191 - sagome più basse e barriera unita
 - I corpi delle 4 sagome della barriera ora si toccano lateralmente.
 - Numero abbassato di circa il 15%, restando sopra la testa.
 - Nessuna modifica a doppio tap, selezione, allineamenti, Distribuisci, Flip o modifica numeri.
+
+
+v192 - barriera ridisegnata
+- La barriera da 4 è ora composta graficamente da quattro copie della sagoma singola.
+- Stesse proporzioni di testa e busto della sagoma singola.
+- Stessa altezza della sagoma singola.
+- I busti delle quattro sagome si toccano lateralmente senza deformazioni.
+- Doppio tap/clic, numeri, selezione, ridimensionamento, allineamenti, Distribuisci e Flip restano invariati.

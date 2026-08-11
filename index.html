@@ -6264,12 +6264,28 @@ function renderDrawings(){
       const width=Math.max(24,maxX-minX);
       const height=Math.max(48,maxY-minY);
       const figures=d.type==="wall4" ? 4 : 1;
-      const gap=0;
-      const figureWidth=(width-gap*(figures-1))/figures;
+
+      /*
+        La barriera usa ESATTAMENTE la stessa sagoma grafica della sagoma singola.
+        Il busto della sagoma singola misura il 62% del suo box (2 * .31).
+        Nella barriera i centri vengono distanziati proprio di quella misura,
+        così i corpi si toccano senza deformare la figura.
+      */
+      const singleReferenceWidth=d.type==="wall4"
+        ? width/(4*.62)
+        : width;
+
+      const bodyTouchSpacing=singleReferenceWidth*.62;
+      const wallVisualWidth=bodyTouchSpacing*figures;
+      const firstCenterX=d.type==="wall4"
+        ? minX+(singleReferenceWidth*.31)
+        : minX+(singleReferenceWidth/2);
 
       const addMannequinFigure=(index)=>{
-        const x=minX+index*(figureWidth+gap);
-        const centerX=x+figureWidth/2;
+        const figureWidth=singleReferenceWidth;
+        const centerX=d.type==="wall4"
+          ? firstCenterX+(index*bodyTouchSpacing)
+          : firstCenterX;
 
         /*
           Proporzioni leggermente "compresse" sulle gambe:
@@ -6279,8 +6295,8 @@ function renderDrawings(){
         const shoulderY=minY+height*.19;
         const headCy=shoulderY-headR;
         const torsoBottom=minY+height*.61;
-        const torsoHalfTop=figureWidth*(figures===4 ? .50 : .31);
-        const torsoHalfBottom=figureWidth*(figures===4 ? .50 : .25);
+        const torsoHalfTop=figureWidth*.31;
+        const torsoHalfBottom=figureWidth*.25;
 
         const head=document.createElementNS("http://www.w3.org/2000/svg","circle");
         head.setAttribute("cx",centerX);
@@ -7220,8 +7236,8 @@ function addTrainingMannequin(type){
   const isWall=type==="wall4";
   const centerX=500;
   const centerY=310;
-  const width=isWall ? 88 : 40;
-  const height=isWall ? 55.9 : 58.5;
+  const width=isWall ? 99.2 : 40;
+  const height=isWall ? 58.5 : 58.5;
 
   const drawing={
     type,
@@ -9598,7 +9614,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v191",
+    appVersion:"v192",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -10580,7 +10596,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=191",
+        "./service-worker.js?v=192",
         { updateViaCache: "none" }
       );
 
