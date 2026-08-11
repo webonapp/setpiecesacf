@@ -720,3 +720,15 @@ v196 - Distribuisci con distanza visiva reale
 - Tra due elementi viene lasciato uno spazio di 6 px.
 - Gli elementi non si toccano e non si sovrappongono, ma restano quasi affiancati.
 - Compatibile con maglie di dimensioni diverse e sagome/barriere.
+
+
+v198 - bugfix e pulizia generale
+- Spessore freccia default corretto al 75% reale della corsa slider: valore 11 su range 2-14.
+- Allineato drawingDefaults allo stesso valore 11.
+- Rimossi fallback residui della dimensione giocatori al 90%; default coerente al 75%.
+- Rimosso il vecchio startGroupDrag non più utilizzato.
+- Pulito CSS morto del vecchio controllo VISTA e doppio return ridondante.
+- Distribuisci reso deterministico: larghezza maglie calcolata da scala dati, non dal timing del DOM.
+- Sagome/barriere renderizzate sulle coordinate reali, senza minimi grafici nascosti 24x48.
+- Service Worker verificato: updateViaCache none, skipWaiting, clients.claim, versioni allineate.
+- Audit JavaScript, Service Worker e ID superato.

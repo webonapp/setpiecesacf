@@ -2116,7 +2116,7 @@ body.export-clean-view .board-shell{
   <div class="library-panel">
     <div class="library-title">Object style</div>
     <div class="library-help mannequin-color-help">Seleziona una sagoma: colore dalla palette sopra e ridimensionamento proporzionale dalle maniglie.</div>
-    <label class="style-control"><span>Spessore</span><input id="drawingWidth" type="range" min="2" max="14" step="1" value="9"></label>
+    <label class="style-control"><span>Spessore</span><input id="drawingWidth" type="range" min="2" max="14" step="1" value="11"></label>
     <label class="style-control"><span>Punta</span><input id="drawingHead" type="range" min="8" max="22" step="1" value="13">
 <div class="drawing-choice-row" id="drawingHeadButtons" aria-label="Dimensione punta freccia">
   <button type="button" class="drawing-choice-btn" data-head-size="10">Piccola</button>
@@ -2536,7 +2536,7 @@ let drawingDragStart=null;
 let drawingInitial=null;
 let drawingDefaults={
   color:"#20242a",
-  width:6,
+  width:11,
   headSize:13,
   curveOffset:-90,
   opacity:1,
@@ -3564,7 +3564,6 @@ function getViewPreset(id=state.viewPreset){
 
 function syncViewPresetControl(){
   const select=document.getElementById("viewPresetSelect");
-  if(!select)return;
   if(!select)return;
 
   const normalizedId=normalizeViewPresetId(state.viewPreset);
@@ -5588,95 +5587,6 @@ function handlePlayerPointerDown(e){
   window.addEventListener("pointercancel",pendingEnd);
 }
 
-function startGroupDrag({
-  originalEvent,
-  startX,
-  startY,
-  target,
-  pointerId
-}){
-  const indices=[...selectedPlayers].filter(
-    index=>page().positions[index]
-  );
-
-  if(!indices.length)return false;
-
-  const initial=new Map(
-    indices.map(index=>[
-      index,
-      {...page().positions[index]}
-    ])
-  );
-
-  const elements=new Map(
-    indices.map(index=>[
-      index,
-      document.querySelector(`.player[data-index="${index}"]`)
-    ])
-  );
-
-  /*
-    Il motore condiviso lavora per delta del puntatore.
-    Questo elimina il piccolo salto che il vecchio drag poteva
-    produrre quando si prendeva la maglia lontano dal centro.
-  */
-  return startBoardObjectDrag({
-    event:originalEvent,
-    element:target,
-    initial:null,
-    startClientX:startX,
-    startClientY:startY,
-    pointerIdOverride:pointerId,
-    applyPosition:(dx,dy)=>{
-      const groupSnap=getGroupSnapDelta(
-        indices,
-        initial,
-        dx,
-        dy
-      );
-
-      if(groupSnap.candidate){
-        showSnapGuides(groupSnap.candidate);
-      }
-
-      indices.forEach(index=>{
-        const original=initial.get(index);
-        if(!original)return;
-
-        const nextX=Math.max(
-          1.5,
-          Math.min(98.5,original.x+groupSnap.dx)
-        );
-        const nextY=Math.max(
-          2,
-          Math.min(98,original.y+groupSnap.dy)
-        );
-
-        page().positions[index]={
-          x:nextX,
-          y:nextY
-        };
-
-        const element=elements.get(index);
-        if(!element)return;
-
-        element.style.left=nextX+"%";
-        element.style.top=nextY+"%";
-        element.style.transform=
-          `translate(-50%,-50%) scale(${
-            state.roster[index].individualScale ??
-            state.playerScale ??
-            .90
-          })`;
-      });
-    },
-    onFinish:()=>{
-      hideSnapGuides();
-      renderPlayers();
-      refreshUnifiedSelectionVisuals();
-    }
-  });
-}
 function renderBalls(){
   const layer=document.getElementById("ballsLayer");
   if(!layer)return;
@@ -6261,8 +6171,8 @@ function renderDrawings(){
       const maxX=Math.max(d.x1,d.x2);
       const minY=Math.min(d.y1,d.y2);
       const maxY=Math.max(d.y1,d.y2);
-      const width=Math.max(24,maxX-minX);
-      const height=Math.max(48,maxY-minY);
+      const width=Math.max(1,maxX-minX);
+      const height=Math.max(1,maxY-minY);
       const figures=d.type==="wall4" ? 4 : 1;
 
       /*
@@ -6955,7 +6865,7 @@ function renderAll(){
 
   if(singleSelected!==null && state.roster[singleSelected]){
     const player=state.roster[singleSelected];
-    const value=player.individualScale ?? state.playerScale ?? .90;
+    const value=player.individualScale ?? state.playerScale ?? .75;
     if(scaleInput)scaleInput.value=value;
     if(scaleValue)scaleValue.textContent=Math.round(value*100)+"%";
     if(scaleMode)scaleMode.innerHTML=`<strong>Dimensione singola</strong><br>${escapeHtml(player.lastName||player.name||"Giocatore")}`;
@@ -8346,17 +8256,21 @@ function alignSelectedHorizontally(){
 
 
 function getAlignmentItemVisualWidthPx(item){
+  const boardWidth=document
+    .getElementById("board")
+    ?.getBoundingClientRect?.()
+    .width;
+
+  if(!Number.isFinite(boardWidth) || boardWidth<=0){
+    return 40;
+  }
+
   if(item.kind==="player"){
-    const el=document.querySelector(
-      `.player[data-index="${item.index}"]`
-    );
-
-    const width=el?.getBoundingClientRect?.().width;
-    if(Number.isFinite(width) && width>0)return width;
-
     /*
-      Fallback coerente con la scala effettiva della maglia.
-      La jersey SVG ha una larghezza nominale vicina a 56 px.
+      La maglia ha larghezza CSS nominale 56px.
+      Usiamo la scala dati, non getBoundingClientRect(), così Safari,
+      Chrome e iPad calcolano esattamente la stessa distanza anche
+      subito dopo un render o un cambio di scala.
     */
     const player=state.roster[item.index];
     const scale=Number(
@@ -8365,33 +8279,21 @@ function getAlignmentItemVisualWidthPx(item){
       .75
     );
 
-    return 56*Math.max(.4,scale);
+    return 56*Math.max(.4,Math.min(2,Number.isFinite(scale)?scale:.75));
   }
 
   if(item.kind==="drawing"){
-    const el=document.querySelector(
-      `[data-drawing-index="${item.index}"]`
-    );
-
-    const width=el?.getBoundingClientRect?.().width;
-    if(Number.isFinite(width) && width>0)return width;
-
     const drawing=page().drawings?.[item.index];
-    if(drawing){
+
+    if(
+      drawing &&
+      (drawing.type==="mannequin" || drawing.type==="wall4")
+    ){
       const logicalWidth=Math.abs(
         Number(drawing.x2)-Number(drawing.x1)
       );
 
-      const boardWidth=document
-        .getElementById("board")
-        ?.getBoundingClientRect?.()
-        .width;
-
-      if(
-        Number.isFinite(logicalWidth) &&
-        Number.isFinite(boardWidth) &&
-        boardWidth>0
-      ){
+      if(Number.isFinite(logicalWidth)){
         return (logicalWidth/1000)*boardWidth;
       }
     }
@@ -9681,7 +9583,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v197",
+    appVersion:"v198",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -10663,7 +10565,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=197",
+        "./service-worker.js?v=198",
         { updateViaCache: "none" }
       );
 
