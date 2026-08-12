@@ -3335,7 +3335,7 @@ const FIORENTINA_PRESET=[
   {number:65,firstName:"",lastName:"Parisi",name:"Parisi",team:"home",color:"#5b3192"},
   {number:20,firstName:"",lastName:"Jiménez",name:"Jiménez",team:"home",color:"#5b3192"},
   {number:2,firstName:"",lastName:"Dodô",name:"Dodô",team:"home",color:"#5b3192"},
-  {number:17,firstName:"",lastName:"Joao Mario",name:"Joao Mario",team:"home",color:"#5b3192"},
+  {number:17,firstName:"",lastName:"Joao Mario",name:"Joao Mario",team:"home",color:"#5b3192",role:"difensore"},
   {number:8,firstName:"",lastName:"Mandragora",name:"Mandragora",team:"home",color:"#5b3192"},
   {number:42,firstName:"",lastName:"Oulai",name:"Oulai",team:"home",color:"#5b3192"},
   {number:14,firstName:"",lastName:"Atta",name:"Atta",team:"home",color:"#5b3192"},
@@ -3344,11 +3344,11 @@ const FIORENTINA_PRESET=[
   {number:4,firstName:"",lastName:"Brescianini",name:"Brescianini",team:"home",color:"#5b3192"},
   {number:80,firstName:"",lastName:"Fabbian",name:"Fabbian",team:"home",color:"#5b3192"},
   {number:11,firstName:"",lastName:"Gudmundsson",name:"Gudmundsson",team:"home",color:"#5b3192"},
-  {number:30,firstName:"",lastName:"Mastantuono",name:"Mastantuono",team:"home",color:"#5b3192"},
+  {number:30,firstName:"",lastName:"Mastantuono",name:"Mastantuono",team:"home",color:"#5b3192",role:"attaccante"},
   {number:9,firstName:"",lastName:"Kean",name:"Kean",team:"home",color:"#5b3192"},
   {number:91,firstName:"",lastName:"Piccoli",name:"Piccoli",team:"home",color:"#5b3192"},
-  {number:70,firstName:"",lastName:"Croci",name:"Croci",team:"home",color:"#5b3192"},
-  {number:72,firstName:"",lastName:"Mazzeo",name:"Mazzeo",team:"home",color:"#5b3192"},
+  {number:70,firstName:"",lastName:"Croci",name:"Croci",team:"home",color:"#5b3192",role:"attaccante"},
+  {number:72,firstName:"",lastName:"Mazzeo",name:"Mazzeo",team:"home",color:"#5b3192",role:"attaccante"},
 ].map((p,i)=>({id:"p"+i,...p}));
 
 
@@ -3724,6 +3724,7 @@ function applyV94PermanentRosterUpdates(){
       player.name=fresh.name;
       player.team=fresh.team;
       player.color=fresh.color;
+      if(fresh.role)player.role=fresh.role;
     });
   };
 
@@ -3972,16 +3973,70 @@ function normalizePlayerRole(role){return PLAYER_ROLE_ORDER.includes(role)?role:
 function inferPlayerRole(player){
   if(player?.team==="away")return "avversario";
   if(player?.team==="gk")return "portiere";
-  const s=String(player?.lastName||player?.name||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").trim().toLowerCase();
-  if(new Set(["dragusin","pongracic","ranieri","viery","valdepenas","kospo","fortini","parisi","jimenez","dodo","mario"]).has(s))return "difensore";
-  if(new Set(["gudmundsson","kean","piccoli","braschi"]).has(s))return "attaccante";
+
+  const s=String(player?.lastName||player?.name||"")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g,"")
+    .trim()
+    .toLowerCase();
+
+  if(new Set([
+    "dragusin",
+    "pongracic",
+    "ranieri",
+    "viery",
+    "valdepenas",
+    "kospo",
+    "fortini",
+    "parisi",
+    "jimenez",
+    "dodo",
+    "joao mario"
+  ]).has(s))return "difensore";
+
+  if(new Set([
+    "gudmundsson",
+    "mastantuono",
+    "kean",
+    "piccoli",
+    "croci",
+    "mazzeo"
+  ]).has(s))return "attaccante";
+
   return "centrocampista";
 }
 function ensurePlayerRoles(){
+  const forcedRoleByName=new Map([
+    ["joao mario","difensore"],
+    ["mastantuono","attaccante"],
+    ["croci","attaccante"],
+    ["mazzeo","attaccante"]
+  ]);
+
+  const normalizedName=player=>String(
+    player?.lastName||player?.name||""
+  )
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g,"")
+    .trim()
+    .toLowerCase();
+
   const apply=list=>Array.isArray(list)&&list.forEach(player=>{
-    player.role=player.team==="away"
-      ? "avversario"
-      : normalizePlayerRole(player.role||inferPlayerRole(player));
+    if(player.team==="away"){
+      player.role="avversario";
+      return;
+    }
+
+    if(player.team==="gk"){
+      player.role="portiere";
+      return;
+    }
+
+    const forcedRole=forcedRoleByName.get(normalizedName(player));
+
+    player.role=forcedRole || normalizePlayerRole(
+      player.role || inferPlayerRole(player)
+    );
   });
 
   apply(state.roster);
@@ -10643,7 +10698,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v216",
+    appVersion:"v217",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -11723,7 +11778,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=216",
+        "./service-worker.js?v=217",
         { updateViaCache: "none" }
       );
 
