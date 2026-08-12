@@ -1,4 +1,4 @@
-const APP_VERSION = "214";
+const APP_VERSION = "215";
 const CACHE_NAME = `acf-set-pieces-v${APP_VERSION}`;
 
 const APP_SHELL = [
@@ -45,8 +45,6 @@ self.addEventListener("install", event => {
       );
     })
   );
-
-  self.skipWaiting();
 });
 
 self.addEventListener("message", event => {

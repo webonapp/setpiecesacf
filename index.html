@@ -2943,8 +2943,6 @@ body.export-clean-view .board-shell{
   </div>
 </div>
 
-<input type="file" id="projectFile" accept=".json" hidden>
-
 <script>
 const STORAGE_KEY="setPieceBoardPro_v165";
 const UPDATE_RECOVERY_KEY="setPieceBoardPro_updateRecovery_v199";
@@ -4421,7 +4419,7 @@ function openCurrentSchemeRenameModal(){
   const input=document.getElementById("schemeRenameInput");
   if(!modal || !input)return;
 
-  input.value=page().title||`Schema ${currentPage+1}`;
+  input.value=page().title||`Schema-${currentPage+1}`;
   modal.classList.add("open");
 
   requestAnimationFrame(()=>{
@@ -8015,11 +8013,23 @@ document.getElementById("board").addEventListener("pointermove",e=>{
   });
 
   (page().drawings||[]).forEach((d,i)=>{
-    const minX=Math.min(d.x1,d.x2,d.c1x??d.x1,d.c2x??d.x2);
-    const maxX=Math.max(d.x1,d.x2,d.c1x??d.x1,d.c2x??d.x2);
-    const minY=Math.min(d.y1,d.y2,d.c1y??d.y1,d.c2y??d.y2);
-    const maxY=Math.max(d.y1,d.y2,d.c1y??d.y1,d.c2y??d.y2);
-    if(maxX>=left&&minX<=right&&maxY>=top&&minY<=bottom)selectedDrawings.add(i);
+    let minX=Math.min(d.x1,d.x2,d.c1x??d.x1,d.c2x??d.x2);
+    let maxX=Math.max(d.x1,d.x2,d.c1x??d.x1,d.c2x??d.x2);
+    let minY=Math.min(d.y1,d.y2,d.c1y??d.y1,d.c2y??d.y2);
+    let maxY=Math.max(d.y1,d.y2,d.c1y??d.y1,d.c2y??d.y2);
+
+    if(
+      (d.type==="mannequin" || d.type==="wall4") &&
+      d.showNumber!==false
+    ){
+      const height=Math.max(1,Math.abs(Number(d.y2)-Number(d.y1)));
+      const numberTopExtra=Math.max(16,height*.20);
+      minY-=numberTopExtra;
+    }
+
+    if(maxX>=left&&minX<=right&&maxY>=top&&minY<=bottom){
+      selectedDrawings.add(i);
+    }
   });
 
   selectedBall=selectedBalls.size===1?[...selectedBalls][0]:null;
@@ -8162,7 +8172,7 @@ document.getElementById("schemeSelect").addEventListener("change",e=>{
   editingTextIndex=null;
   renderAll();
 });
-document.getElementById("renameScheme").addEventListener("click",()=>{pushHistory();page().title=document.getElementById("schemeName").value.trim()||`Schema ${currentPage+1}`;renderSchemeSelect();save(false)});
+document.getElementById("renameScheme").addEventListener("click",()=>{pushHistory();page().title=document.getElementById("schemeName").value.trim()||`Schema-${currentPage+1}`;renderSchemeSelect();save(false)});
 document.getElementById("addScheme").addEventListener("click",()=>{if(state.pages.length>=30){alert("Massimo 30 schemi");return}pushHistory();state.pages.push(emptyPage(state.pages.length));currentPage=state.pages.length-1;renderAll();save()});
 
 function closeNewSchemeModal(){
@@ -8172,7 +8182,7 @@ function closeNewSchemeModal(){
 function makeBlankSchemeForCurrentRoster(){
   const index=state.pages.length;
   return {
-    title:`Schema ${index+1}`,
+    title:`Schema-${index+1}`,
     notes:"",
     positions:Array.from({length:state.roster.length},()=>null),
     drawings:[],
@@ -8932,23 +8942,13 @@ document.getElementById("exportPdf").addEventListener("click",async()=>{
     console.error(err);
     alert(
       "Impossibile esportare il PDF. "+
-      "Verifica la connessione internet e riprova."
+      "Riprova tra qualche secondo. Se il problema persiste, ricarica l\'app e riprova."
     );
   }finally{
     restoreExportUiState(uiSnapshot);
     document.body.classList.remove("export-in-progress");
   }
 });
-
-document.getElementById("projectFile").addEventListener("change",async e=>{const f=e.target.files[0];if(!f)return;try{const obj=JSON.parse(await f.text());if(obj.roster&&obj.pages){
-  pushHistory();
-  state=normalizeProjectState(obj);
-  currentPage=0;
-  redoStack=[];
-  renderAll();
-  save();
-  updateHistoryButtons();
-}}catch(err){alert("File JSON non valido")}e.target.value=""});
 
 const modal=document.getElementById("rosterModal");
 
@@ -10594,7 +10594,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v214",
+    appVersion:"v215",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -11674,7 +11674,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=214",
+        "./service-worker.js?v=215",
         { updateViaCache: "none" }
       );
 
