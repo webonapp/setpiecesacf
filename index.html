@@ -2393,17 +2393,25 @@ body.export-clean-view .board-shell{
 }
 
 
-/* v208 - dropdown DIFENSIVE robusto su Safari/iPad */
+/* v212 - dropdown DIFENSIVE ancorato direttamente al pulsante */
+.defensive-mode-control{
+  position:relative!important;
+  overflow:visible!important;
+  z-index:10040!important;
+}
+
 .defensive-mode-menu{
-  position:fixed!important;
-  transform:none!important;
+  position:absolute!important;
+  top:calc(100% + 6px)!important;
+  left:50%!important;
+  transform:translateX(-50%)!important;
   z-index:10050!important;
 }
 
-/* Il gruppo superiore non deve ritagliare il menu. */
+/* Nessun contenitore dell'header deve ritagliare il menu. */
+.topbar,
 .topbar-presentation-slot,
-.topbar-presentation-slot .presentation-mode-actions,
-.defensive-mode-control{
+.topbar-presentation-slot .presentation-mode-actions{
   overflow:visible!important;
 }
 
@@ -10564,7 +10572,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v211",
+    appVersion:"v212",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -11420,48 +11428,7 @@ document.getElementById("opponentBlankLine").addEventListener("change",event=>{
 
 
 
-function positionDefensiveMenu(){
-  const button=document.getElementById("defensiveModeBtn");
-  const menu=document.getElementById("defensiveModeMenu");
-  if(!button || !menu || menu.hidden)return;
 
-  const buttonRect=button.getBoundingClientRect();
-  const menuRect=menu.getBoundingClientRect();
-  const viewportWidth=Math.max(
-    1,
-    document.documentElement.clientWidth||window.innerWidth
-  );
-  const viewportHeight=Math.max(
-    1,
-    document.documentElement.clientHeight||window.innerHeight
-  );
-
-  const margin=8;
-
-  let left=
-    buttonRect.left+
-    (buttonRect.width/2)-
-    (menuRect.width/2);
-
-  left=Math.max(
-    margin,
-    Math.min(
-      viewportWidth-menuRect.width-margin,
-      left
-    )
-  );
-
-  let top=buttonRect.bottom+6;
-
-  if(top+menuRect.height>viewportHeight-margin){
-    top=buttonRect.top-menuRect.height-6;
-  }
-
-  top=Math.max(margin,top);
-
-  menu.style.left=`${Math.round(left)}px`;
-  menu.style.top=`${Math.round(top)}px`;
-}
 
 function setDefensiveMenuOpen(open){
   const button=document.getElementById("defensiveModeBtn");
@@ -11470,10 +11437,6 @@ function setDefensiveMenuOpen(open){
 
   menu.hidden=!open;
   button.setAttribute("aria-expanded",String(open));
-
-  if(open){
-    requestAnimationFrame(positionDefensiveMenu);
-  }
 }
 
 function toggleDefensiveMenu(){
@@ -11549,14 +11512,6 @@ document.getElementById("defensiveFreeKickBtn").addEventListener(
   }
 );
 
-
-window.addEventListener("resize",()=>{
-  positionDefensiveMenu();
-});
-
-window.addEventListener("scroll",()=>{
-  positionDefensiveMenu();
-},{passive:true});
 
 document.addEventListener("pointerdown",event=>{
   const control=document.getElementById("defensiveModeControl");
@@ -11697,7 +11652,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=211",
+        "./service-worker.js?v=212",
         { updateViaCache: "none" }
       );
 

@@ -823,3 +823,12 @@ v211 - PDF ottimizzato per stampa
 - Margini laterali PDF ridotti a 1,5 mm per sfruttare quasi tutta la larghezza A4 landscape.
 - Margine inferiore 2,5 mm; scala campo calcolata automaticamente sulla massima area disponibile.
 - Nessuna modifica alla visualizzazione dell'app o alle funzioni operative.
+
+
+v212 - fix menu DIFENSIVE
+- Corretto il bug che poteva staccare il menu CORNER/PUNIZIONI dal pulsante DIFENSIVE.
+- Rimossa la combinazione position:fixed + coordinate viewport, incompatibile con il contenitore topbar trasformato.
+- Menu ora position:absolute direttamente dentro defensive-mode-control position:relative.
+- Il menu rimane sempre centrato sotto DIFENSIVE con gap di 6 px.
+- Rimossi i listener resize/scroll usati solo per il vecchio posizionamento.
+- Nessuna modifica alla logica CORNER/PUNIZIONI, Defensive, PDF, backup o schemi.
