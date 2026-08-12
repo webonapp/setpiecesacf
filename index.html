@@ -2281,153 +2281,6 @@ body.export-clean-view .board-shell{
 }
 
 
-/* v205 - modalità DIFENSIVE isolata */
-.defensive-mode-control{
-  position:relative;
-  display:flex;
-  align-items:center;
-  flex:0 0 auto;
-}
-.presentation-mode-btn.defensive{
-  border-color:#5b6673;
-  background:#202832;
-}
-.presentation-mode-btn.defensive.active{
-  border-color:#9be85d!important;
-  background:#8bd450!important;
-  color:#071008!important;
-  box-shadow:0 0 0 2px rgba(139,212,80,.2);
-}
-.defensive-caret{
-  display:inline-block;
-  margin-left:5px;
-  font-size:9px;
-  line-height:1;
-}
-.defensive-mode-menu{
-  position:absolute;
-  top:calc(100% + 6px);
-  left:50%;
-  transform:translateX(-50%);
-  min-width:138px;
-  padding:5px;
-  border:1px solid #425066;
-  border-radius:8px;
-  background:#101923;
-  box-shadow:0 12px 28px rgba(0,0,0,.34);
-  z-index:10030;
-}
-.defensive-mode-menu[hidden]{
-  display:none!important;
-}
-.defensive-mode-option{
-  display:block;
-  width:100%;
-  min-height:34px;
-  border:0;
-  border-radius:6px;
-  padding:7px 10px;
-  background:transparent;
-  color:#e8edf3;
-  font-size:10px;
-  font-weight:900;
-  letter-spacing:.055em;
-  text-align:left;
-  cursor:pointer;
-  touch-action:manipulation;
-  -webkit-tap-highlight-color:transparent;
-}
-.defensive-mode-option:hover,
-.defensive-mode-option:focus-visible{
-  background:#1b2a3a;
-  outline:none;
-}
-.defensive-mode-option.active{
-  background:#8bd450;
-  color:#071008;
-}
-
-/*
-  Marker DIFENSIVE: è figlio della maglia, quindi segue automaticamente
-  drag, scala individuale/globale, allineamenti, distribuzione e Flip.
-*/
-.player .defensive-marker{
-  position:absolute;
-  display:block;
-  pointer-events:none;
-  background:#9b9da3;
-  z-index:-1;
-}
-
-/* PUNIZIONI: verticale sopra, leggermente a sinistra come riferimento. */
-.player.defensive-free-kick .defensive-marker{
-  width:1.6px;
-  height:76px;
-  left:42%;
-  top:-82px;
-  transform:translateX(-50%);
-}
-
-/* CORNER: orizzontale sotto, centrata rispetto alla maglia. */
-.player.defensive-corner .defensive-marker{
-  width:64px;
-  height:1.6px;
-  left:50%;
-  top:68px;
-  transform:translateX(-50%);
-}
-
-/* In DIFENSIVE il giocatore resta riconoscibile dalla maglia, senza etichette. */
-.player.defensive-corner .player-tag,
-.player.defensive-free-kick .player-tag{
-  display:none!important;
-}
-
-@media(max-width:1200px){
-  .presentation-mode-btn.defensive{
-    min-width:84px!important;
-  }
-  .defensive-mode-menu{
-    min-width:122px;
-  }
-}
-
-
-/* v212 - dropdown DIFENSIVE ancorato direttamente al pulsante */
-.defensive-mode-control{
-  position:relative!important;
-  overflow:visible!important;
-  z-index:10040!important;
-}
-
-.defensive-mode-menu{
-  position:absolute!important;
-  top:calc(100% + 6px)!important;
-  left:50%!important;
-  transform:translateX(-50%)!important;
-  z-index:10050!important;
-}
-
-/* Nessun contenitore dell'header deve ritagliare il menu. */
-.topbar,
-.topbar-presentation-slot,
-.topbar-presentation-slot .presentation-mode-actions{
-  overflow:visible!important;
-}
-
-
-/* v214 - feedback selezione sagoma/barriera coerente anche con marquee */
-.mannequin-selection-outline{
-  opacity:0;
-  visibility:hidden;
-  pointer-events:none;
-}
-.drawing-group-selected .mannequin-selection-outline,
-.drawing-selected .mannequin-selection-outline{
-  opacity:.95;
-  visibility:visible;
-}
-
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
@@ -2454,33 +2307,6 @@ body.export-clean-view .board-shell{
   <div class="topbar-presentation-slot" aria-label="Modalità visualizzazione giocatori">
     <div class="presentation-mode-actions">
       <button type="button" class="btn presentation-mode-btn bench" id="benchModeBtn">PANCHINA</button>
-
-      <div class="defensive-mode-control" id="defensiveModeControl">
-        <button type="button"
-                class="btn presentation-mode-btn defensive"
-                id="defensiveModeBtn"
-                aria-haspopup="menu"
-                aria-expanded="false">
-          DIFENSIVE <span class="defensive-caret" aria-hidden="true">▾</span>
-        </button>
-        <div class="defensive-mode-menu" id="defensiveModeMenu" role="menu" hidden>
-          <button type="button"
-                  class="defensive-mode-option"
-                  id="defensiveCornerBtn"
-                  role="menuitem"
-                  data-defensive-mode="corner">
-            CORNER
-          </button>
-          <button type="button"
-                  class="defensive-mode-option"
-                  id="defensiveFreeKickBtn"
-                  role="menuitem"
-                  data-defensive-mode="freeKick">
-            PUNIZIONI
-          </button>
-        </div>
-      </div>
-
       <button type="button" class="btn presentation-mode-btn dressing-room" id="dressingRoomModeBtn">SPOGLIATOIO</button>
       <button type="button" class="btn presentation-mode-btn preparation" id="preparationModeBtn">PREPARAZIONE</button>
     </div>
@@ -2567,7 +2393,6 @@ body.export-clean-view .board-shell{
   <button type="button" class="drawing-choice-btn" data-head-size="13">Media</button>
   <button type="button" class="drawing-choice-btn" data-head-size="18">Grande</button>
 </div></label>
-    <label class="style-control"><span>Curvatura</span><input id="drawingCurve" type="range" min="-220" max="220" step="10" value="-90"></label>
     <label class="style-control"><span>Opacità</span><input id="drawingOpacity" type="range" min="0.10" max="1" step="0.05" value="1"></label>
     <label class="style-control"><span>Tratteggio</span><input id="drawingDash" type="range" min="0" max="3" step="1" value="0">
 <div class="drawing-choice-row" id="drawingDashButtons" aria-label="Stile corpo freccia">
@@ -3246,7 +3071,6 @@ function initializeContinuousHistory(){
   const labels={
     drawingWidth:"Spessore freccia",
     drawingHeadSize:"Dimensione punta freccia",
-    drawingCurve:"Curvatura freccia",
     drawingOpacity:"Opacità elemento",
     playerScale:"Dimensione maglie",
     playerSize:"Dimensione maglie",
@@ -3322,7 +3146,7 @@ function defaultPositions(count=state?.roster?.length || defaultRoster.length){
   return Array.from({length:count},()=>null);
 }
 const emptyPage=i=>({title:`Schema-${i+1}`,notes:"",positions:defaultPositions(defaultRoster.length),drawings:[],balls:[],texts:[],playerDisplayOverrides:{}});
-let state={roster:defaultRoster,pages:[emptyPage(0)],playerScale:.75,snapEnabled:true,homeChestCircle:true,awayChestCircle:false,homeRosterLoaded:false,awayRosterLoaded:false,homeRosterTemplate:null,defensiveDisplay:null};
+let state={roster:defaultRoster,pages:[emptyPage(0)],playerScale:.75,snapEnabled:true,homeChestCircle:true,awayChestCircle:false,homeRosterLoaded:false,awayRosterLoaded:false,homeRosterTemplate:null};
 
 const FIORENTINA_PRESET=[
   {number:43,firstName:"",lastName:"De Gea",name:"De Gea",team:"gk",color:"#e3b52d"},
@@ -3556,10 +3380,11 @@ function normalizeProjectState(projectState){
   if(typeof safe.snapEnabled!=="boolean")safe.snapEnabled=true;
   safe.snapStep=clampNumber(safe.snapStep,1,20,5);
 
-  safe.defensiveDisplay=
-    safe.defensiveDisplay==="corner" || safe.defensiveDisplay==="freeKick"
-      ? safe.defensiveDisplay
-      : null;
+  /*
+    v221: la vecchia modalità DIFENSIVE è stata rimossa.
+    I backup precedenti possono ancora contenere il campo: lo eliminiamo.
+  */
+  delete safe.defensiveDisplay;
 
   if(!["normal","bench","locker"].includes(safe.presentationMode)){
     safe.presentationMode="normal";
@@ -4324,6 +4149,17 @@ function getPagePlayerDisplayOverride(index,property){
 function getPlayerDisplayValue(index,property,fallback){
   const player=state.roster[index];
   if(!player)return fallback;
+
+  /*
+    v221: PANCHINA è una vista deterministica.
+    Nome e numero devono essere sempre visibili e "Solo maglietta"
+    non può mascherarli in questa modalità.
+  */
+  if(state.presentationMode==="bench"){
+    if(property==="showLastName")return true;
+    if(property==="showShirtNumber")return true;
+    if(property==="jerseyOnly")return false;
+  }
 
   const pageOverride=getPagePlayerDisplayOverride(index,property);
   if(typeof pageOverride==="boolean")return pageOverride;
@@ -5485,17 +5321,6 @@ function renderPlayers(){
     el.style.transform=`translate(-50%,-50%) scale(${appliedScale})`;
     el.dataset.index=i;
 
-    const defensiveDisplay=
-      state.defensiveDisplay==="corner" || state.defensiveDisplay==="freeKick"
-        ? state.defensiveDisplay
-        : null;
-
-    if(defensiveDisplay==="corner"){
-      el.classList.add("defensive-corner");
-    }else if(defensiveDisplay==="freeKick"){
-      el.classList.add("defensive-free-kick");
-    }
-
     const solidColor=pl.color||(pl.team==="home"?"#5b3192":pl.team==="away"?"#d64b62":"#e3b52d");
     const striped=Boolean(pl.pattern&&patternMap[pl.pattern]);
     const clipId=`jerseyClip-${currentPage}-${i}`;
@@ -5535,7 +5360,6 @@ function renderPlayers(){
 
     const chestCircle=(
       !jerseyOnly &&
-      !defensiveDisplay &&
       effectiveShowCircle
     )
       ?'<circle cx="28" cy="29" r="14.5" fill="#ffffff"/>'
@@ -5551,9 +5375,11 @@ function renderPlayers(){
 
     const visibleNumber=(
       !jerseyOnly &&
-      !defensiveDisplay &&
       effectiveShowNumber &&
-      effectiveShowCircle &&
+      (
+        state.presentationMode==="bench" ||
+        effectiveShowCircle
+      ) &&
       pl.number!==0 &&
       pl.number!==null &&
       pl.number!==undefined &&
@@ -5603,15 +5429,7 @@ function renderPlayers(){
         ${visibleNumber}
       </svg>`;
 
-    const defensiveMarker=(
-      defensiveDisplay &&
-      !jerseyOnly
-    )
-      ? '<span class="defensive-marker" aria-hidden="true"></span>'
-      : "";
-
     el.innerHTML=`
-      ${defensiveMarker}
       ${jerseySvg}
       <div class="player-tag${
         effectiveShowOpponentLine
@@ -6144,40 +5962,13 @@ function clearAllSelections(){
 
 
 function updatePresentationModeButtons(){
-  syncViewPresetFromPresentationMode();
   const bench=document.getElementById("benchModeBtn");
   const dressing=document.getElementById("dressingRoomModeBtn");
   const preparation=document.getElementById("preparationModeBtn");
-  const defensive=document.getElementById("defensiveModeBtn");
-  const defensiveCorner=document.getElementById("defensiveCornerBtn");
-  const defensiveFreeKick=document.getElementById("defensiveFreeKickBtn");
 
-  const defensiveActive=
-    state.defensiveDisplay==="corner" ||
-    state.defensiveDisplay==="freeKick";
-
-  bench?.classList.toggle(
-    "active",
-    !defensiveActive && state.presentationMode==="bench"
-  );
-  dressing?.classList.toggle(
-    "active",
-    !defensiveActive && state.presentationMode==="locker"
-  );
-  preparation?.classList.toggle(
-    "active",
-    !defensiveActive && state.presentationMode==="normal"
-  );
-
-  defensive?.classList.toggle("active",defensiveActive);
-  defensiveCorner?.classList.toggle(
-    "active",
-    state.defensiveDisplay==="corner"
-  );
-  defensiveFreeKick?.classList.toggle(
-    "active",
-    state.defensiveDisplay==="freeKick"
-  );
+  bench?.classList.toggle("active",state.presentationMode==="bench");
+  dressing?.classList.toggle("active",state.presentationMode==="locker");
+  preparation?.classList.toggle("active",state.presentationMode==="normal");
 
   syncViewPresetControl();
 }
@@ -6191,29 +5982,16 @@ function applyGlobalPlayerDisplayMode(mode){
         ? "locker"
         : "normal";
 
-  const defensiveWasActive=
-    state.defensiveDisplay==="corner" ||
-    state.defensiveDisplay==="freeKick";
-
   const presentationChanged=
     state.presentationMode!==normalizedMode;
 
-  /*
-    Nessuna modifica reale: non sporca history né backup.
-  */
-  if(!defensiveWasActive && !presentationChanged){
+  if(!presentationChanged){
     updatePresentationModeButtons();
     return;
   }
 
-  /*
-    v208:
-    lo snapshot viene preso PRIMA di spegnere DIFENSIVE.
-    Undo può quindi ripristinare davvero la visualizzazione precedente.
-  */
   pushHistory();
 
-  state.defensiveDisplay=null;
   state.presentationMode=normalizedMode;
   state.viewPreset=
     normalizedMode==="bench"
@@ -6222,10 +6000,6 @@ function applyGlobalPlayerDisplayMode(mode){
         ? "locker"
         : "preparation";
 
-  /*
-    Render sempre eseguito quando si esce da DIFENSIVE,
-    anche se presentationMode era già "normal".
-  */
   renderPlayers();
   renderRoster();
   syncRosterDisplayOptions();
@@ -6238,7 +6012,7 @@ function applyGlobalPlayerDisplayMode(mode){
       ? "Modalità PANCHINA attiva su tutti gli schemi"
       : normalizedMode==="locker"
         ? "Modalità SPOGLIATOIO attiva su tutti gli schemi"
-        : "Modalità PREPARAZIONE: personalizzazioni locali ripristinate"
+        : "Modalità PREPARAZIONE attiva"
   );
 }
 
@@ -8574,7 +8348,6 @@ document.getElementById("drawingWidth").addEventListener("input",event=>{
   );
 });
 document.getElementById("drawingHead").addEventListener("input",e=>applyDrawingStyleChange("headSize",Number(e.target.value)));
-document.getElementById("drawingCurve").addEventListener("input",e=>applyDrawingStyleChange("curveOffset",Number(e.target.value)));
 document.getElementById("drawingOpacity").addEventListener("input",e=>applyDrawingStyleChange("opacity",Number(e.target.value)));
 const drawingDashControl=document.getElementById("drawingDash");
 
@@ -8758,6 +8531,53 @@ async function waitForExportAssets(boardShell){
   await nextStableRender();
 }
 
+
+function normalizeExportArrowStrokeWidths(clonedDocument){
+  const liveBoard=document.getElementById("board");
+  const clonedBoard=clonedDocument.getElementById("board");
+  if(!liveBoard || !clonedBoard)return;
+
+  const liveWidth=liveBoard.getBoundingClientRect().width;
+  if(!Number.isFinite(liveWidth) || liveWidth<=0)return;
+
+  /*
+    Le frecce usano vector-effect:non-scaling-stroke nell'editor.
+    Quando html2canvas ricrea l'SVG con dimensioni differenti, quel vincolo
+    può far apparire lo spessore maggiore rispetto al progetto.
+    Convertiamo quindi lo spessore visivo corrente in unità del viewBox.
+  */
+  const viewBoxWidth=1000;
+  const exportFactor=viewBoxWidth/liveWidth;
+
+  const liveArrows=[...document.querySelectorAll(
+    "#drawLayer .drawing-visible"
+  )];
+
+  const clonedArrows=[...clonedDocument.querySelectorAll(
+    "#drawLayer .drawing-visible"
+  )];
+
+  clonedArrows.forEach((arrow,index)=>{
+    const liveArrow=liveArrows[index];
+    if(!liveArrow)return;
+
+    const screenStroke=parseFloat(
+      getComputedStyle(liveArrow).strokeWidth
+    );
+
+    if(!Number.isFinite(screenStroke) || screenStroke<=0)return;
+
+    const normalizedStroke=screenStroke*exportFactor;
+
+    arrow.setAttribute(
+      "stroke-width",
+      String(normalizedStroke)
+    );
+    arrow.style.strokeWidth=String(normalizedStroke);
+    arrow.setAttribute("vector-effect","none");
+  });
+}
+
 async function captureCurrentScheme(){
   const boardShell=document.querySelector(".board-shell");
   if(!boardShell){
@@ -8802,6 +8622,8 @@ async function captureCurrentScheme(){
               element.style.display="none";
             });
 
+          normalizeExportArrowStrokeWidths(clonedDocument);
+          normalizeExportArrowStrokeWidths(clonedDocument);
           clonedDocument.body.classList.add("export-clean-view");
         }
       });
@@ -10797,7 +10619,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v220",
+    appVersion:"v221",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -11685,109 +11507,6 @@ document.getElementById("opponentBlankLine").addEventListener("change",event=>{
 
 
 
-function setDefensiveMenuOpen(open){
-  const button=document.getElementById("defensiveModeBtn");
-  const menu=document.getElementById("defensiveModeMenu");
-  if(!button || !menu)return;
-
-  menu.hidden=!open;
-  button.setAttribute("aria-expanded",String(open));
-}
-
-function toggleDefensiveMenu(){
-  const menu=document.getElementById("defensiveModeMenu");
-  if(!menu)return;
-  setDefensiveMenuOpen(menu.hidden);
-}
-
-function applyDefensiveDisplay(mode){
-  if(mode!=="corner" && mode!=="freeKick")return;
-
-  const alreadyActive=
-    state.defensiveDisplay===mode &&
-    state.presentationMode==="normal";
-
-  if(alreadyActive){
-    setDefensiveMenuOpen(false);
-    updatePresentationModeButtons();
-    return;
-  }
-
-  pushHistory();
-
-  /*
-    v208:
-    DIFENSIVE ha sempre una base grafica deterministica di PREPARAZIONE.
-    Non dipende più dalla modalità che era attiva prima (bench/locker).
-    Gli override locali del giocatore restano intatti.
-  */
-  state.presentationMode="normal";
-  state.viewPreset="preparation";
-  state.defensiveDisplay=mode;
-
-  renderPlayers();
-  renderRoster();
-  syncRosterDisplayOptions();
-  syncChestCircleControls();
-  updatePresentationModeButtons();
-  save(false);
-  setDefensiveMenuOpen(false);
-
-  setStatus(
-    mode==="corner"
-      ? "DIFENSIVE · CORNER"
-      : "DIFENSIVE · PUNIZIONI"
-  );
-}
-
-document.getElementById("defensiveModeBtn").addEventListener(
-  "click",
-  event=>{
-    event.preventDefault();
-    event.stopPropagation();
-    toggleDefensiveMenu();
-  }
-);
-
-document.getElementById("defensiveCornerBtn").addEventListener(
-  "click",
-  event=>{
-    event.preventDefault();
-    event.stopPropagation();
-    applyDefensiveDisplay("corner");
-  }
-);
-
-document.getElementById("defensiveFreeKickBtn").addEventListener(
-  "click",
-  event=>{
-    event.preventDefault();
-    event.stopPropagation();
-    applyDefensiveDisplay("freeKick");
-  }
-);
-
-
-document.addEventListener("pointerdown",event=>{
-  const control=document.getElementById("defensiveModeControl");
-  const menu=document.getElementById("defensiveModeMenu");
-
-  if(
-    menu &&
-    !menu.hidden &&
-    control &&
-    !control.contains(event.target)
-  ){
-    setDefensiveMenuOpen(false);
-  }
-});
-
-document.addEventListener("keydown",event=>{
-  if(event.key==="Escape"){
-    setDefensiveMenuOpen(false);
-  }
-});
-
 document.getElementById("benchModeBtn").addEventListener(
   "click",
   ()=>applyGlobalPlayerDisplayMode("bench")
@@ -11907,7 +11626,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=220",
+        "./service-worker.js?v=221",
         { updateViaCache: "none" }
       );
 
