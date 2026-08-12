@@ -2281,6 +2281,161 @@ body.export-clean-view .board-shell{
 }
 
 
+
+/* v223 - navigazione schemi in modalità Campo intero */
+.field-fullscreen-title,
+.field-fullscreen-previews{
+  display:none;
+}
+
+body.field-view-mode .field-fullscreen-title{
+  display:block;
+  position:fixed;
+  top:max(14px,env(safe-area-inset-top));
+  right:max(78px,calc(env(safe-area-inset-right) + 78px));
+  z-index:10025;
+  max-width:min(52vw,720px);
+  padding:8px 13px;
+  border:1px solid rgba(255,255,255,.38);
+  border-radius:9px;
+  background:rgba(10,18,28,.78);
+  color:#fff;
+  font-family:"DIN","DIN Pro","DIN Alternate",Bahnschrift,Arial,sans-serif;
+  font-size:15px;
+  font-weight:900;
+  line-height:1.15;
+  letter-spacing:.06em;
+  text-transform:uppercase;
+  text-align:right;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  pointer-events:none;
+  backdrop-filter:blur(5px);
+  -webkit-backdrop-filter:blur(5px);
+}
+
+body.field-view-mode .field-fullscreen-previews{
+  display:flex;
+  position:fixed;
+  left:50%;
+  bottom:max(10px,env(safe-area-inset-bottom));
+  transform:translateX(-50%);
+  z-index:10025;
+  max-width:calc(100vw - 120px);
+  gap:8px;
+  padding:8px 10px;
+  overflow-x:auto;
+  overflow-y:hidden;
+  border:1px solid rgba(255,255,255,.28);
+  border-radius:12px;
+  background:rgba(9,16,24,.80);
+  box-shadow:0 8px 28px rgba(0,0,0,.28);
+  scrollbar-width:none;
+  -webkit-overflow-scrolling:touch;
+  backdrop-filter:blur(6px);
+  -webkit-backdrop-filter:blur(6px);
+}
+
+body.field-view-mode .field-fullscreen-previews::-webkit-scrollbar{
+  display:none;
+}
+
+.fullscreen-scheme-preview{
+  flex:0 0 auto;
+  width:112px;
+  padding:5px;
+  border:1px solid rgba(255,255,255,.22);
+  border-radius:9px;
+  background:#121c27;
+  color:#fff;
+  cursor:pointer;
+  touch-action:manipulation;
+  -webkit-tap-highlight-color:transparent;
+}
+
+.fullscreen-scheme-preview.active{
+  border-color:#8bd450;
+  box-shadow:0 0 0 2px rgba(139,212,80,.30);
+  background:#1a2a20;
+}
+
+.fullscreen-scheme-preview-field{
+  position:relative;
+  width:100px;
+  height:62px;
+  overflow:hidden;
+  border-radius:5px;
+  background:#fff url("./assets/campo.png") center center / 100px 62px no-repeat;
+  box-shadow:inset 0 0 0 1px rgba(0,0,0,.16);
+}
+
+.fullscreen-preview-player{
+  position:absolute;
+  width:5px;
+  height:5px;
+  transform:translate(-50%,-50%);
+  border-radius:50%;
+  border:1px solid rgba(255,255,255,.9);
+  box-sizing:border-box;
+}
+
+.fullscreen-preview-drawing{
+  position:absolute;
+  height:1px;
+  transform-origin:0 50%;
+  opacity:.9;
+  pointer-events:none;
+}
+
+.fullscreen-scheme-preview-name{
+  margin-top:5px;
+  width:100px;
+  min-height:22px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  color:#e9eef4;
+  font-size:9px;
+  font-weight:900;
+  line-height:1.15;
+  text-align:center;
+  text-transform:uppercase;
+  white-space:normal;
+  overflow-wrap:anywhere;
+}
+
+@media(max-width:900px){
+  body.field-view-mode .field-fullscreen-previews{
+    max-width:calc(100vw - 86px);
+    gap:6px;
+    padding:6px 8px;
+  }
+  .fullscreen-scheme-preview{
+    width:96px;
+  }
+  .fullscreen-scheme-preview-field{
+    width:84px;
+    height:52px;
+    background-size:84px 52px;
+  }
+  .fullscreen-scheme-preview-name{
+    width:84px;
+    font-size:8px;
+  }
+  body.field-view-mode .field-fullscreen-title{
+    right:64px;
+    max-width:55vw;
+    font-size:13px;
+  }
+}
+
+
+body.export-in-progress .field-fullscreen-title,
+body.export-in-progress .field-fullscreen-previews{
+  display:none!important;
+}
+
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
@@ -2462,6 +2617,10 @@ body.export-clean-view .board-shell{
     <button type="button" class="field-fullscreen-exit" id="fieldFullscreenExitBtn" title="Esci dalla modalità campo intero">×</button>
     <button type="button" class="field-fullscreen-nav prev" id="fieldPrevSchemeBtn" title="Schema precedente">‹</button>
     <button type="button" class="field-fullscreen-nav next" id="fieldNextSchemeBtn" title="Schema successivo">›</button>
+
+    <div class="field-fullscreen-title" id="fieldFullscreenTitle" aria-live="polite"></div>
+    <div class="field-fullscreen-previews" id="fieldFullscreenPreviews" aria-label="Anteprima schemi"></div>
+
     <div id="board">
       <div class="pitch"></div><div class="half"></div><div class="center-circle"></div><div class="center-dot"></div>
       <div class="penalty left"></div><div class="penalty right"></div><div class="six left"></div><div class="six right"></div>
@@ -4326,6 +4485,9 @@ function renderSchemeSelect(){
   const s=document.getElementById("schemeSelect");s.innerHTML="";
   state.pages.forEach((p,i)=>{const o=document.createElement("option");o.value=i;o.textContent=`${String(i+1).padStart(2,"0")} · ${p.title}`;if(i===currentPage)o.selected=true;s.appendChild(o)});
   document.getElementById("schemeName").value=page().title;
+  if(fieldViewMode){
+    renderFullscreenSchemePreviews();
+  }
   {
     const currentTitleText=document.getElementById("currentTitleText");
     if(currentTitleText)currentTitleText.textContent=page().title;
@@ -10621,7 +10783,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v222",
+    appVersion:"v223",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -11564,11 +11726,141 @@ document.getElementById("touchFullscreenBtn").addEventListener(
   toggleFieldViewMode
 );
 
+
+function escapePreviewColor(value,fallback="#5b3192"){
+  const color=String(value||"").trim();
+  return /^#[0-9a-f]{3,8}$/i.test(color) ? color : fallback;
+}
+
+function buildFullscreenSchemePreview(projectPage,index){
+  const button=document.createElement("button");
+  button.type="button";
+  button.className="fullscreen-scheme-preview";
+  button.dataset.pageIndex=String(index);
+  button.title=String(projectPage?.title||`Schema-${index+1}`);
+
+  const mini=document.createElement("div");
+  mini.className="fullscreen-scheme-preview-field";
+
+  (projectPage?.positions||[]).forEach((position,playerIndex)=>{
+    if(
+      !position ||
+      !Number.isFinite(Number(position.x)) ||
+      !Number.isFinite(Number(position.y))
+    )return;
+
+    const player=state.roster[playerIndex];
+    if(!player)return;
+
+    const dot=document.createElement("span");
+    dot.className="fullscreen-preview-player";
+    dot.style.left=`${Math.max(0,Math.min(100,Number(position.x)))}%`;
+    dot.style.top=`${Math.max(0,Math.min(100,Number(position.y)))}%`;
+
+    const fallback=
+      player.team==="away"
+        ? "#d64b62"
+        : player.team==="gk"
+          ? "#e3b52d"
+          : "#5b3192";
+
+    dot.style.background=escapePreviewColor(player.color,fallback);
+    mini.appendChild(dot);
+  });
+
+  /*
+    Preview leggera anche delle frecce/linee principali.
+    Non modifica il renderer del progetto e non tocca lo stato.
+  */
+  (projectPage?.drawings||[]).forEach(drawing=>{
+    if(
+      !drawing ||
+      !["arrow","curve","line"].includes(String(drawing.type||""))
+    )return;
+
+    const x1=Number(drawing.x1);
+    const y1=Number(drawing.y1);
+    const x2=Number(drawing.x2);
+    const y2=Number(drawing.y2);
+
+    if(![x1,y1,x2,y2].every(Number.isFinite))return;
+
+    const sx=x1/10;
+    const sy=y1/6.2;
+    const ex=x2/10;
+    const ey=y2/6.2;
+    const dx=ex-sx;
+    const dy=ey-sy;
+    const length=Math.hypot(dx,dy);
+    const angle=Math.atan2(dy,dx)*180/Math.PI;
+
+    const line=document.createElement("span");
+    line.className="fullscreen-preview-drawing";
+    line.style.left=`${sx}%`;
+    line.style.top=`${sy}%`;
+    line.style.width=`${length}%`;
+    line.style.transform=`rotate(${angle}deg)`;
+    line.style.background=escapePreviewColor(drawing.color,"#222222");
+    mini.appendChild(line);
+  });
+
+  const name=document.createElement("div");
+  name.className="fullscreen-scheme-preview-name";
+  name.textContent=String(
+    projectPage?.title||`Schema-${index+1}`
+  ).toUpperCase();
+
+  button.append(mini,name);
+
+  button.addEventListener("click",()=>{
+    if(index===currentPage)return;
+    currentPage=index;
+    clearAllSelections();
+    renderAll();
+    updateFullscreenNavigation();
+  });
+
+  return button;
+}
+
+function renderFullscreenSchemePreviews(){
+  const container=document.getElementById("fieldFullscreenPreviews");
+  const title=document.getElementById("fieldFullscreenTitle");
+
+  if(title){
+    title.textContent=String(
+      page()?.title||`Schema-${currentPage+1}`
+    ).toUpperCase();
+  }
+
+  if(!container)return;
+
+  container.innerHTML="";
+
+  state.pages.forEach((projectPage,index)=>{
+    const preview=buildFullscreenSchemePreview(projectPage,index);
+    preview.classList.toggle("active",index===currentPage);
+    container.appendChild(preview);
+  });
+
+  requestAnimationFrame(()=>{
+    container
+      .querySelector(".fullscreen-scheme-preview.active")
+      ?.scrollIntoView({
+        behavior:"smooth",
+        block:"nearest",
+        inline:"center"
+      });
+  });
+}
+
 function updateFullscreenNavigation(){
   const prev=document.getElementById("fieldPrevSchemeBtn");
   const next=document.getElementById("fieldNextSchemeBtn");
   if(prev)prev.disabled=currentPage<=0;
   if(next)next.disabled=currentPage>=state.pages.length-1;
+
+  renderFullscreenSchemePreviews();
 }
 
 function goToFullscreenScheme(direction){
@@ -11628,7 +11920,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=222",
+        "./service-worker.js?v=223",
         { updateViaCache: "none" }
       );
 
