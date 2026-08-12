@@ -2527,6 +2527,14 @@ body.export-in-progress .field-fullscreen-previews{
   transform:translateX(-50%);
 }
 
+
+/* v230 - allineamento orizzontale modalità con pulsante Sostituzione */
+@media(min-width:851px){
+  .topbar-presentation-slot{
+    left:var(--presentation-center-x,50%)!important;
+  }
+}
+
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
@@ -6265,6 +6273,39 @@ function clearAllSelections(){
 }
 
 
+
+function syncPresentationWithSubstitutionCenter(){
+  if(window.innerWidth<=850)return;
+
+  const topbar=document.querySelector(".topbar");
+  const presentation=document.querySelector(".topbar-presentation-slot");
+  const substitution=document.querySelector(
+    ".canvas-substitution-slot .substitution-launch-btn"
+  );
+
+  if(!topbar || !presentation || !substitution)return;
+
+  const topbarRect=topbar.getBoundingClientRect();
+  const substitutionRect=substitution.getBoundingClientRect();
+
+  const substitutionCenter=
+    substitutionRect.left+
+    (substitutionRect.width/2);
+
+  const relativeCenter=
+    substitutionCenter-topbarRect.left;
+
+  if(
+    Number.isFinite(relativeCenter) &&
+    relativeCenter>0
+  ){
+    topbar.style.setProperty(
+      "--presentation-center-x",
+      `${relativeCenter}px`
+    );
+  }
+}
+
 function updatePresentationModeButtons(){
   const bench=document.getElementById("benchModeBtn");
   const dressing=document.getElementById("dressingRoomModeBtn");
@@ -6275,6 +6316,10 @@ function updatePresentationModeButtons(){
   preparation?.classList.toggle("active",state.presentationMode==="normal");
 
   syncViewPresetControl();
+
+  requestAnimationFrame(
+    syncPresentationWithSubstitutionCenter
+  );
 }
 
 
@@ -8879,7 +8924,18 @@ function normalizeExportArrowStrokeWidths(clonedDocument){
     if(!Number.isFinite(liveStroke) || liveStroke<=0)return;
 
     const relativeStroke=liveStroke/liveWidth;
-    const logicalStroke=relativeStroke*logicalBoardWidth;
+
+    /*
+      v229 - calibrazione finale:
+      html2canvas/PDF rende il corpo della freccia visivamente circa
+      il 20% più pesante rispetto all'editor. Applichiamo quindi una
+      compensazione esclusivamente in export, senza modificare il progetto.
+    */
+    const exportStrokeCompensation=.80;
+    const logicalStroke=
+      relativeStroke*
+      logicalBoardWidth*
+      exportStrokeCompensation;
 
     arrow.setAttribute("stroke-width",String(logicalStroke));
     arrow.style.strokeWidth=String(logicalStroke);
@@ -10979,7 +11035,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v228",
+    appVersion:"v230",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -11836,6 +11892,28 @@ document.addEventListener("change",event=>{
   applySelectedPlayerVisualMode(mode,check.checked);
 });
 
+
+window.addEventListener(
+  "resize",
+  ()=>{
+    requestAnimationFrame(
+      syncPresentationWithSubstitutionCenter
+    );
+  },
+  {passive:true}
+);
+
+window.addEventListener(
+  "orientationchange",
+  ()=>{
+    setTimeout(
+      syncPresentationWithSubstitutionCenter,
+      80
+    );
+  },
+  {passive:true}
+);
+
 document.getElementById("benchModeBtn").addEventListener(
   "click",
   ()=>applyGlobalPlayerDisplayMode("bench")
@@ -12066,6 +12144,7 @@ try{
   state.snapEnabled=true;
 }
 renderAll();updateHistoryButtons();syncDrawingControls();updateSelectedNamesButton();syncChestCircleControls();
+requestAnimationFrame(syncPresentationWithSubstitutionCenter);
 backupSafetyReady=true;
 
 if(recoveredBackupSafety){
@@ -12085,7 +12164,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=228",
+        "./service-worker.js?v=230",
         { updateViaCache: "none" }
       );
 
