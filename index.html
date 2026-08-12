@@ -2500,14 +2500,14 @@ body.export-in-progress .field-fullscreen-previews{
 /* Le righe partono sotto la maglia, senza sovrapporsi al nome. */
 .player-visual-marker.h-long{
   left:50%;
-  top:61px;
+  top:78px;
   width:82px;
   height:1.6px;
   transform:translateX(-50%);
 }
 .player-visual-marker.h-short{
   left:50%;
-  top:61px;
+  top:78px;
   width:48px;
   height:1.6px;
   transform:translateX(-50%);
@@ -2519,11 +2519,11 @@ body.export-in-progress .field-fullscreen-previews{
   height:92px;
   transform:translateX(-50%);
 }
-.player-visual-marker.v-short{
+.player-visual-marker.v-top-long{
   left:50%;
-  top:58px;
+  bottom:58px;
   width:1.6px;
-  height:54px;
+  height:92px;
   transform:translateX(-50%);
 }
 
@@ -2792,8 +2792,8 @@ body.export-in-progress .field-fullscreen-previews{
           <span>Maglietta + riga verticale sotto lunga</span>
         </label>
         <label class="player-visual-mode-option">
-          <input type="checkbox" class="player-visual-mode-check" data-visual-mode="v-short">
-          <span>Maglietta + riga verticale sotto corta</span>
+          <input type="checkbox" class="player-visual-mode-check" data-visual-mode="v-top-long">
+          <span>Maglietta + riga verticale sopra lunga</span>
         </label>
         <div class="player-visual-mode-help">Nessun flag: nome + numero + maglia</div>
       </div>
@@ -3622,7 +3622,7 @@ function normalizePageRecord(projectPage,index,rosterLength){
 
     Object.keys(override).forEach(property=>{
       if(property==="displayVariant"){
-        const allowed=new Set(["jersey","h-long","h-short","v-long","v-short"]);
+        const allowed=new Set(["jersey","h-long","h-short","v-long","v-top-long"]);
         if(!allowed.has(override[property])){
           delete override[property];
         }
@@ -10887,7 +10887,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v224",
+    appVersion:"v225",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -11688,7 +11688,7 @@ function applySelectedPlayerVisualMode(mode,enabled){
     return;
   }
 
-  const allowed=new Set(["jersey","h-long","h-short","v-long","v-short"]);
+  const allowed=new Set(["jersey","h-long","h-short","v-long","v-top-long"]);
   const nextMode=enabled && allowed.has(mode) ? mode : "";
 
   pushHistory();
@@ -11993,7 +11993,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=224",
+        "./service-worker.js?v=225",
         { updateViaCache: "none" }
       );
 
