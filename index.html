@@ -4194,10 +4194,10 @@ function applyViewPreset(presetId,options={}){
 
 const PRESENTATION_MODE_DEFAULTS={
   normal:{
-    showLastName:null,
-    showShirtNumber:null,
-    showChestCircle:null,
-    showOpponentBlankLine:null
+    showLastName:true,
+    showShirtNumber:true,
+    showChestCircle:true,
+    showOpponentBlankLine:false
   },
   bench:{
     showLastName:true,
@@ -4759,35 +4759,40 @@ function applyGlobalSubstitutionPairs(pairs){
     effetti a cascata dovuti all'ordine delle righe.
   */
   state.pages.forEach(projectPage=>{
-    const original=new Map();
+    const originalOutgoingPositions=new Map();
 
+    /*
+      v216:
+      una sostituzione globale è una vera sostituzione, non uno scambio.
+      Per OGNI schema in lavorazione:
+      - se il giocatore in uscita è presente, l'entrante prende il suo posto;
+      - il giocatore in uscita viene rimosso;
+      - se l'entrante era già presente altrove nello stesso schema, non viene
+        lasciata una seconda copia.
+      Tutte le posizioni vengono fotografate prima, così le sostituzioni
+      multiple restano simultanee e non producono effetti a cascata.
+    */
     pairs.forEach(pair=>{
-      original.set(
+      originalOutgoingPositions.set(
         pair.outgoingIndex,
         projectPage.positions[pair.outgoingIndex]
           ? {...projectPage.positions[pair.outgoingIndex]}
           : null
       );
-
-      original.set(
-        pair.incomingIndex,
-        projectPage.positions[pair.incomingIndex]
-          ? {...projectPage.positions[pair.incomingIndex]}
-          : null
-      );
     });
 
     pairs.forEach(pair=>{
-      const outgoingPosition=original.get(pair.outgoingIndex);
-      const incomingPosition=original.get(pair.incomingIndex);
+      const outgoingPosition=
+        originalOutgoingPositions.get(pair.outgoingIndex);
 
-      projectPage.positions[pair.outgoingIndex]=incomingPosition
-        ? {...incomingPosition}
-        : null;
+      if(!outgoingPosition){
+        return;
+      }
 
-      projectPage.positions[pair.incomingIndex]=outgoingPosition
-        ? {...outgoingPosition}
-        : null;
+      projectPage.positions[pair.outgoingIndex]=null;
+      projectPage.positions[pair.incomingIndex]={
+        ...outgoingPosition
+      };
     });
   });
 
@@ -5438,7 +5443,10 @@ function renderPlayers(){
       pl.showChestCircle!==false
     );
 
-    const chestCircle=effectiveShowCircle
+    const chestCircle=(
+      !defensiveDisplay &&
+      effectiveShowCircle
+    )
       ?'<circle cx="28" cy="29" r="14.5" fill="#ffffff"/>'
       :"";
 
@@ -5461,6 +5469,12 @@ function renderPlayers(){
     )
       ? `<text class="jersey-number" x="28" y="29.5">${escapeHtml(String(pl.number))}</text>`
       : "";
+
+    const effectiveShowLastName=getEffectivePlayerDisplayValue(
+      i,
+      "showLastName",
+      pl.showLastName!==false
+    );
 
     const schemaShowOpponentLine=getEffectivePlayerDisplayValue(
       i,
@@ -5517,7 +5531,7 @@ function renderPlayers(){
             ? escapeHtml(String(pl.lastName||pl.name||pl.firstName||"").toUpperCase())
             : state.presentationMode==="locker"
               ? ""
-              : escapeHtml(pl.showLastName===false?"":String(pl.lastName||pl.name||pl.firstName||"").toUpperCase())
+              : escapeHtml(effectiveShowLastName?String(pl.lastName||pl.name||pl.firstName||"").toUpperCase():"")
       }</div>
     `;
     el.title="Trascina per spostare · doppio clic per aprire l’anagrafica";
@@ -8881,7 +8895,7 @@ document.getElementById("exportPdf").addEventListener("click",async()=>{
     */
     const titleHeightMm=titleFontSize*0.352778;
     const titleBottom=titleY+(titleHeightMm/2);
-    const titleToFieldGap=3.6;
+    const titleToFieldGap=3.0;
     const imageTop=titleBottom+titleToFieldGap;
 
     const maxW=pageWidth-(sideMargin*2);
@@ -8894,13 +8908,48 @@ document.getElementById("exportPdf").addEventListener("click",async()=>{
       await nextStableRender();
 
       const canvas=await captureCurrentScheme();
-      const imgData=canvas.toDataURL("image/png",1);
-      const ratio=Math.min(
-        maxW/canvas.width,
-        maxH/canvas.height
+
+      /*
+        v216 - stampa:
+        i margini pagina restano 0,4 mm. Il canvas dell'app contiene però
+        anche una fascia bianca di lavoro attorno al terreno di gioco.
+        Per rendere il campo realmente più grande sulla carta ritagliamo
+        soltanto una piccola fascia esterna del workspace, mantenendo
+        un'area di sicurezza per frecce/giocatori vicini ai bordi.
+      */
+      const cropX=Math.round(canvas.width*0.025);
+      const cropTop=Math.round(canvas.height*0.015);
+      const cropBottom=Math.round(canvas.height*0.015);
+      const croppedWidth=canvas.width-(cropX*2);
+      const croppedHeight=canvas.height-cropTop-cropBottom;
+
+      const printCanvas=document.createElement("canvas");
+      printCanvas.width=croppedWidth;
+      printCanvas.height=croppedHeight;
+      const printCtx=printCanvas.getContext("2d");
+      if(!printCtx){
+        throw new Error("Canvas di stampa non disponibile");
+      }
+
+      printCtx.drawImage(
+        canvas,
+        cropX,
+        cropTop,
+        croppedWidth,
+        croppedHeight,
+        0,
+        0,
+        croppedWidth,
+        croppedHeight
       );
-      const w=canvas.width*ratio;
-      const imageHeight=canvas.height*ratio;
+
+      const imgData=printCanvas.toDataURL("image/png",1);
+      const ratio=Math.min(
+        maxW/printCanvas.width,
+        maxH/printCanvas.height
+      );
+      const w=printCanvas.width*ratio;
+      const imageHeight=printCanvas.height*ratio;
       const x=(pageWidth-w)/2;
       const y=imageTop;
 
@@ -10594,7 +10643,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v215",
+    appVersion:"v216",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -11674,7 +11723,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=215",
+        "./service-worker.js?v=216",
         { updateViaCache: "none" }
       );
 
