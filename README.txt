@@ -848,3 +848,13 @@ v214 - fix feedback selezione sagome/barriere
 - L'outline SVG ora esiste sempre ma resta invisibile finché il gruppo non riceve la classe di selezione.
 - La selezione tramite click, CMD+click e marquee usa ora lo stesso feedback visivo.
 - Nessuna modifica a hit-area, selezione logica, drag, resize, numeri, Flip o strumenti.
+
+
+v218 - PDF field framing fix
+- PDF cattura direttamente #board 1000x620 anziché board-shell.
+- Eliminato il crop fisso v216 che poteva tagliare giocatori vicini ai bordi.
+- Campo PDF ora sfrutta la massima larghezza utile con margini pagina 0,4 mm.
+- Titolo 24 pt centrale mantenuto.
+- Spazio titolo/campo rifinito a 3,2 mm.
+- PNG invariato: continua a usare il percorso di cattura precedente.
+- Ruoli v217, sostituzioni globali, Defensive e selezione sagome invariati.

@@ -8776,6 +8776,89 @@ async function captureCurrentScheme(){
 }
 
 
+
+async function captureBoardForPdf(){
+  const board=document.getElementById("board");
+
+  if(!board){
+    throw new Error("Campo non disponibile");
+  }
+
+  if(!window.html2canvas){
+    throw new Error("Libreria grafica non disponibile");
+  }
+
+  await waitForExportAssets(board);
+
+  const preferredScale=Math.max(
+    2,
+    Math.min(4,window.devicePixelRatio||2)
+  );
+
+  const attempts=[
+    preferredScale,
+    3,
+    2
+  ].filter((value,index,array)=>
+    array.findIndex(v=>Math.abs(v-value)<.05)===index
+  );
+
+  let lastError=null;
+
+  for(const scale of attempts){
+    try{
+      return await html2canvas(board,{
+        backgroundColor:"#ffffff",
+        scale,
+        width:1000,
+        height:620,
+        useCORS:true,
+        allowTaint:false,
+        logging:false,
+        imageTimeout:15000,
+        removeContainer:true,
+        onclone:clonedDocument=>{
+          const clonedBoard=clonedDocument.getElementById("board");
+
+          if(clonedBoard){
+            /*
+              PDF = coordinate logiche pure 1000x620.
+              Nessuna trasformazione/resizing della UI desktop o iPad
+              deve entrare nella cattura.
+            */
+            clonedBoard.style.transform="none";
+            clonedBoard.style.left="0";
+            clonedBoard.style.top="0";
+            clonedBoard.style.width="1000px";
+            clonedBoard.style.height="620px";
+          }
+
+          clonedDocument
+            .querySelectorAll(
+              ".field-fullscreen-exit,"+
+              ".field-fullscreen-nav,"+
+              ".snap-guide"
+            )
+            .forEach(element=>{
+              element.style.display="none";
+            });
+
+          clonedDocument.body.classList.add("export-clean-view");
+        }
+      });
+    }catch(error){
+      lastError=error;
+      console.warn(
+        `Tentativo cattura PDF fallito a scala ${scale}:`,
+        error
+      );
+    }
+  }
+
+  throw lastError||new Error("Cattura campo PDF non riuscita");
+}
+
+
 function snapshotExportUiState(){
   return {
     currentPage,
@@ -8950,7 +9033,7 @@ document.getElementById("exportPdf").addEventListener("click",async()=>{
     */
     const titleHeightMm=titleFontSize*0.352778;
     const titleBottom=titleY+(titleHeightMm/2);
-    const titleToFieldGap=3.0;
+    const titleToFieldGap=3.2;
     const imageTop=titleBottom+titleToFieldGap;
 
     const maxW=pageWidth-(sideMargin*2);
@@ -8962,49 +9045,23 @@ document.getElementById("exportPdf").addEventListener("click",async()=>{
       clearExportSelections();
       await nextStableRender();
 
-      const canvas=await captureCurrentScheme();
-
       /*
-        v216 - stampa:
-        i margini pagina restano 0,4 mm. Il canvas dell'app contiene però
-        anche una fascia bianca di lavoro attorno al terreno di gioco.
-        Per rendere il campo realmente più grande sulla carta ritagliamo
-        soltanto una piccola fascia esterna del workspace, mantenendo
-        un'area di sicurezza per frecce/giocatori vicini ai bordi.
+        v218:
+        per il PDF catturiamo direttamente il campo logico 1000x620,
+        non il contenitore board-shell. In questo modo:
+        - il terreno sfrutta realmente tutta la larghezza disponibile;
+        - spariscono le fasce vuote introdotte dal layout dell'app;
+        - nessun crop fisso può tagliare giocatori vicini ai bordi.
       */
-      const cropX=Math.round(canvas.width*0.025);
-      const cropTop=Math.round(canvas.height*0.015);
-      const cropBottom=Math.round(canvas.height*0.015);
-      const croppedWidth=canvas.width-(cropX*2);
-      const croppedHeight=canvas.height-cropTop-cropBottom;
+      const canvas=await captureBoardForPdf();
+      const imgData=canvas.toDataURL("image/png",1);
 
-      const printCanvas=document.createElement("canvas");
-      printCanvas.width=croppedWidth;
-      printCanvas.height=croppedHeight;
-      const printCtx=printCanvas.getContext("2d");
-      if(!printCtx){
-        throw new Error("Canvas di stampa non disponibile");
-      }
-
-      printCtx.drawImage(
-        canvas,
-        cropX,
-        cropTop,
-        croppedWidth,
-        croppedHeight,
-        0,
-        0,
-        croppedWidth,
-        croppedHeight
-      );
-
-      const imgData=printCanvas.toDataURL("image/png",1);
       const ratio=Math.min(
-        maxW/printCanvas.width,
-        maxH/printCanvas.height
+        maxW/canvas.width,
+        maxH/canvas.height
       );
-      const w=printCanvas.width*ratio;
-      const imageHeight=printCanvas.height*ratio;
+      const w=canvas.width*ratio;
+      const imageHeight=canvas.height*ratio;
       const x=(pageWidth-w)/2;
       const y=imageTop;
 
@@ -10698,7 +10755,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v217",
+    appVersion:"v218",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -11778,7 +11835,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=217",
+        "./service-worker.js?v=218",
         { updateViaCache: "none" }
       );
 
