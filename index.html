@@ -1319,10 +1319,6 @@ body.field-view-mode #board{
   border-color:#7b5c2a;
   background:#3b2d18;
 }
-.substitution-launch-btn.shifted-obsolete{
-  margin-left:28px;
-  min-width:150px;
-}
 .presentation-mode-btn.active{
   border-color:#9be85d!important;
   background:#8bd450!important;
@@ -1337,10 +1333,6 @@ body.field-view-mode #board{
     min-width:88px;
     padding-inline:8px;
     font-size:9px;
-  }
-  .substitution-launch-btn.shifted-obsolete{
-    margin-left:12px;
-    min-width:126px;
   }
 }
 
@@ -1367,11 +1359,6 @@ body.field-view-mode #board{
   min-width:0!important;
   flex-wrap:nowrap!important;
 }
-.substitution-launch-btn.shifted-obsolete{
-  margin-left:30px!important;
-  min-width:150px!important;
-  flex:0 0 auto!important;
-}
 .canvas-header .current-title{
   grid-column:1!important;
   min-width:0!important;
@@ -1395,10 +1382,6 @@ body.field-view-mode #board{
     min-width:84px!important;
     padding-inline:7px!important;
     font-size:9px!important;
-  }
-  .substitution-launch-btn.shifted-obsolete{
-    margin-left:14px!important;
-    min-width:124px!important;
   }
 }
 
@@ -1427,13 +1410,6 @@ body.field-view-mode #board{
   flex-wrap:nowrap!important;
   min-width:0!important;
 }
-.substitution-launch-btn.substitution-separated-obsolete{
-  grid-column:3!important;
-  justify-self:start!important;
-  margin:0!important;
-  min-width:150px!important;
-  flex:0 0 auto!important;
-}
 .canvas-header .lineup-counters{
   grid-column:4!important;
   justify-self:end!important;
@@ -1451,11 +1427,6 @@ body.field-view-mode #board{
     min-width:82px!important;
     padding-inline:7px!important;
     font-size:9px!important;
-  }
-  .substitution-launch-btn.substitution-separated-obsolete{
-    min-width:122px!important;
-    padding-inline:10px!important;
-    font-size:10px!important;
   }
 }
 @media(max-width:980px){
@@ -1480,10 +1451,6 @@ body.field-view-mode #board{
   }
   .presentation-mode-actions::-webkit-scrollbar{
     display:none!important;
-  }
-  .substitution-launch-btn.substitution-separated-obsolete{
-    grid-area:substitution!important;
-    justify-self:end!important;
   }
 }
 
@@ -1518,15 +1485,6 @@ body.field-view-mode #board{
   border-bottom:1px solid #333a42;
   box-sizing:border-box;
 }
-.substitution-launch-btn.substitution-dedicated-obsolete{
-  position:static!important;
-  margin:0!important;
-  min-width:180px!important;
-  max-width:260px!important;
-  width:auto!important;
-  flex:0 0 auto!important;
-  z-index:auto!important;
-}
 @media(max-width:980px){
   .canvas-header{
     grid-template-columns:1fr auto!important;
@@ -1547,9 +1505,6 @@ body.field-view-mode #board{
   .substitution-row-obsolete{
     min-height:44px;
     padding-block:5px;
-  }
-  .substitution-launch-btn.substitution-dedicated-obsolete{
-    min-width:150px!important;
   }
 }
 
@@ -2437,10 +2392,25 @@ body.export-clean-view .board-shell{
   }
 }
 
+
+/* v208 - dropdown DIFENSIVE robusto su Safari/iPad */
+.defensive-mode-menu{
+  position:fixed!important;
+  transform:none!important;
+  z-index:10050!important;
+}
+
+/* Il gruppo superiore non deve ritagliare il menu. */
+.topbar-presentation-slot,
+.topbar-presentation-slot .presentation-mode-actions,
+.defensive-mode-control{
+  overflow:visible!important;
+}
+
 </style>
 
-<script async src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-<script async src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 
 
 <link rel="manifest" href="./manifest.webmanifest">
@@ -6044,12 +6014,6 @@ function updatePresentationModeButtons(){
 
 
 function applyGlobalPlayerDisplayMode(mode){
-  /*
-    Le tre modalità storiche restano identiche.
-    Se una di esse viene scelta, disattiviamo soltanto il layer DIFENSIVE.
-  */
-  state.defensiveDisplay=null;
-
   const normalizedMode=
     mode==="bench"
       ? "bench"
@@ -6057,12 +6021,29 @@ function applyGlobalPlayerDisplayMode(mode){
         ? "locker"
         : "normal";
 
-  if(state.presentationMode===normalizedMode){
+  const defensiveWasActive=
+    state.defensiveDisplay==="corner" ||
+    state.defensiveDisplay==="freeKick";
+
+  const presentationChanged=
+    state.presentationMode!==normalizedMode;
+
+  /*
+    Nessuna modifica reale: non sporca history né backup.
+  */
+  if(!defensiveWasActive && !presentationChanged){
     updatePresentationModeButtons();
     return;
   }
 
+  /*
+    v208:
+    lo snapshot viene preso PRIMA di spegnere DIFENSIVE.
+    Undo può quindi ripristinare davvero la visualizzazione precedente.
+  */
   pushHistory();
+
+  state.defensiveDisplay=null;
   state.presentationMode=normalizedMode;
   state.viewPreset=
     normalizedMode==="bench"
@@ -6072,9 +6053,8 @@ function applyGlobalPlayerDisplayMode(mode){
         : "preparation";
 
   /*
-    v157: la modalità è un livello di presentazione globale e non
-    modifica più gli override salvati nei singoli schemi.
-    Tornando a PREPARAZIONE riappaiono automaticamente le scelte locali.
+    Render sempre eseguito quando si esce da DIFENSIVE,
+    anche se presentationMode era già "normal".
   */
   renderPlayers();
   renderRoster();
@@ -7053,11 +7033,33 @@ function renderDrawings(){
       */
       if(selectedDrawings.has(i)){
         const selectionPad=5;
-        const selectionRect=document.createElementNS("http://www.w3.org/2000/svg","rect");
+
+        /*
+          Se il numero è visibile, il bordo comprende anche la zona
+          sopra la testa occupata dall'etichetta.
+        */
+        const numberTopExtra=
+          d.showNumber!==false
+            ? Math.max(16,height*.20)
+            : 0;
+
+        const selectionY=
+          minY-selectionPad-numberTopExtra;
+
+        const selectionHeight=
+          height+
+          (selectionPad*2)+
+          numberTopExtra;
+
+        const selectionRect=document.createElementNS(
+          "http://www.w3.org/2000/svg",
+          "rect"
+        );
+
         selectionRect.setAttribute("x",minX-selectionPad);
-        selectionRect.setAttribute("y",minY-selectionPad);
+        selectionRect.setAttribute("y",selectionY);
         selectionRect.setAttribute("width",width+(selectionPad*2));
-        selectionRect.setAttribute("height",height+(selectionPad*2));
+        selectionRect.setAttribute("height",selectionHeight);
         selectionRect.setAttribute("rx","4");
         selectionRect.setAttribute("fill","none");
         selectionRect.setAttribute("stroke","#4b8dff");
@@ -10470,7 +10472,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v207",
+    appVersion:"v208",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -11049,24 +11051,8 @@ document.getElementById("backupFileInput").addEventListener("change",async event
 })();
 
 
-let fieldLocked=false;
 let fieldViewMode=false;
 
-function updateFieldLockUI(){
-  document.body.classList.toggle("field-locked",fieldLocked);
-  const button=document.getElementById("touchLockBtn");
-  if(button){
-    button.classList.toggle("active",fieldLocked);
-    button.setAttribute("aria-pressed",String(fieldLocked));
-    button.textContent=fieldLocked ? "Sblocca" : "Blocca";
-  }
-}
-
-function toggleFieldLock(){
-  fieldLocked=!fieldLocked;
-  updateFieldLockUI();
-  setStatus(fieldLocked ? "Campo bloccato" : "Campo sbloccato");
-}
 
 
 const BOARD_LOGICAL_WIDTH=1000;
@@ -11267,19 +11253,6 @@ function toggleFieldViewMode(){
   setFieldViewMode(!fieldViewMode);
 }
 
-document.getElementById("board").addEventListener("pointerdown",event=>{
-  if(!fieldLocked)return;
-  event.preventDefault();
-  event.stopImmediatePropagation();
-},true);
-
-document.getElementById("board").addEventListener("dblclick",event=>{
-  if(!fieldLocked)return;
-  event.preventDefault();
-  event.stopImmediatePropagation();
-},true);
-
-
 document.getElementById("showShirtNumbers").addEventListener("change",event=>{
   const indexes=getSelectedPlayerIndexesForNumberToggle();
   const mannequinIndexes=getSelectedMannequinIndexesForNumberToggle();
@@ -11345,6 +11318,49 @@ document.getElementById("opponentBlankLine").addEventListener("change",event=>{
 
 
 
+function positionDefensiveMenu(){
+  const button=document.getElementById("defensiveModeBtn");
+  const menu=document.getElementById("defensiveModeMenu");
+  if(!button || !menu || menu.hidden)return;
+
+  const buttonRect=button.getBoundingClientRect();
+  const menuRect=menu.getBoundingClientRect();
+  const viewportWidth=Math.max(
+    1,
+    document.documentElement.clientWidth||window.innerWidth
+  );
+  const viewportHeight=Math.max(
+    1,
+    document.documentElement.clientHeight||window.innerHeight
+  );
+
+  const margin=8;
+
+  let left=
+    buttonRect.left+
+    (buttonRect.width/2)-
+    (menuRect.width/2);
+
+  left=Math.max(
+    margin,
+    Math.min(
+      viewportWidth-menuRect.width-margin,
+      left
+    )
+  );
+
+  let top=buttonRect.bottom+6;
+
+  if(top+menuRect.height>viewportHeight-margin){
+    top=buttonRect.top-menuRect.height-6;
+  }
+
+  top=Math.max(margin,top);
+
+  menu.style.left=`${Math.round(left)}px`;
+  menu.style.top=`${Math.round(top)}px`;
+}
+
 function setDefensiveMenuOpen(open){
   const button=document.getElementById("defensiveModeBtn");
   const menu=document.getElementById("defensiveModeMenu");
@@ -11352,6 +11368,10 @@ function setDefensiveMenuOpen(open){
 
   menu.hidden=!open;
   button.setAttribute("aria-expanded",String(open));
+
+  if(open){
+    requestAnimationFrame(positionDefensiveMenu);
+  }
 }
 
 function toggleDefensiveMenu(){
@@ -11363,7 +11383,11 @@ function toggleDefensiveMenu(){
 function applyDefensiveDisplay(mode){
   if(mode!=="corner" && mode!=="freeKick")return;
 
-  if(state.defensiveDisplay===mode){
+  const alreadyActive=
+    state.defensiveDisplay===mode &&
+    state.presentationMode==="normal";
+
+  if(alreadyActive){
     setDefensiveMenuOpen(false);
     updatePresentationModeButtons();
     return;
@@ -11372,9 +11396,13 @@ function applyDefensiveDisplay(mode){
   pushHistory();
 
   /*
-    Defensive è un layer di visualizzazione dedicato.
-    Non riscrive nome, numero, linea locale o altri override del giocatore.
+    v208:
+    DIFENSIVE ha sempre una base grafica deterministica di PREPARAZIONE.
+    Non dipende più dalla modalità che era attiva prima (bench/locker).
+    Gli override locali del giocatore restano intatti.
   */
+  state.presentationMode="normal";
+  state.viewPreset="preparation";
   state.defensiveDisplay=mode;
 
   renderPlayers();
@@ -11418,6 +11446,15 @@ document.getElementById("defensiveFreeKickBtn").addEventListener(
     applyDefensiveDisplay("freeKick");
   }
 );
+
+
+window.addEventListener("resize",()=>{
+  positionDefensiveMenu();
+});
+
+window.addEventListener("scroll",()=>{
+  positionDefensiveMenu();
+},{passive:true});
 
 document.addEventListener("pointerdown",event=>{
   const control=document.getElementById("defensiveModeControl");
@@ -11550,7 +11587,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=207",
+        "./service-worker.js?v=208",
         { updateViaCache: "none" }
       );
 

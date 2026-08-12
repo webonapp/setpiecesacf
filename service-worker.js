@@ -1,4 +1,4 @@
-const APP_VERSION = "207";
+const APP_VERSION = "208";
 const CACHE_NAME = `acf-set-pieces-v${APP_VERSION}`;
 
 const APP_SHELL = [
@@ -10,10 +10,42 @@ const APP_SHELL = [
   "./assets/campo.png"
 ];
 
+const EXTERNAL_EXPORT_ASSETS = [
+  "https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js",
+  "https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"
+];
+
 self.addEventListener("install", event => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(APP_SHELL))
+    caches.open(CACHE_NAME).then(async cache => {
+      await cache.addAll(APP_SHELL);
+
+      /*
+        Le librerie export sono opzionali per l'installazione:
+        se il CDN è momentaneamente irraggiungibile la PWA continua
+        comunque ad aggiornarsi. Quando disponibili vengono cache-ate
+        e restano utilizzabili offline.
+      */
+      await Promise.allSettled(
+        EXTERNAL_EXPORT_ASSETS.map(async url => {
+          const request=new Request(url,{
+            mode:"no-cors",
+            cache:"no-store"
+          });
+
+          const response=await fetch(request);
+
+          if(
+            response &&
+            (response.ok || response.type==="opaque")
+          ){
+            await cache.put(request,response.clone());
+          }
+        })
+      );
+    })
   );
+
   self.skipWaiting();
 });
 
@@ -74,12 +106,43 @@ async function staleWhileRevalidate(request) {
   });
 }
 
+async function cacheFirstExternal(request) {
+  const cache = await caches.open(CACHE_NAME);
+  const cached = await cache.match(request);
+
+  if (cached) return cached;
+
+  try {
+    const response = await fetch(request);
+
+    if (
+      response &&
+      (response.ok || response.type === "opaque")
+    ) {
+      await cache.put(request, response.clone());
+    }
+
+    return response;
+  } catch (_) {
+    return new Response("", {
+      status: 504,
+      statusText: "Offline"
+    });
+  }
+}
+
 self.addEventListener("fetch", event => {
   if (event.request.method !== "GET") return;
 
   const requestURL = new URL(event.request.url);
   const isSameOrigin = requestURL.origin === self.location.origin;
-  if (!isSameOrigin) return;
+
+  if (!isSameOrigin) {
+    if (EXTERNAL_EXPORT_ASSETS.includes(event.request.url)) {
+      event.respondWith(cacheFirstExternal(event.request));
+    }
+    return;
+  }
 
   const isNavigation =
     event.request.mode === "navigate" ||

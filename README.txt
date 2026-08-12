@@ -789,3 +789,16 @@ v205 - modalità DIFENSIVE
 - In DIFENSIVE nome e numero vengono nascosti solo graficamente; gli override originali non vengono modificati.
 - Panchina, Spogliatoio e Preparazione disattivano il layer DIFENSIVE senza cambiare la loro logica storica.
 - Nessuna modifica a coordinate, selezione, sostituzioni multiple, backup, rose, SNAP, sagome o archivio.
+
+
+v208 - deep stability fixes
+- Corretto passaggio DIFENSIVE -> PANCHINA/SPOGLIATOIO/PREPARAZIONE anche quando la modalità interna coincideva già.
+- Undo di DIFENSIVE corretto: snapshot preso prima della disattivazione del layer.
+- DIFENSIVE ora usa sempre PREPARAZIONE come baseline deterministica, senza dipendere da bench/locker precedenti.
+- Dropdown DIFENSIVE reso position:fixed e vincolato al viewport per Safari/iPad.
+- Bordo selezione sagoma/barriera esteso per comprendere anche il numero sopra la testa.
+- Rimossa completamente la vecchia logica Blocca non più raggiungibile dall'interfaccia.
+- Rimossi selettori CSS esplicitamente obsolete senza toccare regole attive.
+- html2canvas/jsPDF non sono più async: disponibili prima dell'avvio dell'app.
+- Service Worker v208 cache-a le due librerie export quando disponibili, così PNG/PDF restano utilizzabili offline dopo una installazione/aggiornamento effettuato con rete.
+- Backup, sostituzioni multiple, rose, Flip, SNAP, drag e coordinate non modificati.
