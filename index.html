@@ -2535,6 +2535,52 @@ body.export-in-progress .field-fullscreen-previews{
   }
 }
 
+
+/* v231 - barriera nominativa */
+.create-named-wall-btn{
+  width:100%;
+  margin-top:8px;
+  min-height:34px;
+  border:1px solid #38546e;
+  border-radius:8px;
+  background:#132437;
+  color:#eef5fc;
+  font:inherit;
+  font-size:10px;
+  font-weight:900;
+  letter-spacing:.04em;
+  cursor:pointer;
+}
+.create-named-wall-btn:disabled{
+  opacity:.42;
+  cursor:not-allowed;
+}
+.create-named-wall-btn:not(:disabled):hover{
+  border-color:#8bd450;
+  background:#1a3024;
+}
+
+/* Fix: il bordo blu esiste nel DOM ma è invisibile senza selezione. */
+.mannequin-selection-outline{
+  opacity:0!important;
+  visibility:hidden!important;
+}
+.drawing-group-selected .mannequin-selection-outline,
+.drawing-selected .mannequin-selection-outline{
+  opacity:.95!important;
+  visibility:visible!important;
+}
+
+.named-wall-member-hit{
+  fill:transparent;
+  stroke:transparent;
+  pointer-events:all;
+  cursor:pointer;
+}
+.named-wall-member-selected{
+  filter:drop-shadow(0 0 3px #4b8dff) drop-shadow(0 0 5px rgba(75,141,255,.55));
+}
+
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
@@ -2604,6 +2650,9 @@ body.export-in-progress .field-fullscreen-previews{
         </svg>
       </button>
     </div>
+    <button type="button" class="create-named-wall-btn" id="createNamedWallBtn" disabled>
+      Crea barriera
+    </button>
   </div>
 
   <div class="library-panel">
@@ -3108,6 +3157,7 @@ let selectedText=null;
 let selectedBalls=new Set();
 let selectedTexts=new Set();
 let selectedDrawings=new Set();
+let selectedNamedWallMembers=new Set();
 let selectedRosterPlayers=new Set();
 let drawingDragStart=null;
 let drawingInitial=null;
@@ -3535,7 +3585,7 @@ function normalizePlayerRecord(player,index=0){
 
 function normalizeDrawingRecord(drawing){
   const safe=drawing && typeof drawing==="object" ? drawing : {};
-  const allowedTypes=new Set(["arrow","curve","circle","rect","mannequin","wall4"]);
+  const allowedTypes=new Set(["arrow","curve","circle","rect","mannequin","wall4","namedWall"]);
   // v182: preserva i nuovi tipi durante save/import/normalizzazione.
   if(safe.type==="mannequin"){
     if(safe.number===undefined || safe.number===null) safe.number="5";
@@ -3546,6 +3596,24 @@ function normalizeDrawingRecord(drawing){
       safe.numbers=["1","2","3","4"];
     }
     if(typeof safe.showNumber!=="boolean") safe.showNumber=true;
+  }
+  if(safe.type==="namedWall"){
+    safe.members=Array.isArray(safe.members)
+      ? safe.members
+          .filter(member=>member && typeof member==="object")
+          .map(member=>({
+            playerId:String(member.playerId||""),
+            displayVariant:[
+              "jersey","h-long","h-short","v-long","v-top-long"
+            ].includes(member.displayVariant)
+              ? member.displayVariant
+              : "",
+            color:typeof member.color==="string" ? member.color : ""
+          }))
+          .filter(member=>member.playerId)
+      : [];
+
+    if(typeof safe.showNumber!=="boolean")safe.showNumber=true;
   }
 
   safe.type=allowedTypes.has(safe.type) ? safe.type : "arrow";
@@ -4522,21 +4590,28 @@ function getSelectedPlayerIndexesForBlankLine(){
 
 function syncRosterDisplayOptions(){
   const indexes=getSelectedPlayerIndexesForNumberToggle();
+  const wallRefs=getSelectedNamedWallMemberRefs();
   const checks=[...document.querySelectorAll(".player-visual-mode-check")];
+  const total=indexes.length+wallRefs.length;
 
   checks.forEach(check=>{
-    check.disabled=indexes.length===0;
+    check.disabled=total===0;
 
-    if(!indexes.length){
+    if(!total){
       check.checked=false;
       check.indeterminate=false;
       return;
     }
 
     const mode=check.dataset.visualMode||"";
-    const values=indexes.map(index=>
-      getEffectivePlayerDisplayValue(index,"displayVariant","")===mode
-    );
+    const values=[
+      ...indexes.map(index=>
+        getEffectivePlayerDisplayValue(index,"displayVariant","")===mode
+      ),
+      ...wallRefs.map(ref=>
+        String(ref.member.displayVariant||"")===mode
+      )
+    ];
 
     check.checked=values.every(Boolean);
     check.indeterminate=
@@ -4909,6 +4984,28 @@ function applyGlobalSubstitutionPairs(pairs){
     effetti a cascata dovuti all'ordine delle righe.
   */
   state.pages.forEach(projectPage=>{
+    /*
+      v231: le barriere nominative partecipano alle sostituzioni globali.
+      Il posto nella barriera conserva numero d'ordine, colore e flag visuale:
+      cambia esclusivamente il giocatore collegato.
+    */
+    (projectPage.drawings||[]).forEach(drawing=>{
+      if(drawing?.type!=="namedWall" || !Array.isArray(drawing.members))return;
+
+      pairs.forEach(pair=>{
+        const outgoingPlayer=state.roster[pair.outgoingIndex];
+        const incomingPlayer=state.roster[pair.incomingIndex];
+        const outgoingId=String(outgoingPlayer?.id||pair.outgoingIndex);
+        const incomingId=String(incomingPlayer?.id||pair.incomingIndex);
+
+        drawing.members.forEach(member=>{
+          if(String(member.playerId)===outgoingId){
+            member.playerId=incomingId;
+          }
+        });
+      });
+    });
+
     const originalOutgoingPositions=new Map();
     const originalOutgoingDisplayOverrides=new Map();
 
@@ -5860,6 +5957,7 @@ function clearSelectionKinds(except=null){
   if(except!=="drawing"){
     selectedDrawings.clear();
     selectedDrawing=null;
+    selectedNamedWallMembers.clear();
   }
 }
 
@@ -6411,6 +6509,43 @@ function updateSelectedNamesButton(){
     :"Nascondi i cognomi dei giocatori selezionati";
 }
 
+
+function namedWallMemberKey(drawingIndex,memberIndex){
+  return `${drawingIndex}:${memberIndex}`;
+}
+
+function getSelectedNamedWallMemberRefs(){
+  const refs=[];
+
+  selectedNamedWallMembers.forEach(key=>{
+    const parts=String(key).split(":");
+    const drawingIndex=Number(parts[0]);
+    const memberIndex=Number(parts[1]);
+    const drawing=page().drawings?.[drawingIndex];
+
+    if(
+      drawing?.type==="namedWall" &&
+      Array.isArray(drawing.members) &&
+      drawing.members[memberIndex]
+    ){
+      refs.push({drawingIndex,memberIndex,drawing,member:drawing.members[memberIndex]});
+    }
+  });
+
+  return refs;
+}
+
+function updateCreateNamedWallButton(){
+  const button=document.getElementById("createNamedWallBtn");
+  if(!button)return;
+
+  const valid=[...selectedPlayers].filter(index=>page().positions[index]);
+  button.disabled=valid.length<2;
+  button.title=valid.length>=2
+    ? `Crea una barriera nominativa con ${valid.length} giocatori`
+    : "Seleziona almeno 2 giocatori presenti sul campo";
+}
+
 function refreshSelectionVisuals(){
   document.querySelectorAll(".player").forEach(el=>{
     el.classList.toggle("selected",selectedPlayers.has(Number(el.dataset.index)));
@@ -6420,6 +6555,7 @@ function refreshSelectionVisuals(){
   updateLineupCounters();
 
   updateSubstitutionButton();
+  updateCreateNamedWallButton();
 
   syncRosterDisplayOptions();
 }
@@ -7317,14 +7453,18 @@ function renderDrawings(){
     if(selectedDrawings.has(i))g.classList.add("drawing-group-selected");
 
 
-    if(d.type==="mannequin" || d.type==="wall4"){
+    if(d.type==="mannequin" || d.type==="wall4" || d.type==="namedWall"){
       const minX=Math.min(d.x1,d.x2);
       const maxX=Math.max(d.x1,d.x2);
       const minY=Math.min(d.y1,d.y2);
       const maxY=Math.max(d.y1,d.y2);
       const width=Math.max(1,maxX-minX);
       const height=Math.max(1,maxY-minY);
-      const figures=d.type==="wall4" ? 4 : 1;
+      const figures=d.type==="namedWall"
+        ? Math.max(1,Array.isArray(d.members)?d.members.length:1)
+        : d.type==="wall4"
+          ? 4
+          : 1;
 
       /*
         v207: feedback visivo di selezione per sagoma/barriera.
@@ -7376,11 +7516,15 @@ function renderDrawings(){
         Nella barriera i centri vengono distanziati proprio di quella misura,
         così i corpi si toccano senza deformare la figura.
       */
-      const figureWidth=d.type==="wall4" ? width/4 : width;
+      const figureWidth=(d.type==="wall4" || d.type==="namedWall")
+        ? width/figures
+        : width;
       const firstCenterX=minX+(figureWidth/2);
 
       const addMannequinFigure=(index)=>{
         const centerX=firstCenterX+(index*figureWidth);
+        const member=d.type==="namedWall" ? d.members?.[index] : null;
+        const figureColor=member?.color || d.color || "#f5bf2d";
 
         /*
           Proporzioni leggermente "compresse" sulle gambe:
@@ -7397,7 +7541,7 @@ function renderDrawings(){
         head.setAttribute("cx",centerX);
         head.setAttribute("cy",headCy);
         head.setAttribute("r",headR);
-        head.setAttribute("fill",d.color||"#f5bf2d");
+        head.setAttribute("fill",figureColor);
         head.setAttribute("stroke","#a88a39");
         head.setAttribute("stroke-width","1.4");
         head.setAttribute("vector-effect","non-scaling-stroke");
@@ -7411,7 +7555,7 @@ function renderDrawings(){
            L ${centerX+torsoHalfBottom} ${torsoBottom}
            L ${centerX-torsoHalfBottom} ${torsoBottom} Z`
         );
-        torso.setAttribute("fill",d.color||"#f5bf2d");
+        torso.setAttribute("fill",figureColor);
         torso.setAttribute("stroke","#a88a39");
         torso.setAttribute("stroke-width","1.4");
         torso.setAttribute("vector-effect","non-scaling-stroke");
@@ -7425,9 +7569,11 @@ function renderDrawings(){
             "text"
           );
 
-          const value=d.type==="wall4"
-            ? String((Array.isArray(d.numbers)?d.numbers[index]:null) ?? (index+1))
-            : String(d.number ?? "5");
+          const value=d.type==="namedWall"
+            ? String(index+1)
+            : d.type==="wall4"
+              ? String((Array.isArray(d.numbers)?d.numbers[index]:null) ?? (index+1))
+              : String(d.number ?? "5");
 
           label.textContent=value;
           label.setAttribute("x",centerX);
@@ -7444,6 +7590,92 @@ function renderDrawings(){
           label.setAttribute("stroke-width","1.1");
           label.setAttribute("stroke-linejoin","round");
           g.appendChild(label);
+        }
+
+        if(d.type==="namedWall" && member){
+          const variant=String(member.displayVariant||"");
+
+          const marker=document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "line"
+          );
+
+          if(variant && variant!=="jersey"){
+            marker.setAttribute("stroke","#9aa0a8");
+            marker.setAttribute("stroke-width","1.8");
+            marker.setAttribute("vector-effect","non-scaling-stroke");
+            marker.setAttribute("pointer-events","none");
+
+            const horizontal=variant==="h-long" || variant==="h-short";
+            const long=variant==="h-long" || variant==="v-long" || variant==="v-top-long";
+
+            if(horizontal){
+              const half=figureWidth*(long?1.45:.85);
+              const y=torsoBottom+Math.max(14,height*.24);
+              marker.setAttribute("x1",centerX-half);
+              marker.setAttribute("x2",centerX+half);
+              marker.setAttribute("y1",y);
+              marker.setAttribute("y2",y);
+            }else{
+              const length=height*(long?1.65:.95);
+              const above=variant==="v-top-long";
+              marker.setAttribute("x1",centerX);
+              marker.setAttribute("x2",centerX);
+              marker.setAttribute(
+                "y1",
+                above ? headCy-headR-10-length : torsoBottom+10
+              );
+              marker.setAttribute(
+                "y2",
+                above ? headCy-headR-10 : torsoBottom+10+length
+              );
+            }
+
+            g.appendChild(marker);
+          }
+
+          const memberHit=document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "rect"
+          );
+          memberHit.classList.add("named-wall-member-hit");
+          memberHit.setAttribute("x",centerX-figureWidth/2);
+          memberHit.setAttribute("y",minY-Math.max(18,height*.22));
+          memberHit.setAttribute("width",figureWidth);
+          memberHit.setAttribute("height",height+Math.max(18,height*.22));
+          memberHit.dataset.memberIndex=String(index);
+
+          const memberKey=namedWallMemberKey(i,index);
+          if(selectedNamedWallMembers.has(memberKey)){
+            head.classList.add("named-wall-member-selected");
+            torso.classList.add("named-wall-member-selected");
+          }
+
+          memberHit.addEventListener("pointerdown",event=>{
+            if(tool!=="move")return;
+            event.preventDefault();
+            event.stopPropagation();
+
+            const additive=event.metaKey||event.ctrlKey;
+            if(!additive)selectedNamedWallMembers.clear();
+
+            if(additive && selectedNamedWallMembers.has(memberKey)){
+              selectedNamedWallMembers.delete(memberKey);
+            }else{
+              selectedNamedWallMembers.add(memberKey);
+            }
+
+            clearSelectionKinds("drawing");
+            selectedDrawings.add(i);
+            selectedDrawing=i;
+
+            refreshUnifiedSelectionVisuals();
+            syncRosterDisplayOptions();
+            syncDrawingControls();
+            renderDrawings();
+          });
+
+          g.appendChild(memberHit);
         }
       };
 
@@ -7480,6 +7712,10 @@ function renderDrawings(){
         )*1000;
 
         let targetIndex=0;
+
+        if(d.type==="namedWall"){
+          return;
+        }
 
         if(d.type==="wall4"){
           const local=(svgX-minX)/Math.max(1,width);
@@ -8259,7 +8495,7 @@ document.getElementById("board").addEventListener("pointermove",e=>{
     let maxY=Math.max(d.y1,d.y2,d.c1y??d.y1,d.c2y??d.y2);
 
     if(
-      (d.type==="mannequin" || d.type==="wall4") &&
+      (d.type==="mannequin" || d.type==="wall4" || d.type==="namedWall") &&
       d.showNumber!==false
     ){
       const height=Math.max(1,Math.abs(Number(d.y2)-Number(d.y1)));
@@ -8386,6 +8622,98 @@ document.querySelector(".add-mannequin-action")?.addEventListener("click",()=>{
 document.querySelector(".add-wall4-action")?.addEventListener("click",()=>{
   addTrainingMannequin("wall4");
 });
+
+function createNamedWallFromSelectedPlayers(){
+  const indexes=[...selectedPlayers]
+    .filter(index=>state.roster[index] && page().positions[index]);
+
+  if(indexes.length<2){
+    setStatus("Seleziona almeno 2 giocatori presenti sul campo");
+    return false;
+  }
+
+  const ordered=indexes
+    .map(index=>({
+      index,
+      player:state.roster[index],
+      position:page().positions[index]
+    }))
+    .sort((a,b)=>{
+      const dx=Number(a.position.x)-Number(b.position.x);
+      return Math.abs(dx)>.25
+        ? dx
+        : Number(a.position.y)-Number(b.position.y);
+    });
+
+  const logicalPoints=ordered.map(item=>({
+    x:Number(item.position.x)*10,
+    y:Number(item.position.y)*6.2
+  }));
+
+  const centerX=logicalPoints.reduce((sum,p)=>sum+p.x,0)/logicalPoints.length;
+  const centerY=logicalPoints.reduce((sum,p)=>sum+p.y,0)/logicalPoints.length;
+
+  /*
+    Stesse identiche proporzioni della barriera attuale:
+    24 unità per sagoma e altezza 53.2.
+  */
+  const figureWidth=24;
+  const width=figureWidth*ordered.length;
+  const height=53.2;
+
+  pushHistory();
+
+  const drawing={
+    type:"namedWall",
+    x1:Math.max(0,Math.min(1000-width,centerX-width/2)),
+    y1:Math.max(0,Math.min(620-height,centerY-height/2)),
+    x2:0,
+    y2:0,
+    color:"#f5bf2d",
+    width:2,
+    opacity:1,
+    shapeMode:"both",
+    dashStyle:0,
+    headSize:13,
+    curveOffset:0,
+    showNumber:true,
+    members:ordered.map(item=>({
+      playerId:String(item.player.id||item.index),
+      displayVariant:"",
+      color:""
+    }))
+  };
+
+  drawing.x2=drawing.x1+width;
+  drawing.y2=drawing.y1+height;
+
+  ordered.forEach(item=>{
+    page().positions[item.index]=null;
+  });
+
+  page().drawings.push(drawing);
+  const drawingIndex=page().drawings.length-1;
+
+  clearSelectionKinds();
+  selectedDrawing=drawingIndex;
+  selectedDrawings.add(drawingIndex);
+  selectedNamedWallMembers.clear();
+  tool="move";
+
+  renderAll();
+  refreshUnifiedSelectionVisuals();
+  syncDrawingControls();
+  save(false);
+
+  setStatus(`Barriera nominativa creata · ${ordered.length} giocatori`);
+  return true;
+}
+
+document.getElementById("createNamedWallBtn")?.addEventListener(
+  "click",
+  createNamedWallFromSelectedPlayers
+);
+
 
 document.querySelectorAll(".library-icon[data-tool]").forEach(btn=>{
   btn.addEventListener("click",()=>{
@@ -8645,6 +8973,21 @@ document.getElementById("notes").addEventListener("input",e=>{
 
 
 function applyDrawingStyleChange(property,value){
+  const namedWallRefs=getSelectedNamedWallMemberRefs();
+
+  if(property==="color" && namedWallRefs.length){
+    if(!historyTransaction)pushHistory();
+
+    namedWallRefs.forEach(ref=>{
+      ref.member.color=String(value||"");
+    });
+
+    renderDrawings();
+    syncDrawingControls();
+    save(false);
+    return;
+  }
+
   if(property==="width"){
     value=normalizeDrawingStrokeWidth(value);
   }
@@ -10136,6 +10479,10 @@ function flipSelectedHorizontally(){
       copy.numbers=[...copy.numbers].reverse();
     }
 
+    if(copy.type==="namedWall" && Array.isArray(copy.members)){
+      copy.members=[...copy.members].reverse();
+    }
+
     clampFlippedDrawingInPlace(copy);
     return copy;
   });
@@ -11035,7 +11382,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v230",
+    appVersion:"v231",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -11829,8 +12176,9 @@ function toggleFieldViewMode(){
 
 function applySelectedPlayerVisualMode(mode,enabled){
   const indexes=getSelectedPlayerIndexesForNumberToggle();
+  const wallRefs=getSelectedNamedWallMemberRefs();
 
-  if(!indexes.length){
+  if(!indexes.length && !wallRefs.length){
     setStatus("Seleziona almeno un giocatore");
     syncRosterDisplayOptions();
     return;
@@ -11870,6 +12218,10 @@ function applySelectedPlayerVisualMode(mode,enabled){
     }
   });
 
+  wallRefs.forEach(ref=>{
+    ref.member.displayVariant=nextMode;
+  });
+
   renderPlayers();
   renderRoster();
   refreshSelectionVisuals();
@@ -11879,7 +12231,7 @@ function applySelectedPlayerVisualMode(mode,enabled){
 
   setStatus(
     nextMode
-      ? `Modalità visuale applicata a ${indexes.length} giocatore/i`
+      ? `Modalità visuale applicata a ${indexes.length+wallRefs.length} elemento/i`
       : "Visualizzazione ripristinata: nome + numero + maglia"
   );
 }
@@ -12164,7 +12516,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=230",
+        "./service-worker.js?v=231",
         { updateViaCache: "none" }
       );
 
