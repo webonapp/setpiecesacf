@@ -813,3 +813,13 @@ v209 - daily-use stability
 - Un aggiornamento PWA in attesa non viene attivato automaticamente se ci sono modifiche reali non ancora protette da backup.
 - Dopo un backup riuscito, un eventuale aggiornamento in attesa può attivarsi automaticamente.
 - Defensive, sostituzioni multiple, selezione sagome, Flip, export offline, SNAP e strumenti invariati.
+
+
+v211 - PDF ottimizzato per stampa
+- Titolo PDF convertito automaticamente in MAIUSCOLO.
+- Titolo centrato orizzontalmente.
+- Titolo aumentato del 35%: da 15 pt a 20,25 pt.
+- Campo posizionato sotto il titolo con separazione dedicata, senza sovrapposizioni.
+- Margini laterali PDF ridotti a 1,5 mm per sfruttare quasi tutta la larghezza A4 landscape.
+- Margine inferiore 2,5 mm; scala campo calcolata automaticamente sulla massima area disponibile.
+- Nessuna modifica alla visualizzazione dell'app o alle funzioni operative.
