@@ -8843,15 +8843,23 @@ document.getElementById("exportPdf").addEventListener("click",async()=>{
     const pageHeight=210;
 
     /*
-      v211 - impaginazione PDF ottimizzata per stampa:
-      titolo centrale +35% e campo alla massima dimensione utile.
+      v213 - impaginazione PDF ottimizzata per stampa cartacea:
+      margini quasi a vivo, titolo più leggibile e campo molto ampio.
     */
-    const sideMargin=1.5;
-    const bottomMargin=2.5;
-    const titleFontSize=20.25; // 15 pt + 35%
-    const titleY=10.5;
-    const titleToFieldGap=5.0;
-    const imageTop=titleY+titleToFieldGap;
+    const sideMargin=0.4;
+    const bottomMargin=0.4;
+    const titleFontSize=24;
+    const titleY=9.8;
+
+    /*
+      24 pt ≈ 8,47 mm. Calcoliamo il fondo ottico del titolo
+      e lasciamo 3,6 mm reali prima del campo.
+    */
+    const titleHeightMm=titleFontSize*0.352778;
+    const titleBottom=titleY+(titleHeightMm/2);
+    const titleToFieldGap=3.6;
+    const imageTop=titleBottom+titleToFieldGap;
+
     const maxW=pageWidth-(sideMargin*2);
     const maxH=pageHeight-imageTop-bottomMargin;
 
@@ -10572,7 +10580,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v212",
+    appVersion:"v213",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -11652,7 +11660,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=212",
+        "./service-worker.js?v=213",
         { updateViaCache: "none" }
       );
 

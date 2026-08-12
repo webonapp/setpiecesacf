@@ -832,3 +832,12 @@ v212 - fix menu DIFENSIVE
 - Il menu rimane sempre centrato sotto DIFENSIVE con gap di 6 px.
 - Rimossi i listener resize/scroll usati solo per il vecchio posizionamento.
 - Nessuna modifica alla logica CORNER/PUNIZIONI, Defensive, PDF, backup o schemi.
+
+
+v213 - PDF stampa massimizzato
+- Margini laterali PDF ridotti da 1,5 mm a 0,4 mm.
+- Margine inferiore portato a 0,4 mm.
+- Titolo centrale portato da 20,25 pt a 24 pt.
+- Distanza titolo/campo calcolata sul reale ingombro del font, con gap ottico di 3,6 mm.
+- Campo spostato più in basso e scalato alla massima larghezza disponibile.
+- Nessuna modifica alle funzioni operative dell'app.
