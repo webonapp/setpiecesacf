@@ -2706,6 +2706,10 @@ body.export-clean-view .board-shell{
         <input type="checkbox" id="opponentBlankLine">
         <span>Linea nei selezionati</span>
       </label>
+      <label class="roster-option-toggle">
+        <input type="checkbox" id="selectedJerseyOnly">
+        <span>Solo maglietta</span>
+      </label>
       <div class="roster" id="roster"></div>
     </div>
   <div class="section"><div class="section-title">Note dello schema</div><textarea class="notes" id="notes" placeholder="Trigger, movimenti, blocchi, zona di attacco, alternative..."></textarea></div>
@@ -4394,6 +4398,7 @@ function getSelectedPlayerIndexesForBlankLine(){
 function syncRosterDisplayOptions(){
   const numbers=document.getElementById("showShirtNumbers");
   const blankLine=document.getElementById("opponentBlankLine");
+  const jerseyOnly=document.getElementById("selectedJerseyOnly");
 
   if(numbers){
     const indexes=getSelectedPlayerIndexesForNumberToggle();
@@ -4426,6 +4431,29 @@ function syncRosterDisplayOptions(){
     numbers.title=numberValues.length
       ? "Mostra o nasconde il numero negli elementi selezionati"
       : "Seleziona almeno un giocatore o una sagoma";
+  }
+
+  if(jerseyOnly){
+    const indexes=getSelectedPlayerIndexesForNumberToggle();
+
+    jerseyOnly.disabled=indexes.length===0;
+
+    const values=indexes.map(index=>
+      getEffectivePlayerDisplayValue(index,"jerseyOnly",false)
+    );
+
+    jerseyOnly.indeterminate=
+      values.length>0 &&
+      values.some(Boolean) &&
+      values.some(value=>!value);
+
+    jerseyOnly.checked=
+      values.length>0 &&
+      values.every(Boolean);
+
+    jerseyOnly.title=indexes.length
+      ? "Mostra solo la maglietta nei giocatori selezionati"
+      : "Seleziona almeno un giocatore";
   }
 
   if(blankLine){
@@ -5492,6 +5520,12 @@ function renderPlayers(){
         <path d="${jerseyPath}" fill="url(#${gradientId})"/>`;
     }
 
+    const jerseyOnly=getEffectivePlayerDisplayValue(
+      i,
+      "jerseyOnly",
+      false
+    );
+
     const effectiveShowCircle=getEffectivePlayerDisplayValue(
       i,
       "showChestCircle",
@@ -5499,6 +5533,7 @@ function renderPlayers(){
     );
 
     const chestCircle=(
+      !jerseyOnly &&
       !defensiveDisplay &&
       effectiveShowCircle
     )
@@ -5514,6 +5549,7 @@ function renderPlayers(){
     const effectiveShowNumber=schemaShowNumber;
 
     const visibleNumber=(
+      !jerseyOnly &&
       !defensiveDisplay &&
       effectiveShowNumber &&
       effectiveShowCircle &&
@@ -5538,9 +5574,11 @@ function renderPlayers(){
     );
 
     const effectiveShowOpponentLine=
-      state.presentationMode==="locker"
-        ? true
-        : schemaShowOpponentLine;
+      jerseyOnly
+        ? false
+        : state.presentationMode==="locker"
+          ? true
+          : schemaShowOpponentLine;
 
     const jerseySvg=`
       <svg class="jersey-svg" viewBox="0 0 56 50" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -5564,7 +5602,10 @@ function renderPlayers(){
         ${visibleNumber}
       </svg>`;
 
-    const defensiveMarker=defensiveDisplay
+    const defensiveMarker=(
+      defensiveDisplay &&
+      !jerseyOnly
+    )
       ? '<span class="defensive-marker" aria-hidden="true"></span>'
       : "";
 
@@ -5583,10 +5624,10 @@ function renderPlayers(){
         effectiveShowOpponentLine
           ? ""
           : state.presentationMode==="bench"
-            ? escapeHtml(String(pl.lastName||pl.name||pl.firstName||"").toUpperCase())
+            ? escapeHtml(jerseyOnly?"":String(pl.lastName||pl.name||pl.firstName||"").toUpperCase())
             : state.presentationMode==="locker"
               ? ""
-              : escapeHtml(effectiveShowLastName?String(pl.lastName||pl.name||pl.firstName||"").toUpperCase():"")
+              : escapeHtml((!jerseyOnly && effectiveShowLastName)?String(pl.lastName||pl.name||pl.firstName||"").toUpperCase():"")
       }</div>
     `;
     el.title="Trascina per spostare · doppio clic per aprire l’anagrafica";
@@ -10755,7 +10796,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v218",
+    appVersion:"v219",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -11580,6 +11621,36 @@ document.getElementById("showShirtNumbers").addEventListener("change",event=>{
       : "Numero nascosto negli elementi selezionati"
   );
 });
+document.getElementById("selectedJerseyOnly").addEventListener("change",event=>{
+  const indexes=getSelectedPlayerIndexesForNumberToggle();
+
+  if(!indexes.length){
+    event.target.checked=false;
+    event.target.indeterminate=false;
+    setStatus("Seleziona almeno un giocatore");
+    return;
+  }
+
+  pushHistory();
+
+  indexes.forEach(index=>{
+    const override=getPlayerDisplayOverride(index);
+    override.jerseyOnly=event.target.checked;
+  });
+
+  renderPlayers();
+  renderRoster();
+  syncRosterDisplayOptions();
+  syncChestCircleControls();
+  save(false);
+
+  setStatus(
+    event.target.checked
+      ? "Solo maglietta attivato nei giocatori selezionati"
+      : "Solo maglietta disattivato nei giocatori selezionati"
+  );
+});
+
 document.getElementById("opponentBlankLine").addEventListener("change",event=>{
   const indexes=getSelectedPlayerIndexesForBlankLine();
 
@@ -11835,7 +11906,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=218",
+        "./service-worker.js?v=219",
         { updateViaCache: "none" }
       );
 
