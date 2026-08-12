@@ -2436,6 +2436,97 @@ body.export-in-progress .field-fullscreen-previews{
   display:none!important;
 }
 
+
+/* v224 - modalità visuali giocatori selezionati */
+.player-visual-mode-box{
+  margin:8px 0 12px;
+  padding:10px;
+  border:1px solid #30465d;
+  border-radius:12px;
+  background:#0f1b27;
+}
+.player-visual-mode-title{
+  margin:0 0 8px;
+  color:#91a6bb;
+  font-size:9px;
+  font-weight:900;
+  letter-spacing:.18em;
+}
+.player-visual-mode-option{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  min-height:38px;
+  padding:7px 8px;
+  border-top:1px solid rgba(72,96,120,.34);
+  color:#d5deea;
+  font-size:10px;
+  font-weight:800;
+  line-height:1.25;
+  cursor:pointer;
+  user-select:none;
+}
+.player-visual-mode-option:first-of-type{border-top:0}
+.player-visual-mode-option input{
+  flex:0 0 auto;
+  width:17px;
+  height:17px;
+  accent-color:#8bd450;
+}
+.player-visual-mode-option:has(input:checked){
+  color:#fff;
+  background:rgba(139,212,80,.08);
+}
+.player-visual-mode-option:has(input:disabled){
+  opacity:.45;
+  cursor:not-allowed;
+}
+.player-visual-mode-help{
+  padding:8px 8px 1px;
+  color:#7f91a4;
+  font-size:9px;
+  font-weight:700;
+}
+
+.player-visual-marker{
+  position:absolute;
+  z-index:1;
+  display:block;
+  background:#c9c9ce;
+  pointer-events:none;
+  box-shadow:none;
+}
+
+/* Le righe partono sotto la maglia, senza sovrapporsi al nome. */
+.player-visual-marker.h-long{
+  left:50%;
+  top:61px;
+  width:82px;
+  height:1.6px;
+  transform:translateX(-50%);
+}
+.player-visual-marker.h-short{
+  left:50%;
+  top:61px;
+  width:48px;
+  height:1.6px;
+  transform:translateX(-50%);
+}
+.player-visual-marker.v-long{
+  left:50%;
+  top:58px;
+  width:1.6px;
+  height:92px;
+  transform:translateX(-50%);
+}
+.player-visual-marker.v-short{
+  left:50%;
+  top:58px;
+  width:1.6px;
+  height:54px;
+  transform:translateX(-50%);
+}
+
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
@@ -2682,18 +2773,30 @@ body.export-in-progress .field-fullscreen-previews{
         <button type="button" class="btn add-player-action">＋ Giocatore</button>
         <button type="button" class="btn toggle-selected-names-action" title="Mostra o nascondi i cognomi dei giocatori selezionati" aria-label="Mostra o nascondi i cognomi dei giocatori selezionati">👁</button>
       </div>
-      <label class="roster-option-toggle">
-        <input type="checkbox" id="showShirtNumbers">
-        <span>Numero nei selezionati</span>
-      </label>
-      <label class="roster-option-toggle">
-        <input type="checkbox" id="opponentBlankLine">
-        <span>Linea nei selezionati</span>
-      </label>
-      <label class="roster-option-toggle">
-        <input type="checkbox" id="selectedJerseyOnly">
-        <span>Solo maglietta</span>
-      </label>
+      <div class="player-visual-mode-box" id="playerVisualModeBox">
+        <div class="player-visual-mode-title">VISUALIZZAZIONE SELEZIONATI</div>
+        <label class="player-visual-mode-option">
+          <input type="checkbox" class="player-visual-mode-check" data-visual-mode="jersey">
+          <span>Solo maglietta</span>
+        </label>
+        <label class="player-visual-mode-option">
+          <input type="checkbox" class="player-visual-mode-check" data-visual-mode="h-long">
+          <span>Maglietta + riga orizzontale sotto lunga</span>
+        </label>
+        <label class="player-visual-mode-option">
+          <input type="checkbox" class="player-visual-mode-check" data-visual-mode="h-short">
+          <span>Maglietta + riga orizzontale sotto corta</span>
+        </label>
+        <label class="player-visual-mode-option">
+          <input type="checkbox" class="player-visual-mode-check" data-visual-mode="v-long">
+          <span>Maglietta + riga verticale sotto lunga</span>
+        </label>
+        <label class="player-visual-mode-option">
+          <input type="checkbox" class="player-visual-mode-check" data-visual-mode="v-short">
+          <span>Maglietta + riga verticale sotto corta</span>
+        </label>
+        <div class="player-visual-mode-help">Nessun flag: nome + numero + maglia</div>
+      </div>
       <div class="roster" id="roster"></div>
     </div>
   <div class="section"><div class="section-title">Note dello schema</div><textarea class="notes" id="notes" placeholder="Trigger, movimenti, blocchi, zona di attacco, alternative..."></textarea></div>
@@ -2736,6 +2839,10 @@ body.export-in-progress .field-fullscreen-previews{
 
 
 <div id="legacyControls" hidden aria-hidden="true">
+  <input type="checkbox" id="showShirtNumbers">
+  <input type="checkbox" id="opponentBlankLine">
+  <input type="checkbox" id="selectedJerseyOnly">
+
   <input id="schemeName" value="">
   <button id="renameScheme" type="button"></button>
   <button id="addScheme" type="button"></button>
@@ -3514,6 +3621,14 @@ function normalizePageRecord(projectPage,index,rosterLength){
     }
 
     Object.keys(override).forEach(property=>{
+      if(property==="displayVariant"){
+        const allowed=new Set(["jersey","h-long","h-short","v-long","v-short"]);
+        if(!allowed.has(override[property])){
+          delete override[property];
+        }
+        return;
+      }
+
       if(
         PLAYER_DISPLAY_PROPERTIES.has(property) &&
         typeof override[property]!=="boolean"
@@ -4279,7 +4394,8 @@ const PLAYER_DISPLAY_PROPERTIES=new Set([
   "showShirtNumber",
   "showChestCircle",
   "showOpponentBlankLine",
-  "jerseyOnly"
+  "jerseyOnly",
+  "displayVariant"
 ]);
 
 function getGlobalPlayerDisplayBase(player,property){
@@ -4318,9 +4434,13 @@ function getPlayerDisplayValue(index,property,fallback){
     if(property==="showLastName")return true;
     if(property==="showShirtNumber")return true;
     if(property==="jerseyOnly")return false;
+    if(property==="displayVariant")return "";
   }
 
   const pageOverride=getPagePlayerDisplayOverride(index,property);
+  if(property==="displayVariant"){
+    return typeof pageOverride==="string" ? pageOverride : "";
+  }
   if(typeof pageOverride==="boolean")return pageOverride;
 
   const globalBase=getGlobalPlayerDisplayBase(player,property);
@@ -4392,92 +4512,31 @@ function getSelectedPlayerIndexesForBlankLine(){
 }
 
 function syncRosterDisplayOptions(){
-  const numbers=document.getElementById("showShirtNumbers");
-  const blankLine=document.getElementById("opponentBlankLine");
-  const jerseyOnly=document.getElementById("selectedJerseyOnly");
+  const indexes=getSelectedPlayerIndexesForNumberToggle();
+  const checks=[...document.querySelectorAll(".player-visual-mode-check")];
 
-  if(numbers){
-    const indexes=getSelectedPlayerIndexesForNumberToggle();
-    const mannequinIndexes=getSelectedMannequinIndexesForNumberToggle();
+  checks.forEach(check=>{
+    check.disabled=indexes.length===0;
 
-    numbers.disabled=indexes.length===0 && mannequinIndexes.length===0;
+    if(!indexes.length){
+      check.checked=false;
+      check.indeterminate=false;
+      return;
+    }
 
-    const numberValues=[
-      ...indexes.map(index=>
-        getEffectivePlayerDisplayValue(
-          index,
-          "showShirtNumber",
-          state.roster[index].showShirtNumber===true
-        )
-      ),
-      ...mannequinIndexes.map(index=>
-        page().drawings[index].showNumber!==false
-      )
-    ];
-
-    numbers.indeterminate=
-      numberValues.length>0 &&
-      numberValues.some(Boolean) &&
-      numberValues.some(value=>!value);
-
-    numbers.checked=
-      numberValues.length>0 &&
-      numberValues.every(Boolean);
-
-    numbers.title=numberValues.length
-      ? "Mostra o nasconde il numero negli elementi selezionati"
-      : "Seleziona almeno un giocatore o una sagoma";
-  }
-
-  if(jerseyOnly){
-    const indexes=getSelectedPlayerIndexesForNumberToggle();
-
-    jerseyOnly.disabled=indexes.length===0;
-
+    const mode=check.dataset.visualMode||"";
     const values=indexes.map(index=>
-      getEffectivePlayerDisplayValue(index,"jerseyOnly",false)
+      getEffectivePlayerDisplayValue(index,"displayVariant","")===mode
     );
 
-    jerseyOnly.indeterminate=
-      values.length>0 &&
+    check.checked=values.every(Boolean);
+    check.indeterminate=
       values.some(Boolean) &&
       values.some(value=>!value);
+  });
 
-    jerseyOnly.checked=
-      values.length>0 &&
-      values.every(Boolean);
-
-    jerseyOnly.title=indexes.length
-      ? "Mostra solo la maglietta nei giocatori selezionati"
-      : "Seleziona almeno un giocatore";
-  }
-
-  if(blankLine){
-    const lineIndexes=getSelectedPlayerIndexesForBlankLine();
-    blankLine.disabled=lineIndexes.length===0;
-    const lineValues=lineIndexes.map(index=>
-      getEffectivePlayerDisplayValue(
-        index,
-        "showOpponentBlankLine",
-        state.roster[index].showOpponentBlankLine===true
-      )
-    );
-
-    blankLine.indeterminate=
-      lineIndexes.length>0 &&
-      lineValues.some(Boolean) &&
-      lineValues.some(value=>!value);
-
-    blankLine.checked=
-      lineIndexes.length>0 &&
-      lineValues.every(Boolean);
-
-    blankLine.title=lineIndexes.length
-      ? "Mostra o nasconde la linea nei giocatori selezionati"
-      : "Seleziona almeno un giocatore";
-  }
+  updateSelectedNamesButton();
 }
-
 function setStatus(msg){const el=document.getElementById("status");el.textContent=msg;clearTimeout(setStatus.t);setStatus.t=setTimeout(()=>el.textContent="Pronto",1600)}
 function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[c]))}
 
@@ -5508,11 +5567,21 @@ function renderPlayers(){
         <path d="${jerseyPath}" fill="url(#${gradientId})"/>`;
     }
 
-    const jerseyOnly=getEffectivePlayerDisplayValue(
+    const displayVariant=getEffectivePlayerDisplayValue(
       i,
-      "jerseyOnly",
-      false
+      "displayVariant",
+      ""
     );
+
+    const jerseyOnly=
+      state.presentationMode==="bench"
+        ? false
+        : Boolean(displayVariant) ||
+          getEffectivePlayerDisplayValue(
+            i,
+            "jerseyOnly",
+            false
+          );
 
     const effectiveShowCircle=getEffectivePlayerDisplayValue(
       i,
@@ -5565,8 +5634,10 @@ function renderPlayers(){
     const effectiveShowOpponentLine=
       state.presentationMode==="bench"
         ? false
-        : jerseyOnly
+        : displayVariant
           ? false
+          : jerseyOnly
+            ? false
           : state.presentationMode==="locker"
             ? true
             : schemaShowOpponentLine;
@@ -5593,7 +5664,16 @@ function renderPlayers(){
         ${visibleNumber}
       </svg>`;
 
+    const visualMarker=(
+      displayVariant &&
+      displayVariant!=="jersey" &&
+      state.presentationMode!=="bench"
+    )
+      ? `<span class="player-visual-marker ${displayVariant}" aria-hidden="true"></span>`
+      : "";
+
     el.innerHTML=`
+      ${visualMarker}
       ${jerseySvg}
       <div class="player-tag${
         effectiveShowOpponentLine
@@ -6212,7 +6292,13 @@ function updateSelectedNamesButton(){
     return;
   }
 
-  const allHidden=ids.every(i=>state.roster[i].showLastName===false);
+  const allHidden=ids.every(i=>
+    getEffectivePlayerDisplayValue(
+      i,
+      "showLastName",
+      state.roster[i].showLastName!==false
+    )===false
+  );
   button.textContent=allHidden?"◉":"👁";
   button.classList.toggle("names-hidden",allHidden);
   button.title=allHidden
@@ -10527,11 +10613,29 @@ document.addEventListener("click",e=>{
 
   pushHistory();
 
-  const allHidden=ids.every(i=>state.roster[i].showLastName===false);
+  const allHidden=ids.every(i=>
+    getEffectivePlayerDisplayValue(
+      i,
+      "showLastName",
+      state.roster[i].showLastName!==false
+    )===false
+  );
   const nextVisibility=allHidden;
 
   ids.forEach(i=>{
-    state.roster[i].showLastName=nextVisibility;
+    const override=getPlayerDisplayOverride(i);
+
+    /*
+      Il pulsante occhio agisce sullo schema corrente, esattamente come
+      gli altri controlli dei selezionati. Se era attiva una modalità
+      "solo maglietta", la rimuoviamo per rendere il nome realmente visibile.
+    */
+    if(nextVisibility){
+      delete override.displayVariant;
+      delete override.jerseyOnly;
+    }
+
+    override.showLastName=nextVisibility;
   });
 
   renderPlayers();
@@ -10783,7 +10887,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v223",
+    appVersion:"v224",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -11574,102 +11678,71 @@ function toggleFieldViewMode(){
   setFieldViewMode(!fieldViewMode);
 }
 
-document.getElementById("showShirtNumbers").addEventListener("change",event=>{
-  const indexes=getSelectedPlayerIndexesForNumberToggle();
-  const mannequinIndexes=getSelectedMannequinIndexesForNumberToggle();
 
-  if(!indexes.length && !mannequinIndexes.length){
-    event.target.checked=false;
-    event.target.indeterminate=false;
-    setStatus("Seleziona almeno un giocatore o una sagoma");
-    return;
-  }
-
-  pushHistory();
-
-  indexes.forEach(index=>{
-    const override=getPlayerDisplayOverride(index);
-    override.showShirtNumber=event.target.checked;
-  });
-
-  mannequinIndexes.forEach(index=>{
-    page().drawings[index].showNumber=event.target.checked;
-  });
-
-  renderPlayers();
-  renderRoster();
-  renderDrawings();
-  syncRosterDisplayOptions();
-  save(false);
-
-  setStatus(
-    event.target.checked
-      ? "Numero mostrato negli elementi selezionati"
-      : "Numero nascosto negli elementi selezionati"
-  );
-});
-document.getElementById("selectedJerseyOnly").addEventListener("change",event=>{
+function applySelectedPlayerVisualMode(mode,enabled){
   const indexes=getSelectedPlayerIndexesForNumberToggle();
 
   if(!indexes.length){
-    event.target.checked=false;
-    event.target.indeterminate=false;
     setStatus("Seleziona almeno un giocatore");
+    syncRosterDisplayOptions();
     return;
   }
+
+  const allowed=new Set(["jersey","h-long","h-short","v-long","v-short"]);
+  const nextMode=enabled && allowed.has(mode) ? mode : "";
 
   pushHistory();
 
   indexes.forEach(index=>{
     const override=getPlayerDisplayOverride(index);
-    override.jerseyOnly=event.target.checked;
+
+    /*
+      Una sola modalità alla volta.
+      Rimuoviamo anche i vecchi override visuali così "nessun flag"
+      torna davvero a nome + numero + maglia.
+    */
+    delete override.jerseyOnly;
+    delete override.showOpponentBlankLine;
+    delete override.showLastName;
+    delete override.showShirtNumber;
+    delete override.showChestCircle;
+
+    if(nextMode){
+      override.displayVariant=nextMode;
+    }else{
+      delete override.displayVariant;
+    }
+
+    if(!Object.keys(override).length){
+      const player=state.roster[index];
+      const key=String(player?.id || index);
+      if(page().playerDisplayOverrides){
+        delete page().playerDisplayOverrides[key];
+      }
+    }
   });
 
   renderPlayers();
   renderRoster();
+  refreshSelectionVisuals();
   syncRosterDisplayOptions();
   syncChestCircleControls();
   save(false);
 
   setStatus(
-    event.target.checked
-      ? "Solo maglietta attivato nei giocatori selezionati"
-      : "Solo maglietta disattivato nei giocatori selezionati"
+    nextMode
+      ? `Modalità visuale applicata a ${indexes.length} giocatore/i`
+      : "Visualizzazione ripristinata: nome + numero + maglia"
   );
+}
+
+document.addEventListener("change",event=>{
+  const check=event.target.closest(".player-visual-mode-check");
+  if(!check)return;
+
+  const mode=check.dataset.visualMode||"";
+  applySelectedPlayerVisualMode(mode,check.checked);
 });
-
-document.getElementById("opponentBlankLine").addEventListener("change",event=>{
-  const indexes=getSelectedPlayerIndexesForBlankLine();
-
-  if(!indexes.length){
-    event.target.checked=false;
-    event.target.indeterminate=false;
-    setStatus("Seleziona almeno un giocatore");
-    return;
-  }
-
-  pushHistory();
-
-  indexes.forEach(index=>{
-    const override=getPlayerDisplayOverride(index);
-    override.showOpponentBlankLine=event.target.checked;
-  });
-
-  renderPlayers();
-  renderRoster();
-  syncRosterDisplayOptions();
-  save(false);
-
-  setStatus(
-    event.target.checked
-      ? "Linea mostrata nei giocatori selezionati dello schema corrente"
-      : "Linea nascosta nei giocatori selezionati dello schema corrente"
-  );
-});
-
-
-
-
 
 document.getElementById("benchModeBtn").addEventListener(
   "click",
@@ -11920,7 +11993,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=223",
+        "./service-worker.js?v=224",
         { updateViaCache: "none" }
       );
 
