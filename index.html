@@ -4901,17 +4901,23 @@ function applyGlobalSubstitutionPairs(pairs){
   */
   state.pages.forEach(projectPage=>{
     const originalOutgoingPositions=new Map();
+    const originalOutgoingDisplayOverrides=new Map();
 
     /*
-      v216:
-      una sostituzione globale è una vera sostituzione, non uno scambio.
-      Per OGNI schema in lavorazione:
-      - se il giocatore in uscita è presente, l'entrante prende il suo posto;
-      - il giocatore in uscita viene rimosso;
-      - se l'entrante era già presente altrove nello stesso schema, non viene
-        lasciata una seconda copia.
-      Tutte le posizioni vengono fotografate prima, così le sostituzioni
-      multiple restano simultanee e non producono effetti a cascata.
+      v226:
+      la sostituzione trasferisce non soltanto la posizione ma anche
+      la VISUALIZZAZIONE DEL POSTO nello specifico schema.
+
+      Esempio:
+      - Schema 1: X = maglietta + riga orizzontale corta
+      - Schema 2: X = maglietta + riga orizzontale lunga
+
+      Sostituendo X con Y:
+      - Schema 1: Y eredita la riga corta
+      - Schema 2: Y eredita la riga lunga
+
+      Ogni pagina viene trattata separatamente, quindi gli stili diversi
+      tra gli schemi rimangono indipendenti.
     */
     pairs.forEach(pair=>{
       originalOutgoingPositions.set(
@@ -4920,20 +4926,73 @@ function applyGlobalSubstitutionPairs(pairs){
           ? {...projectPage.positions[pair.outgoingIndex]}
           : null
       );
+
+      const outgoingPlayer=state.roster[pair.outgoingIndex];
+      const outgoingKey=String(
+        outgoingPlayer?.id || pair.outgoingIndex
+      );
+
+      const outgoingOverride=
+        projectPage.playerDisplayOverrides?.[outgoingKey];
+
+      originalOutgoingDisplayOverrides.set(
+        pair.outgoingIndex,
+        outgoingOverride && typeof outgoingOverride==="object"
+          ? JSON.parse(JSON.stringify(outgoingOverride))
+          : null
+      );
     });
 
     pairs.forEach(pair=>{
       const outgoingPosition=
         originalOutgoingPositions.get(pair.outgoingIndex);
 
+      /*
+        Se il giocatore in uscita non è presente in questo schema,
+        quello schema non viene modificato.
+      */
       if(!outgoingPosition){
         return;
       }
+
+      const outgoingPlayer=state.roster[pair.outgoingIndex];
+      const incomingPlayer=state.roster[pair.incomingIndex];
+      const outgoingKey=String(
+        outgoingPlayer?.id || pair.outgoingIndex
+      );
+      const incomingKey=String(
+        incomingPlayer?.id || pair.incomingIndex
+      );
 
       projectPage.positions[pair.outgoingIndex]=null;
       projectPage.positions[pair.incomingIndex]={
         ...outgoingPosition
       };
+
+      if(
+        !projectPage.playerDisplayOverrides ||
+        typeof projectPage.playerDisplayOverrides!=="object"
+      ){
+        projectPage.playerDisplayOverrides={};
+      }
+
+      /*
+        L'entrante prende esattamente lo stile che aveva l'uscente
+        in QUESTO schema. Se l'uscente non aveva override, l'entrante
+        torna alla visualizzazione standard dello schema anziché
+        conservare un proprio vecchio flag.
+      */
+      const outgoingOverride=
+        originalOutgoingDisplayOverrides.get(pair.outgoingIndex);
+
+      delete projectPage.playerDisplayOverrides[outgoingKey];
+
+      if(outgoingOverride){
+        projectPage.playerDisplayOverrides[incomingKey]=
+          JSON.parse(JSON.stringify(outgoingOverride));
+      }else{
+        delete projectPage.playerDisplayOverrides[incomingKey];
+      }
     });
   });
 
@@ -10887,7 +10946,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v225",
+    appVersion:"v226",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -11993,7 +12052,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=225",
+        "./service-worker.js?v=226",
         { updateViaCache: "none" }
       );
 
