@@ -3657,10 +3657,7 @@ function normalizeDrawingRecord(drawing){
 function normalizePageRecord(projectPage,index,rosterLength){
   const safe=projectPage && typeof projectPage==="object" ? projectPage : {};
 
-  safe.title=String(
-    safe.title ||
-    `Schema-${index+1}`
-  );
+  safe.title=String(safe.title||"").trim() || `Schema-${index+1}`;
   safe.notes=String(safe.notes||"");
 
   safe.positions=Array.from({length:rosterLength},(_,playerIndex)=>{
@@ -3835,15 +3832,31 @@ function assertProjectIntegrity(projectState){
 
   if(new Set(rosterIds).size!==rosterIds.length)return false;
 
-  return projectState.pages.every(projectPage=>
-    Array.isArray(projectPage.positions) &&
-    projectPage.positions.length===projectState.roster.length &&
-    Array.isArray(projectPage.drawings) &&
-    Array.isArray(projectPage.balls) &&
-    Array.isArray(projectPage.texts) &&
-    projectPage.playerDisplayOverrides &&
-    typeof projectPage.playerDisplayOverrides==="object"
-  );
+  const validRosterIds=new Set(rosterIds);
+
+  return projectState.pages.every(projectPage=>{
+    if(
+      !Array.isArray(projectPage.positions) ||
+      projectPage.positions.length!==projectState.roster.length ||
+      !Array.isArray(projectPage.drawings) ||
+      !Array.isArray(projectPage.balls) ||
+      !Array.isArray(projectPage.texts) ||
+      !projectPage.playerDisplayOverrides ||
+      typeof projectPage.playerDisplayOverrides!=="object"
+    ) return false;
+
+    if(!projectPage.positions.every(position=>
+      position===null ||
+      (Number.isFinite(Number(position.x)) && Number.isFinite(Number(position.y)))
+    )) return false;
+
+    return projectPage.drawings.every(drawing=>{
+      if(drawing?.type!=="wall4")return true;
+      if(!Array.isArray(drawing.members) || drawing.members.length!==4)return false;
+      const ids=drawing.members.map(member=>String(member?.playerId||"")).filter(Boolean);
+      return ids.every(id=>validRosterIds.has(id)) && new Set(ids).size===ids.length;
+    });
+  });
 }
 
 
@@ -6596,7 +6609,17 @@ function getSelectedWallMemberRefs(){
       Array.isArray(drawing.members) &&
       drawing.members[memberIndex]
     ){
-      refs.push({drawingIndex,memberIndex,drawing,member:drawing.members[memberIndex]});
+      selectedDrawings.add(drawingIndex);
+      if(selectedDrawing===null){
+        selectedDrawing=drawingIndex;
+      }
+
+      refs.push({
+        drawingIndex,
+        memberIndex,
+        drawing,
+        member:drawing.members[memberIndex]
+      });
     }
   });
 
@@ -6632,6 +6655,53 @@ function getUnifiedSelectionCount(){
     selectedTexts.size+
     selectedDrawings.size
   );
+}
+
+function pruneTransientSelections(){
+  const current=page();
+
+  selectedPlayers=new Set([...selectedPlayers].filter(index=>
+    Number.isInteger(index) && Boolean(state.roster[index]) && Boolean(current.positions?.[index])
+  ));
+  selectedRosterPlayers=new Set([...selectedRosterPlayers].filter(index=>
+    Number.isInteger(index) && Boolean(state.roster[index])
+  ));
+
+  selectedBalls=new Set([...selectedBalls].filter(index=>
+    Number.isInteger(index) && Boolean(current.balls?.[index])
+  ));
+  if(!selectedBalls.has(selectedBall))selectedBall=null;
+
+  selectedTexts=new Set([...selectedTexts].filter(index=>
+    Number.isInteger(index) && Boolean(current.texts?.[index])
+  ));
+  if(!selectedTexts.has(selectedText))selectedText=null;
+
+  selectedDrawings=new Set([...selectedDrawings].filter(index=>
+    Number.isInteger(index) && Boolean(current.drawings?.[index])
+  ));
+  if(!selectedDrawings.has(selectedDrawing))selectedDrawing=null;
+
+  selectedWallMembers=new Set([...selectedWallMembers].filter(key=>{
+    const [drawingIndexRaw,memberIndexRaw]=String(key).split(":");
+    const drawingIndex=Number(drawingIndexRaw);
+    const memberIndex=Number(memberIndexRaw);
+    const drawing=current.drawings?.[drawingIndex];
+
+    const valid=
+      drawing?.type==="wall4" &&
+      Array.isArray(drawing.members) &&
+      Boolean(drawing.members[memberIndex]);
+
+    if(valid){
+      selectedDrawings.add(drawingIndex);
+      if(selectedDrawing===null){
+        selectedDrawing=drawingIndex;
+      }
+    }
+
+    return valid;
+  }));
 }
 
 function isUnifiedSelectionMember(kind,index){
@@ -7215,7 +7285,9 @@ function getWallMemberPlayerIndex(member){
 
 function closeWallMemberPlayerModal(){
   wallMemberPlayerTarget=null;
-  document.getElementById("wallMemberPlayerModal")?.classList.remove("open");
+  const modal=document.getElementById("wallMemberPlayerModal");
+  modal?.classList.remove("open");
+  modal?.setAttribute("aria-hidden","true");
 }
 
 function openWallMemberPlayerModal(drawingIndex,memberIndex){
@@ -7267,9 +7339,17 @@ function openWallMemberPlayerModal(drawingIndex,memberIndex){
     select.appendChild(option);
   });
 
-  select.value=String(member.playerId||"");
+  const currentPlayerId=String(member.playerId||"");
 
-  document.getElementById("wallMemberPlayerModal")?.classList.add("open");
+  select.value=[...select.options].some(option=>
+    option.value===currentPlayerId
+  )
+    ? currentPlayerId
+    : "";
+
+  const modal=document.getElementById("wallMemberPlayerModal");
+  modal?.classList.add("open");
+  modal?.setAttribute("aria-hidden","false");
 
   requestAnimationFrame(()=>{
     select.focus();
@@ -7923,19 +8003,45 @@ function renderDrawings(){
             syncDrawingControls();
           };
 
+          let wallSlotPress=null;
+
           memberHit.addEventListener("pointerdown",event=>{
             if(tool!=="move")return;
 
             event.preventDefault();
             event.stopPropagation();
 
+            wallSlotPress={
+              pointerId:event.pointerId,
+              x:event.clientX,
+              y:event.clientY,
+              moved:false
+            };
+
+            try{
+              memberHit.setPointerCapture(event.pointerId);
+            }catch(_){}
+          });
+
+          memberHit.addEventListener("pointermove",event=>{
+            if(
+              !wallSlotPress ||
+              wallSlotPress.pointerId!==event.pointerId ||
+              wallSlotPress.moved
+            )return;
+
+            const distance=Math.hypot(
+              event.clientX-wallSlotPress.x,
+              event.clientY-wallSlotPress.y
+            );
+
+            if(distance<7)return;
+
+            wallSlotPress.moved=true;
+
             selectWallSlot(event);
             renderDrawings();
 
-            /*
-              Il singolo posto è selezionabile, ma la barriera continua
-              a muoversi come un unico oggetto.
-            */
             startUnifiedSelectionDrag({
               event,
               element:memberHit,
@@ -7944,29 +8050,61 @@ function renderDrawings(){
             });
           });
 
+          memberHit.addEventListener("pointerup",event=>{
+            if(
+              wallSlotPress &&
+              wallSlotPress.pointerId===event.pointerId &&
+              !wallSlotPress.moved
+            ){
+              selectWallSlot(event);
+              renderDrawings();
+            }
+
+            wallSlotPress=null;
+
+            try{
+              memberHit.releasePointerCapture(event.pointerId);
+            }catch(_){}
+          });
+
+          memberHit.addEventListener("pointercancel",()=>{
+            wallSlotPress=null;
+          });
+
           memberHit.addEventListener("dblclick",event=>{
+            if(tool!=="move")return;
+
             event.preventDefault();
             event.stopPropagation();
+
             selectWallSlot(event);
+            renderDrawings();
             openWallMemberPlayerModal(i,index);
           });
 
           let lastWallSlotTap=0;
+
           memberHit.addEventListener("pointerup",event=>{
             if(event.pointerType==="mouse")return;
 
             const now=performance.now();
+
             if(now-lastWallSlotTap<430){
               lastWallSlotTap=0;
               event.preventDefault();
               event.stopPropagation();
+
+              selectWallSlot(event);
+              renderDrawings();
               openWallMemberPlayerModal(i,index);
               return;
             }
 
             lastWallSlotTap=now;
             setTimeout(()=>{
-              if(lastWallSlotTap===now)lastWallSlotTap=0;
+              if(lastWallSlotTap===now){
+                lastWallSlotTap=0;
+              }
             },460);
           });
 
@@ -8007,10 +8145,6 @@ function renderDrawings(){
         )*1000;
 
         let targetIndex=0;
-
-        if(d.type==="wall4"){
-          return;
-        }
 
         if(d.type==="wall4"){
           return;
@@ -8573,6 +8707,7 @@ function updateLineupCounters(){
 }
 
 function renderAll(){
+  pruneTransientSelections();
   renderSchemeSelect();
   renderRoster();
   renderPlayers();
@@ -11591,7 +11726,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v234",
+    appVersion:"v236",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -12433,7 +12568,8 @@ function applySelectedPlayerVisualMode(mode,enabled){
 
   renderPlayers();
   renderRoster();
-  refreshSelectionVisuals();
+  renderDrawings();
+  refreshUnifiedSelectionVisuals();
   syncRosterDisplayOptions();
   syncChestCircleControls();
   save(false);
@@ -12725,7 +12861,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=234",
+        "./service-worker.js?v=236",
         { updateViaCache: "none" }
       );
 
