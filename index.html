@@ -2595,7 +2595,7 @@ body.export-clean-view .board-shell{
 <section class="field-wrap">
   <div class="canvas-header">
     <button type="button" class="current-title current-title-edit" id="currentTitle" title="Modifica nome schema" aria-label="Modifica nome schema">
-      <span id="currentTitleText">Schema 1</span>
+      <span id="currentTitleText">Schema-1</span>
       <span class="current-title-pencil" aria-hidden="true">✎</span>
     </button>
     <div class="canvas-substitution-slot">
@@ -3298,8 +3298,8 @@ const defaultRoster=[];
 function defaultPositions(count=state?.roster?.length || defaultRoster.length){
   return Array.from({length:count},()=>null);
 }
-const emptyPage=i=>({title:i===0?"ACF Fiorentina · Schema 1":`Schema ${i+1}`,notes:"",positions:defaultPositions(defaultRoster.length),drawings:[],balls:[],texts:[],playerDisplayOverrides:{}});
-let state={roster:defaultRoster,pages:Array.from({length:10},(_,i)=>emptyPage(i)),playerScale:.75,snapEnabled:true,homeChestCircle:true,awayChestCircle:false,homeRosterLoaded:false,awayRosterLoaded:false,homeRosterTemplate:null,defensiveDisplay:null};
+const emptyPage=i=>({title:`Schema-${i+1}`,notes:"",positions:defaultPositions(defaultRoster.length),drawings:[],balls:[],texts:[],playerDisplayOverrides:{}});
+let state={roster:defaultRoster,pages:[emptyPage(0)],playerScale:.75,snapEnabled:true,homeChestCircle:true,awayChestCircle:false,homeRosterLoaded:false,awayRosterLoaded:false,homeRosterTemplate:null,defensiveDisplay:null};
 
 const FIORENTINA_PRESET=[
   {number:43,firstName:"",lastName:"De Gea",name:"De Gea",team:"gk",color:"#e3b52d"},
@@ -3458,7 +3458,7 @@ function normalizePageRecord(projectPage,index,rosterLength){
 
   safe.title=String(
     safe.title ||
-    (index===0 ? "ACF Fiorentina · Schema 1" : `Schema ${index+1}`)
+    `Schema-${index+1}`
   );
   safe.notes=String(safe.notes||"");
 
@@ -10547,7 +10547,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v209",
+    appVersion:"v210",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -11680,7 +11680,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=209",
+        "./service-worker.js?v=210",
         { updateViaCache: "none" }
       );
 
