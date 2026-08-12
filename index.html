@@ -3440,7 +3440,7 @@ const FIORENTINA_PRESET=[
   {number:11,firstName:"",lastName:"Gudmundsson",name:"Gudmundsson",team:"home",color:"#5b3192"},
   {number:30,firstName:"",lastName:"Mastantuono",name:"Mastantuono",team:"home",color:"#5b3192",role:"attaccante"},
   {number:9,firstName:"",lastName:"Kean",name:"Kean",team:"home",color:"#5b3192"},
-  {number:91,firstName:"",lastName:"Piccoli",name:"Piccoli",team:"home",color:"#5b3192"},
+  {number:32,firstName:"",lastName:"Pellegrino",name:"Pellegrino",team:"home",color:"#5b3192",role:"attaccante"},
   {number:70,firstName:"",lastName:"Croci",name:"Croci",team:"home",color:"#5b3192",role:"attaccante"},
   {number:72,firstName:"",lastName:"Mazzeo",name:"Mazzeo",team:"home",color:"#5b3192",role:"attaccante"},
 ].map((p,i)=>({id:"p"+i,...p}));
@@ -4101,7 +4101,7 @@ function inferPlayerRole(player){
     "gudmundsson",
     "mastantuono",
     "kean",
-    "piccoli",
+    "pellegrino",
     "croci",
     "mazzeo"
   ]).has(s))return "attaccante";
@@ -4112,6 +4112,7 @@ function ensurePlayerRoles(){
   const forcedRoleByName=new Map([
     ["joao mario","difensore"],
     ["mastantuono","attaccante"],
+    ["pellegrino","attaccante"],
     ["croci","attaccante"],
     ["mazzeo","attaccante"]
   ]);
@@ -8846,22 +8847,23 @@ function normalizeExportArrowStrokeWidths(clonedDocument){
   const clonedBoard=clonedDocument.getElementById("board");
   if(!liveBoard || !clonedBoard)return;
 
-  const liveWidth=liveBoard.getBoundingClientRect().width;
+  const liveRect=liveBoard.getBoundingClientRect();
+  const liveWidth=liveRect.width;
+
   if(!Number.isFinite(liveWidth) || liveWidth<=0)return;
 
   /*
-    Le frecce usano vector-effect:non-scaling-stroke nell'editor.
-    Quando html2canvas ricrea l'SVG con dimensioni differenti, quel vincolo
-    può far apparire lo spessore maggiore rispetto al progetto.
-    Convertiamo quindi lo spessore visivo corrente in unità del viewBox.
-  */
-  const viewBoxWidth=1000;
-  const exportFactor=viewBoxWidth/liveWidth;
+    Manteniamo nel file esportato la stessa proporzione visiva
+    "spessore freccia / larghezza campo" osservata nell'editor.
 
+    Il campo logico esportato è 1000 px. Le frecce dell'editor usano
+    non-scaling-stroke, quindi il valore CSS dello stroke non può essere
+    copiato brutalmente nel clone: va convertito in unità del campo.
+  */
+  const logicalBoardWidth=1000;
   const liveArrows=[...document.querySelectorAll(
     "#drawLayer .drawing-visible"
   )];
-
   const clonedArrows=[...clonedDocument.querySelectorAll(
     "#drawLayer .drawing-visible"
   )];
@@ -8870,20 +8872,44 @@ function normalizeExportArrowStrokeWidths(clonedDocument){
     const liveArrow=liveArrows[index];
     if(!liveArrow)return;
 
-    const screenStroke=parseFloat(
-      getComputedStyle(liveArrow).strokeWidth
+    const liveStroke=parseFloat(
+      window.getComputedStyle(liveArrow).strokeWidth
     );
 
-    if(!Number.isFinite(screenStroke) || screenStroke<=0)return;
+    if(!Number.isFinite(liveStroke) || liveStroke<=0)return;
 
-    const normalizedStroke=screenStroke*exportFactor;
+    const relativeStroke=liveStroke/liveWidth;
+    const logicalStroke=relativeStroke*logicalBoardWidth;
 
-    arrow.setAttribute(
-      "stroke-width",
-      String(normalizedStroke)
-    );
-    arrow.style.strokeWidth=String(normalizedStroke);
+    arrow.setAttribute("stroke-width",String(logicalStroke));
+    arrow.style.strokeWidth=String(logicalStroke);
     arrow.setAttribute("vector-effect","none");
+    arrow.style.vectorEffect="none";
+
+    /*
+      I pattern tratteggiati sono definiti nello stesso sistema della
+      freccia. Ridimensioniamo anche dash e gap con lo stesso rapporto,
+      evitando che nel PDF sembrino blocchi molto più grossi.
+    */
+    const liveDash=window.getComputedStyle(liveArrow).strokeDasharray;
+
+    if(
+      liveDash &&
+      liveDash!=="none" &&
+      liveDash.trim()!==""
+    ){
+      const values=liveDash
+        .split(/[,\s]+/)
+        .map(value=>parseFloat(value))
+        .filter(Number.isFinite)
+        .map(value=>value/liveWidth*logicalBoardWidth);
+
+      if(values.length){
+        const normalizedDash=values.join(" ");
+        arrow.setAttribute("stroke-dasharray",normalizedDash);
+        arrow.style.strokeDasharray=normalizedDash;
+      }
+    }
   });
 }
 
@@ -8931,7 +8957,6 @@ async function captureCurrentScheme(){
               element.style.display="none";
             });
 
-          normalizeExportArrowStrokeWidths(clonedDocument);
           normalizeExportArrowStrokeWidths(clonedDocument);
           clonedDocument.body.classList.add("export-clean-view");
         }
@@ -9016,6 +9041,14 @@ async function captureBoardForPdf(){
               element.style.display="none";
             });
 
+          /*
+            v228:
+            anche il PDF deve passare dallo stesso normalizzatore del PNG.
+            In v221 il richiamo era stato inserito due volte nel PNG e zero
+            volte nel PDF: per questo il corpo delle frecce risultava
+            sensibilmente più spesso nell'esportazione PDF.
+          */
+          normalizeExportArrowStrokeWidths(clonedDocument);
           clonedDocument.body.classList.add("export-clean-view");
         }
       });
@@ -10946,7 +10979,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v226",
+    appVersion:"v228",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -12052,7 +12085,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=226",
+        "./service-worker.js?v=228",
         { updateViaCache: "none" }
       );
 
