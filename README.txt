@@ -802,3 +802,14 @@ v208 - deep stability fixes
 - html2canvas/jsPDF non sono più async: disponibili prima dell'avvio dell'app.
 - Service Worker v208 cache-a le due librerie export quando disponibili, così PNG/PDF restano utilizzabili offline dopo una installazione/aggiornamento effettuato con rete.
 - Backup, sostituzioni multiple, rose, Flip, SNAP, drag e coordinate non modificati.
+
+
+v209 - daily-use stability
+- Esporta backup non incrementa più il contatore modifiche; Annulla su iPad non crea falso stato dirty.
+- Import backup azzera Undo/Redo, transazioni e clipboard per impedire ritorni al progetto precedente.
+- Apri/Usa copia dal Database ACF normalizza e valida il progetto prima del caricamento e azzera la history tra progetti.
+- Recovery dopo aggiornamento PWA salta le migrazioni legacy distruttive della rosa e preserva eventuali home player personalizzati.
+- Stato BACKUP (verde/rosso e conteggio) preservato durante il solo reload tecnico da aggiornamento.
+- Un aggiornamento PWA in attesa non viene attivato automaticamente se ci sono modifiche reali non ancora protette da backup.
+- Dopo un backup riuscito, un eventuale aggiornamento in attesa può attivarsi automaticamente.
+- Defensive, sostituzioni multiple, selezione sagome, Flip, export offline, SNAP e strumenti invariati.

@@ -3602,6 +3602,7 @@ function assertProjectIntegrity(projectState){
 let backupSafetyReady=false;
 let backupExported=false;
 let backupModificationCount=0;
+let recoveredBackupSafety=null;
 
 function updateBackupSafetyIndicator(){
   const box=document.getElementById("backupSafetyIndicator");
@@ -3635,6 +3636,14 @@ function registerBackupExport(){
   backupExported=true;
   backupModificationCount=0;
   updateBackupSafetyIndicator();
+
+  /*
+    Se un aggiornamento PWA era stato rinviato perché stavamo lavorando,
+    dopo il backup può essere attivato senza interrompere modifiche non protette.
+  */
+  try{
+    window.requestPendingAppUpdateActivation?.();
+  }catch(_){}
 }
 
 function save(show=true){
@@ -3706,10 +3715,10 @@ function applyV94PermanentRosterUpdates(){
 function load(){
   /*
     Refresh manuale = progetto pulito.
-    L'unica eccezione è una ricarica automatica causata da un
-    aggiornamento del service worker: in quel caso recuperiamo una
-    sola volta lo stato dalla sessione e poi lo cancelliamo.
+    Reload tecnico da aggiornamento = recovery una tantum della sessione.
   */
+  let recoveredFromUpdate=false;
+
   try{
     const recoveryRaw=safeSessionGet(UPDATE_RECOVERY_KEY);
 
@@ -3717,11 +3726,23 @@ function load(){
       const recovery=JSON.parse(recoveryRaw);
 
       if(recovery?.state && typeof recovery.state==="object"){
-        state=recovery.state;
+        const recoveredState=normalizeProjectState(recovery.state);
+
+        if(assertProjectIntegrity(recoveredState)){
+          state=recoveredState;
+          recoveredFromUpdate=true;
+        }
       }
 
       if(Number.isFinite(Number(recovery?.currentPage))){
         currentPage=Math.max(0,Number(recovery.currentPage));
+      }
+
+      if(recovery?.backupSafety){
+        recoveredBackupSafety={
+          exported:Boolean(recovery.backupSafety.exported),
+          count:Math.max(0,Number(recovery.backupSafety.count)||0)
+        };
       }
     }
   }catch(error){
@@ -3730,6 +3751,7 @@ function load(){
     safeSessionRemove(UPDATE_RECOVERY_KEY);
     safeStorageRemove(STORAGE_KEY);
   }
+
   if(!state.playerScale)state.playerScale=.75;
   if(!["normal","bench","locker"].includes(state.presentationMode)){
     state.presentationMode="normal";
@@ -3748,6 +3770,24 @@ function load(){
     state.awayRosterLoaded=state.roster.some(p=>
       p.team==="away" && String(p.id||"").startsWith("opp-")
     );
+  }
+
+  /*
+    Uno stato recuperato dopo update proviene dalla versione corrente:
+    non deve attraversare le vecchie migrazioni distruttive della rosa.
+    Questo preserva anche eventuali giocatori home personalizzati.
+  */
+  if(recoveredFromUpdate){
+    ensurePlayerRoles();
+    fixLegacyOpponentTenName();
+    state=normalizeProjectState(state);
+
+    currentPage=Math.max(
+      0,
+      Math.min(currentPage,state.pages.length-1)
+    );
+
+    return;
   }
 
   const meaningfulHomePlayers=state.roster.filter(player=>{
@@ -10079,15 +10119,39 @@ function renderArchive(){
         const open=document.createElement("button");
         open.textContent=folder.type==="layout"?"Usa copia":"Apri";
         const openProject=()=>{
-          pushHistory();
-          state=JSON.parse(JSON.stringify(project.data));
+          const candidate=normalizeProjectState(
+            JSON.parse(JSON.stringify(project.data))
+          );
+
+          if(!assertProjectIntegrity(candidate)){
+            alert("Questo progetto archiviato non è compatibile o risulta danneggiato.");
+            setStatus("Progetto archivio non valido");
+            return;
+          }
+
+          /*
+            Aprire un progetto/layout è un confine di sessione:
+            niente Undo che possa riportare al progetto precedente.
+          */
+          state=candidate;
           currentPage=0;
+          undoStack=[];
+          redoStack=[];
+          historyTransaction=null;
+          clipboardPayload=null;
+          dragSnapshot=null;
+
           selectedPlayers.clear();
           selectedRosterPlayers.clear();
+          selectedBalls.clear();
+          selectedTexts.clear();
+          selectedDrawings.clear();
           selectedDrawing=null;
           selectedBall=null;
           selectedText=null;
+
           renderAll();
+          updateHistoryButtons();
           save(false);
           document.getElementById("archiveModal").classList.remove("open");
           setStatus(folder.type==="layout"?"Layout duplicato nel progetto":"Progetto aperto");
@@ -10461,7 +10525,18 @@ function cloneBackupValue(value){
 }
 
 function getBackupPayload(){
-  save(false);
+  /*
+    v209:
+    preparare/esportare il backup non è una modifica al progetto.
+    Normalizziamo e validiamo senza chiamare save(false), così Annulla
+    nel pannello Condividi non rende il backup falsamente "sporco".
+  */
+  state=normalizeProjectState(state);
+
+  if(!assertProjectIntegrity(state)){
+    throw new Error("Stato progetto non valido");
+  }
+
   saveArchive();
 
   return {
@@ -10472,7 +10547,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v208",
+    appVersion:"v209",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -10887,6 +10962,16 @@ async function importBackupFile(file){
     */
     safeStorageRemove(STORAGE_KEY);
     safeStorageSet(ARCHIVE_KEY,JSON.stringify(archiveState));
+
+    /*
+      Un backup importato è un nuovo confine di progetto:
+      nessun Undo/Redo deve poter tornare al progetto precedente.
+    */
+    undoStack=[];
+    redoStack=[];
+    historyTransaction=null;
+    clipboardPayload=null;
+    dragSnapshot=null;
 
     selectedPlayers.clear();
     selectedRosterPlayers.clear();
@@ -11577,8 +11662,16 @@ try{
 }
 renderAll();updateHistoryButtons();syncDrawingControls();updateSelectedNamesButton();syncChestCircleControls();
 backupSafetyReady=true;
-backupExported=false;
-backupModificationCount=0;
+
+if(recoveredBackupSafety){
+  backupExported=recoveredBackupSafety.exported;
+  backupModificationCount=recoveredBackupSafety.count;
+  recoveredBackupSafety=null;
+}else{
+  backupExported=false;
+  backupModificationCount=0;
+}
+
 updateBackupSafetyIndicator();
 </script>
 
@@ -11587,7 +11680,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=208",
+        "./service-worker.js?v=209",
         { updateViaCache: "none" }
       );
 
@@ -11612,7 +11705,17 @@ if ("serviceWorker" in navigator) {
               UPDATE_RECOVERY_KEY,
               JSON.stringify({
                 state,
-                currentPage
+                currentPage,
+                backupSafety:{
+                  exported:
+                    typeof backupExported==="boolean"
+                      ? backupExported
+                      : false,
+                  count:
+                    Number.isFinite(Number(backupModificationCount))
+                      ? Number(backupModificationCount)
+                      : 0
+                }
               })
             );
           }
@@ -11623,10 +11726,36 @@ if ("serviceWorker" in navigator) {
         window.location.reload();
       });
 
-      const askWaitingWorkerToActivate = () => {
-        if (registration.waiting) {
-          registration.waiting.postMessage({ type: "SKIP_WAITING" });
+      const canActivateWaitingWorker = () => {
+        try {
+          return !(
+            typeof backupSafetyReady==="boolean" &&
+            backupSafetyReady &&
+            Number(backupModificationCount)>0
+          );
+        } catch (_) {
+          return true;
         }
+      };
+
+      const askWaitingWorkerToActivate = () => {
+        if (
+          registration.waiting &&
+          canActivateWaitingWorker()
+        ) {
+          registration.waiting.postMessage({ type: "SKIP_WAITING" });
+          return true;
+        }
+
+        return false;
+      };
+
+      /*
+        Dopo un backup riuscito possiamo applicare in sicurezza un
+        aggiornamento che era rimasto in attesa durante il lavoro.
+      */
+      window.requestPendingAppUpdateActivation = () => {
+        askWaitingWorkerToActivate();
       };
 
       registration.addEventListener("updatefound", () => {
