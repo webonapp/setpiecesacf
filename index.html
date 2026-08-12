@@ -5401,11 +5401,13 @@ function renderPlayers(){
     );
 
     const effectiveShowOpponentLine=
-      jerseyOnly
+      state.presentationMode==="bench"
         ? false
-        : state.presentationMode==="locker"
-          ? true
-          : schemaShowOpponentLine;
+        : jerseyOnly
+          ? false
+          : state.presentationMode==="locker"
+            ? true
+            : schemaShowOpponentLine;
 
     const jerseySvg=`
       <svg class="jersey-svg" viewBox="0 0 56 50" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -10619,7 +10621,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v221",
+    appVersion:"v222",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -11626,7 +11628,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=221",
+        "./service-worker.js?v=222",
         { updateViaCache: "none" }
       );
 
