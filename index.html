@@ -2415,6 +2415,19 @@ body.export-clean-view .board-shell{
   overflow:visible!important;
 }
 
+
+/* v214 - feedback selezione sagoma/barriera coerente anche con marquee */
+.mannequin-selection-outline{
+  opacity:0;
+  visibility:hidden;
+  pointer-events:none;
+}
+.drawing-group-selected .mannequin-selection-outline,
+.drawing-selected .mannequin-selection-outline{
+  opacity:.95;
+  visibility:visible;
+}
+
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
@@ -7079,44 +7092,45 @@ function renderDrawings(){
         v207: feedback visivo di selezione per sagoma/barriera.
         Solo grafica: non modifica hit-area, drag, resize o dati.
       */
-      if(selectedDrawings.has(i)){
-        const selectionPad=5;
+      const selectionPad=5;
 
-        /*
-          Se il numero è visibile, il bordo comprende anche la zona
-          sopra la testa occupata dall'etichetta.
-        */
-        const numberTopExtra=
-          d.showNumber!==false
-            ? Math.max(16,height*.20)
-            : 0;
+      /*
+        v214:
+        il bordo di selezione viene SEMPRE creato nel DOM SVG e la sua
+        visibilità dipende dalle classi drawing-group-selected/drawing-selected.
+        Così funziona anche dopo selezione tramite marquee, che aggiorna
+        le classi senza eseguire renderDrawings().
+      */
+      const numberTopExtra=
+        d.showNumber!==false
+          ? Math.max(16,height*.20)
+          : 0;
 
-        const selectionY=
-          minY-selectionPad-numberTopExtra;
+      const selectionY=
+        minY-selectionPad-numberTopExtra;
 
-        const selectionHeight=
-          height+
-          (selectionPad*2)+
-          numberTopExtra;
+      const selectionHeight=
+        height+
+        (selectionPad*2)+
+        numberTopExtra;
 
-        const selectionRect=document.createElementNS(
-          "http://www.w3.org/2000/svg",
-          "rect"
-        );
+      const selectionRect=document.createElementNS(
+        "http://www.w3.org/2000/svg",
+        "rect"
+      );
 
-        selectionRect.setAttribute("x",minX-selectionPad);
-        selectionRect.setAttribute("y",selectionY);
-        selectionRect.setAttribute("width",width+(selectionPad*2));
-        selectionRect.setAttribute("height",selectionHeight);
-        selectionRect.setAttribute("rx","4");
-        selectionRect.setAttribute("fill","none");
-        selectionRect.setAttribute("stroke","#4b8dff");
-        selectionRect.setAttribute("stroke-width","2");
-        selectionRect.setAttribute("vector-effect","non-scaling-stroke");
-        selectionRect.setAttribute("pointer-events","none");
-        selectionRect.setAttribute("opacity",".95");
-        g.appendChild(selectionRect);
-      }
+      selectionRect.classList.add("mannequin-selection-outline");
+      selectionRect.setAttribute("x",minX-selectionPad);
+      selectionRect.setAttribute("y",selectionY);
+      selectionRect.setAttribute("width",width+(selectionPad*2));
+      selectionRect.setAttribute("height",selectionHeight);
+      selectionRect.setAttribute("rx","4");
+      selectionRect.setAttribute("fill","none");
+      selectionRect.setAttribute("stroke","#4b8dff");
+      selectionRect.setAttribute("stroke-width","2");
+      selectionRect.setAttribute("vector-effect","non-scaling-stroke");
+      selectionRect.setAttribute("pointer-events","none");
+      g.appendChild(selectionRect);
 
       /*
         La barriera usa ESATTAMENTE la stessa sagoma grafica della sagoma singola.
@@ -10580,7 +10594,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v213",
+    appVersion:"v214",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -11660,7 +11674,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=213",
+        "./service-worker.js?v=214",
         { updateViaCache: "none" }
       );
 

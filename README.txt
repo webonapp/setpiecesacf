@@ -841,3 +841,10 @@ v213 - PDF stampa massimizzato
 - Distanza titolo/campo calcolata sul reale ingombro del font, con gap ottico di 3,6 mm.
 - Campo spostato più in basso e scalato alla massima larghezza disponibile.
 - Nessuna modifica alle funzioni operative dell'app.
+
+
+v214 - fix feedback selezione sagome/barriere
+- Corretto il caso in cui selezionando più sagome/barriere con l'area di selezione non compariva il bordo blu.
+- L'outline SVG ora esiste sempre ma resta invisibile finché il gruppo non riceve la classe di selezione.
+- La selezione tramite click, CMD+click e marquee usa ora lo stesso feedback visivo.
+- Nessuna modifica a hit-area, selezione logica, drag, resize, numeri, Flip o strumenti.
