@@ -2407,9 +2407,9 @@ body.export-clean-view .board-shell{
 /* PUNIZIONI: verticale sopra, leggermente a sinistra come riferimento. */
 .player.defensive-free-kick .defensive-marker{
   width:1.6px;
-  height:63px;
+  height:76px;
   left:42%;
-  top:-69px;
+  top:-82px;
   transform:translateX(-50%);
 }
 
@@ -7048,6 +7048,27 @@ function renderDrawings(){
       const figures=d.type==="wall4" ? 4 : 1;
 
       /*
+        v207: feedback visivo di selezione per sagoma/barriera.
+        Solo grafica: non modifica hit-area, drag, resize o dati.
+      */
+      if(selectedDrawings.has(i)){
+        const selectionPad=5;
+        const selectionRect=document.createElementNS("http://www.w3.org/2000/svg","rect");
+        selectionRect.setAttribute("x",minX-selectionPad);
+        selectionRect.setAttribute("y",minY-selectionPad);
+        selectionRect.setAttribute("width",width+(selectionPad*2));
+        selectionRect.setAttribute("height",height+(selectionPad*2));
+        selectionRect.setAttribute("rx","4");
+        selectionRect.setAttribute("fill","none");
+        selectionRect.setAttribute("stroke","#4b8dff");
+        selectionRect.setAttribute("stroke-width","2");
+        selectionRect.setAttribute("vector-effect","non-scaling-stroke");
+        selectionRect.setAttribute("pointer-events","none");
+        selectionRect.setAttribute("opacity",".95");
+        g.appendChild(selectionRect);
+      }
+
+      /*
         La barriera usa ESATTAMENTE la stessa sagoma grafica della sagoma singola.
         Il busto della sagoma singola misura il 62% del suo box (2 * .31).
         Nella barriera i centri vengono distanziati proprio di quella misura,
@@ -10449,7 +10470,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v206",
+    appVersion:"v207",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -11529,7 +11550,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=206",
+        "./service-worker.js?v=207",
         { updateViaCache: "none" }
       );
 
