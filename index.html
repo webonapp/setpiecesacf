@@ -2558,6 +2558,7 @@ body.export-in-progress .field-fullscreen-previews{
   filter:drop-shadow(0 0 3px #4b8dff) drop-shadow(0 0 5px rgba(75,141,255,.55));
 }
 
+.wall-member-options{display:grid;gap:7px;margin-top:14px;padding:10px;border:1px solid #30465d;border-radius:10px;background:#101a25}
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
@@ -2938,6 +2939,12 @@ body.export-in-progress .field-fullscreen-previews{
       <span>Giocatore</span>
       <select class="select" id="wallMemberPlayerSelect"></select>
     </label>
+
+    <div class="wall-member-options">
+      <label class="roster-option-toggle"><input type="checkbox" id="wallMemberLineAbove"><span>Mostra linea verticale lunga sopra</span></label>
+      <label class="roster-option-toggle"><input type="checkbox" id="wallMemberLineBelow"><span>Mostra linea verticale lunga sotto</span></label>
+      <label class="roster-option-toggle"><input type="checkbox" id="wallMemberVerticalName"><span>Mostra nome giocatore in verticale</span></label>
+    </div>
 
     <div class="modal-actions">
       <button type="button" class="btn" id="cancelWallMemberPlayer">Annulla</button>
@@ -3623,7 +3630,10 @@ function normalizeDrawingRecord(drawing){
         ].includes(member?.displayVariant)
           ? member.displayVariant
           : "",
-        color:typeof member?.color==="string" ? member.color : ""
+        color:typeof member?.color==="string" ? member.color : "",
+        showLineAbove:Boolean(member?.showLineAbove),
+        showLineBelow:Boolean(member?.showLineBelow),
+        showVerticalName:Boolean(member?.showVerticalName)
       };
     });
   }
@@ -5603,6 +5613,7 @@ function getRosterDropTarget(clientX,clientY,draggedIndex){
 }
 
 function renderRoster(){
+  const assignedWallPlayerIds=getAssignedWallPlayerIds();
   const box=document.getElementById("roster");
   box.innerHTML="";
 
@@ -5754,6 +5765,7 @@ card.addEventListener("dblclick",e=>{
 const fieldPlayerTapTimes=new Map();
 
 function renderPlayers(){
+  const assignedWallPlayerIds=getAssignedWallPlayerIds();
   const layer=document.getElementById("playersLayer");
   layer.innerHTML="";
 
@@ -5769,6 +5781,8 @@ function renderPlayers(){
   const jerseyPath="M10 3 L18 0 L23 6 L28 10 L33 6 L38 0 L46 3 L56 14 L48 20 L45 50 L11 50 L8 20 L0 14 Z";
 
   state.roster.forEach((pl,i)=>{
+    if(assignedWallPlayerIds.has(String(pl?.id||i)))return;
+    if(assignedWallPlayerIds.has(String(pl?.id||i)))return;
     const pos=page().positions[i];
     if(!pos)return;
 
@@ -6595,6 +6609,24 @@ function wallMemberKey(drawingIndex,memberIndex){
   return `${drawingIndex}:${memberIndex}`;
 }
 
+function getAssignedWallPlayerIds(projectPage=page()){
+  const ids=new Set();
+  (projectPage?.drawings||[]).forEach(drawing=>{
+    if(drawing?.type!=="wall4" || !Array.isArray(drawing.members))return;
+    drawing.members.forEach(member=>{
+      const id=String(member?.playerId||"");
+      if(id)ids.add(id);
+    });
+  });
+  return ids;
+}
+
+function getRosterIndexByPlayerId(playerId){
+  const id=String(playerId||"");
+  if(!id)return -1;
+  return state.roster.findIndex((player,index)=>String(player?.id||index)===id);
+}
+
 function getSelectedWallMemberRefs(){
   const refs=[];
 
@@ -7321,17 +7353,18 @@ function openWallMemberPlayerModal(drawingIndex,memberIndex){
 
   const usedByOtherSlots=new Set(
     (drawing.members||[])
-      .map((other,otherIndex)=>
-        otherIndex===memberIndex ? "" : String(other?.playerId||"")
-      )
+      .map((other,otherIndex)=>otherIndex===memberIndex ? "" : String(other?.playerId||""))
       .filter(Boolean)
   );
+  const assignedAnywhere=getAssignedWallPlayerIds();
+  const currentMemberPlayerId=String(member.playerId||"");
 
   state.roster.forEach((player,index)=>{
     if(player.team==="gk")return;
 
     const playerId=String(player.id||index);
     if(usedByOtherSlots.has(playerId))return;
+    if(assignedAnywhere.has(playerId) && playerId!==currentMemberPlayerId)return;
 
     const option=document.createElement("option");
     option.value=playerId;
@@ -7341,11 +7374,13 @@ function openWallMemberPlayerModal(drawingIndex,memberIndex){
 
   const currentPlayerId=String(member.playerId||"");
 
-  select.value=[...select.options].some(option=>
-    option.value===currentPlayerId
-  )
+  select.value=[...select.options].some(option=>option.value===currentPlayerId)
     ? currentPlayerId
     : "";
+
+  document.getElementById("wallMemberLineAbove").checked=Boolean(member.showLineAbove);
+  document.getElementById("wallMemberLineBelow").checked=Boolean(member.showLineBelow);
+  document.getElementById("wallMemberVerticalName").checked=Boolean(member.showVerticalName);
 
   const modal=document.getElementById("wallMemberPlayerModal");
   modal?.classList.add("open");
@@ -7367,10 +7402,21 @@ function saveWallMemberPlayerModal(){
 
   pushHistory();
 
-  member.playerId=String(select.value||"");
+  const nextPlayerId=String(select.value||"");
+  member.playerId=nextPlayerId;
+  member.showLineAbove=document.getElementById("wallMemberLineAbove").checked;
+  member.showLineBelow=document.getElementById("wallMemberLineBelow").checked;
+  member.showVerticalName=document.getElementById("wallMemberVerticalName").checked;
   const savedMemberIndex=wallMemberPlayerTarget.memberIndex;
 
-  renderDrawings();
+  if(nextPlayerId){
+    const rosterIndex=getRosterIndexByPlayerId(nextPlayerId);
+    if(rosterIndex>=0 && page().positions?.[rosterIndex]){
+      page().positions[rosterIndex]=null;
+    }
+  }
+
+  renderAll();
   syncRosterDisplayOptions();
   save(false);
   closeWallMemberPlayerModal();
@@ -7795,7 +7841,10 @@ function renderDrawings(){
           return {
             playerId:String(member?.playerId||""),
             displayVariant:String(member?.displayVariant||""),
-            color:String(member?.color||"")
+            color:String(member?.color||""),
+            showLineAbove:Boolean(member?.showLineAbove),
+            showLineBelow:Boolean(member?.showLineBelow),
+            showVerticalName:Boolean(member?.showVerticalName)
           };
         });
       }
@@ -7953,6 +8002,46 @@ function renderDrawings(){
             }
 
             g.appendChild(marker);
+          }
+
+          if(member.showLineAbove){
+            const line=document.createElementNS("http://www.w3.org/2000/svg","line");
+            const endY=headCy-headR-9, length=height*1.65;
+            line.setAttribute("x1",centerX); line.setAttribute("x2",centerX);
+            line.setAttribute("y1",endY-length); line.setAttribute("y2",endY);
+            line.setAttribute("stroke","#9aa0a8"); line.setAttribute("stroke-width","1.8");
+            line.setAttribute("vector-effect","non-scaling-stroke"); line.setAttribute("pointer-events","none");
+            g.appendChild(line);
+          }
+
+          if(member.showLineBelow){
+            const line=document.createElementNS("http://www.w3.org/2000/svg","line");
+            const startY=torsoBottom+10, length=height*1.65;
+            line.setAttribute("x1",centerX); line.setAttribute("x2",centerX);
+            line.setAttribute("y1",startY); line.setAttribute("y2",startY+length);
+            line.setAttribute("stroke","#9aa0a8"); line.setAttribute("stroke-width","1.8");
+            line.setAttribute("vector-effect","non-scaling-stroke"); line.setAttribute("pointer-events","none");
+            g.appendChild(line);
+          }
+
+          if(member.showVerticalName && member.playerId){
+            const linkedPlayer=state.roster[getRosterIndexByPlayerId(member.playerId)];
+            if(linkedPlayer){
+              const name=document.createElementNS("http://www.w3.org/2000/svg","text");
+              const x=centerX+figureWidth*.62, y=torsoBottom+4;
+              name.textContent=String(linkedPlayer.lastName||linkedPlayer.name||"").toUpperCase();
+              name.setAttribute("x",x); name.setAttribute("y",y);
+              name.setAttribute("transform",`rotate(-90 ${x} ${y})`);
+              name.setAttribute("text-anchor","start");
+              name.setAttribute("fill","#111827");
+              name.setAttribute("font-size",String(Math.max(6.6,Math.min(10.2,height*.11))));
+              name.setAttribute("font-weight","700");
+              name.setAttribute("font-family","Arial, Helvetica, sans-serif");
+              name.setAttribute("pointer-events","none");
+              name.setAttribute("paint-order","stroke");
+              name.setAttribute("stroke","#ffffff"); name.setAttribute("stroke-width",".9");
+              g.appendChild(name);
+            }
           }
 
           const memberHit=document.createElementNS(
@@ -9031,7 +9120,10 @@ function addTrainingMannequin(type){
       ? Array.from({length:4},()=>({
           playerId:"",
           displayVariant:"",
-          color:""
+          color:"",
+          showLineAbove:false,
+          showLineBelow:false,
+          showVerticalName:false
         }))
       : null
   };
@@ -11726,7 +11818,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v236",
+    appVersion:"v237",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -12861,7 +12953,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=236",
+        "./service-worker.js?v=237",
         { updateViaCache: "none" }
       );
 
