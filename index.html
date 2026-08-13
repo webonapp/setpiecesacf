@@ -8561,7 +8561,7 @@ function renderDrawings(){
             surname.setAttribute("fill","#111827");
             surname.setAttribute(
               "font-size",
-              String(Math.max(6.6,Math.min(10.5,height*.115)))
+              String(Math.max(9.24,Math.min(14.7,height*.161)))
             );
             surname.setAttribute("font-weight","700");
             surname.setAttribute(
@@ -8710,7 +8710,7 @@ function renderDrawings(){
                 verticalName.setAttribute("fill","#111827");
                 verticalName.setAttribute(
                   "font-size",
-                  String(Math.max(6.6,Math.min(10.2,height*.11)))
+                  String(Math.max(9.24,Math.min(14.28,height*.154)))
                 );
                 verticalName.setAttribute("font-weight","700");
                 verticalName.setAttribute(
@@ -12753,7 +12753,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v251",
+    appVersion:"v253",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -13980,7 +13980,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=251",
+        "./service-worker.js?v=253",
         { updateViaCache: "none" }
       );
 
