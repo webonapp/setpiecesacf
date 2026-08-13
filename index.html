@@ -2498,17 +2498,24 @@ body.export-in-progress .field-fullscreen-previews{
 }
 
 /* Le righe partono sotto la maglia, senza sovrapporsi al nome. */
+/*
+  v259 - valori REALI dei flag giocatore (menu destro / spogliatoio).
+  Queste regole CSS sono quelle usate da renderPlayers().
+  - verticale sopra/sotto: lunghezza +40% (92 -> 128.8)
+  - orizzontale sotto: lunghezza +15% (82 -> 94.3; 48 -> 55.2)
+  - orizzontale sotto: distanza +15% (78 -> 89.7)
+*/
 .player-visual-marker.h-long{
   left:50%;
-  top:78px;
-  width:82px;
+  top:89.7px;
+  width:94.3px;
   height:1.6px;
   transform:translateX(-50%);
 }
 .player-visual-marker.h-short{
   left:50%;
-  top:78px;
-  width:48px;
+  top:89.7px;
+  width:55.2px;
   height:1.6px;
   transform:translateX(-50%);
 }
@@ -2516,14 +2523,14 @@ body.export-in-progress .field-fullscreen-previews{
   left:50%;
   top:58px;
   width:1.6px;
-  height:92px;
+  height:128.8px;
   transform:translateX(-50%);
 }
 .player-visual-marker.v-top-long{
   left:50%;
   bottom:58px;
   width:1.6px;
-  height:92px;
+  height:128.8px;
   transform:translateX(-50%);
 }
 
@@ -13095,7 +13102,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v258",
+    appVersion:"v259",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -14322,7 +14329,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=258",
+        "./service-worker.js?v=259",
         { updateViaCache: "none" }
       );
 
