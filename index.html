@@ -2,7 +2,7 @@
 <html lang="it">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>ACF Fiorentina - Set Pieces App</title>
 <style>
 :root{
@@ -1046,8 +1046,8 @@ body.field-view-mode .board-shell{
   right:auto!important;
   bottom:auto!important;
   z-index:10000!important;
-  width:100vw!important;
-  height:100vh!important;
+  width:100dvw!important;
+  height:100dvh!important;
   min-width:0!important;
   min-height:0!important;
   max-width:none!important;
@@ -1270,8 +1270,8 @@ body.field-view-mode .field-fullscreen-nav.next{
 
 
 body.field-view-mode{
-  width:100vw!important;
-  height:100vh!important;
+  width:100dvw!important;
+  height:100dvh!important;
   overflow:hidden!important;
 }
 body.field-view-mode #board{
@@ -2322,7 +2322,7 @@ body.field-view-mode .field-fullscreen-previews{
   bottom:max(10px,env(safe-area-inset-bottom));
   transform:translateX(-50%);
   z-index:10025;
-  max-width:calc(100vw - 120px);
+  max-width:calc(100dvw - 120px);
   gap:8px;
   padding:8px 10px;
   overflow-x:auto;
@@ -2569,6 +2569,92 @@ body.export-in-progress .field-fullscreen-previews{
   background:#101a25;
 }
 
+
+/* v249 - Safari / iPadOS stability */
+html{
+  -webkit-text-size-adjust:100%;
+  text-size-adjust:100%;
+  min-height:100%;
+  background:#fff;
+}
+body{
+  min-height:100%;
+  min-height:100dvh;
+  overscroll-behavior:none;
+  -webkit-tap-highlight-color:transparent;
+}
+button,
+[role="button"],
+.tool,
+.library-icon,
+.color-swatch,
+.player,
+.ball,
+.tactical-text,
+.fullscreen-scheme-preview{
+  -webkit-tap-highlight-color:transparent;
+}
+#board,
+#playersLayer,
+#ballsLayer,
+#textsLayer,
+#drawLayer,
+#selectionBox{
+  -webkit-user-select:none;
+  user-select:none;
+  -webkit-touch-callout:none;
+}
+#board{
+  touch-action:none;
+}
+body:not(.is-dragging) input,
+body:not(.is-dragging) textarea,
+body:not(.is-dragging) select{
+  -webkit-user-select:text;
+  user-select:text;
+}
+body.is-dragging,
+body.is-dragging *{
+  -webkit-user-select:none!important;
+  user-select:none!important;
+  -webkit-touch-callout:none!important;
+}
+.modal-backdrop{
+  overscroll-behavior:contain;
+}
+.modal{
+  max-height:min(92dvh,920px);
+  overflow:auto;
+  -webkit-overflow-scrolling:touch;
+}
+body.field-view-mode{
+  padding-top:env(safe-area-inset-top);
+  padding-right:env(safe-area-inset-right);
+  padding-bottom:env(safe-area-inset-bottom);
+  padding-left:env(safe-area-inset-left);
+}
+@supports (-webkit-touch-callout:none){
+  body.field-view-mode .board-shell{
+    height:100dvh!important;
+    width:100dvw!important;
+  }
+}
+@media (pointer:coarse){
+  input,
+  textarea,
+  select{
+    font-size:16px!important;
+  }
+
+  .field-fullscreen-nav,
+  .fullscreen-scheme-preview,
+  .presentation-mode-btn,
+  .tool,
+  .library-icon{
+    touch-action:manipulation;
+  }
+}
+
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
@@ -2582,6 +2668,8 @@ body.export-in-progress .field-fullscreen-previews{
 <meta name="apple-mobile-web-app-title" content="ACF Set Pieces">
 <link rel="apple-touch-icon" href="./icons/icon-192.png">
 
+
+<meta name="format-detection" content="telephone=no">
 </head>
 <body>
 <div class="app">
@@ -7543,6 +7631,32 @@ function resetTransientInteractionState(){
     hideSnapGuides();
   }
 }
+
+function cancelActivePointerInteractions(){
+  drawingStart=null;
+  drawingDragStart=null;
+  drawingInitial=null;
+  groupDragStart=null;
+  groupInitialPositions=null;
+  marqueeStart=null;
+  marqueeMoved=false;
+  dragSnapshot=null;
+
+  document.body.classList.remove("is-dragging");
+  document.querySelectorAll(".drag-active").forEach(element=>
+    element.classList.remove("drag-active")
+  );
+
+  const selectionBox=document.getElementById("selectionBox");
+  if(selectionBox){
+    selectionBox.style.display="none";
+  }
+
+  if(typeof hideSnapGuides==="function"){
+    hideSnapGuides();
+  }
+}
+
 
 function addTextToScheme(){
   openTextEditor(null);
@@ -12542,7 +12656,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v248",
+    appVersion:"v249",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -13648,6 +13762,55 @@ document.addEventListener("keydown",event=>{
   }
 });
 
+
+window.addEventListener("pointercancel",cancelActivePointerInteractions,true);
+window.addEventListener("blur",cancelActivePointerInteractions);
+
+document.addEventListener("visibilitychange",()=>{
+  if(document.visibilityState!=="visible"){
+    cancelActivePointerInteractions();
+  }
+});
+
+window.addEventListener("pagehide",cancelActivePointerInteractions);
+
+window.addEventListener("pageshow",event=>{
+  cancelActivePointerInteractions();
+
+  if(event.persisted){
+    clearSelectionKinds();
+    renderAll();
+  }
+});
+
+window.addEventListener("orientationchange",()=>{
+  cancelActivePointerInteractions();
+
+  requestAnimationFrame(()=>{
+    renderAll();
+
+    if(fieldViewMode){
+      updateFullscreenNavigation();
+    }
+  });
+});
+
+/*
+  Safari iOS può trasformare il pinch sul campo in zoom pagina.
+  Lo blocchiamo solo sul board, non nell'interfaccia o nei modali.
+*/
+["gesturestart","gesturechange","gestureend"].forEach(type=>{
+  document.addEventListener(type,event=>{
+    if(event.target?.closest?.("#board")){
+      event.preventDefault();
+    }
+  },{passive:false});
+});
+
+document.getElementById("board")?.addEventListener("contextmenu",event=>{
+  event.preventDefault();
+});
+
 installLogicalBoardRenderer();
 load();
 try{
@@ -13681,7 +13844,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=248",
+        "./service-worker.js?v=249",
         { updateViaCache: "none" }
       );
 
