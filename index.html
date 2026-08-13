@@ -2950,6 +2950,11 @@ body.export-in-progress .field-fullscreen-previews{
       <select class="select" id="wallMemberPlayerSelect"></select>
     </label>
 
+    <label class="player-profile-field">
+      <span>Numero sopra la sagoma</span>
+      <input class="input" id="wallMemberNumber" type="number" min="0" max="999" inputmode="numeric">
+    </label>
+
     <div class="wall-member-options">
       <label class="roster-option-toggle">
         <input type="checkbox" id="wallMemberLineAbove">
@@ -2962,8 +2967,13 @@ body.export-in-progress .field-fullscreen-previews{
       </label>
 
       <label class="roster-option-toggle">
-        <input type="checkbox" id="wallMemberVerticalName">
-        <span>Mostra nome giocatore in verticale</span>
+        <input type="checkbox" id="wallMemberVerticalNameBelow">
+        <span>Mostra nome giocatore in verticale sotto</span>
+      </label>
+
+      <label class="roster-option-toggle">
+        <input type="checkbox" id="wallMemberVerticalNameAbove">
+        <span>Mostra nome giocatore in verticale sopra</span>
       </label>
     </div>
 
@@ -3639,7 +3649,20 @@ function normalizeDrawingRecord(drawing){
     if(typeof safe.showNumber!=="boolean") safe.showNumber=true;
   }
   if(safe.type==="wall4"){
-    safe.numbers=["1","2","3","4"];
+    const sourceNumbers=Array.isArray(safe.numbers) ? safe.numbers : [];
+    safe.numbers=Array.from({length:4},(_,index)=>{
+      const raw=String(sourceNumbers[index] ?? (index+1)).trim();
+      const parsed=Number(raw);
+      return (
+        raw!=="" &&
+        Number.isFinite(parsed) &&
+        parsed>=0 &&
+        parsed<=999
+      )
+        ? String(Math.round(parsed))
+        : String(index+1);
+    });
+
     if(typeof safe.showNumber!=="boolean") safe.showNumber=true;
 
     safe.members=Array.from({length:4},(_,index)=>{
@@ -3655,7 +3678,10 @@ function normalizeDrawingRecord(drawing){
         color:typeof member?.color==="string" ? member.color : "",
         showLineAbove:Boolean(member?.showLineAbove),
         showLineBelow:Boolean(member?.showLineBelow),
-        showVerticalName:Boolean(member?.showVerticalName)
+        showVerticalNameBelow:Boolean(
+          member?.showVerticalNameBelow ?? member?.showVerticalName
+        ),
+        showVerticalNameAbove:Boolean(member?.showVerticalNameAbove)
       };
     });
   }
@@ -4774,6 +4800,45 @@ function getSelectedFieldPlayerIndexes(){
     .sort((a,b)=>a-b);
 }
 
+function getSelectedWallSubstitutionPlayerIndexes(){
+  const indexes=[];
+  const used=new Set();
+
+  [...selectedDrawings].forEach(drawingIndex=>{
+    const drawing=page().drawings?.[drawingIndex];
+    if(drawing?.type!=="wall4" || !Array.isArray(drawing.members))return;
+
+    const selectedMemberIndexes=[...selectedWallMembers]
+      .map(key=>String(key).split(":").map(Number))
+      .filter(parts=>parts[0]===drawingIndex)
+      .map(parts=>parts[1]);
+
+    const membersToUse=selectedMemberIndexes.length
+      ? selectedMemberIndexes
+          .map(memberIndex=>drawing.members[memberIndex])
+          .filter(Boolean)
+      : drawing.members;
+
+    membersToUse.forEach(member=>{
+      const rosterIndex=getRosterIndexByPlayerId(member?.playerId);
+      if(rosterIndex<0 || used.has(rosterIndex))return;
+      used.add(rosterIndex);
+      indexes.push(rosterIndex);
+    });
+  });
+
+  return indexes;
+}
+
+function getSelectedSubstitutionPlayerIndexes(){
+  const combined=[
+    ...getSelectedFieldPlayerIndexes(),
+    ...getSelectedWallSubstitutionPlayerIndexes()
+  ];
+
+  return [...new Set(combined)].sort((a,b)=>a-b);
+}
+
 function getSingleSelectedFieldPlayer(){
   const indexes=getSelectedFieldPlayerIndexes();
   return indexes.length===1 ? indexes[0] : null;
@@ -4781,25 +4846,27 @@ function getSingleSelectedFieldPlayer(){
 
 function getBatchReplacementCandidates(outgoingIndexes){
   const outgoingSet=new Set(outgoingIndexes);
+  const assignedIds=getAssignedWallPlayerIds();
 
   /*
-    Candidati = giocatori che NON stanno attualmente sul campo e che
-    non fanno parte del gruppo selezionato in uscita.
-    Mantiene la logica storica della sostituzione singola.
+    Candidati = giocatori realmente disponibili nella lista:
+    non sul campo, non già assegnati a un'altra barriera e non in uscita.
   */
   return state.roster
-    .map((_,index)=>index)
-    .filter(index=>
+    .map((player,index)=>({player,index}))
+    .filter(({player,index})=>
       !outgoingSet.has(index) &&
-      !page().positions[index]
-    );
+      !page().positions[index] &&
+      !assignedIds.has(String(player?.id||index))
+    )
+    .map(({index})=>index);
 }
 
 function updateSubstitutionButton(){
   const button=document.getElementById("openSubstitutionBtn");
   if(!button)return;
 
-  const selectedIndexes=getSelectedFieldPlayerIndexes();
+  const selectedIndexes=getSelectedSubstitutionPlayerIndexes();
   const available=getBatchReplacementCandidates(selectedIndexes);
 
   button.disabled=
@@ -4807,7 +4874,7 @@ function updateSubstitutionButton(){
     available.length===0;
 
   if(!selectedIndexes.length){
-    button.title="Seleziona una o più maglie presenti nel campo";
+    button.title="Seleziona uno o più giocatori oppure una barriera con giocatori assegnati";
   }else if(!available.length){
     button.title="Non ci sono giocatori disponibili nella lista";
   }else if(selectedIndexes.length===1){
@@ -5004,10 +5071,10 @@ function openBatchSubstitutionModal(selectedIndexes,availableIndexes){
 }
 
 function openSubstitutionModal(){
-  const selectedIndexes=getSelectedFieldPlayerIndexes();
+  const selectedIndexes=getSelectedSubstitutionPlayerIndexes();
 
   if(!selectedIndexes.length){
-    alert("Seleziona una o più maglie presenti nel campo.");
+    alert("Seleziona uno o più giocatori oppure una barriera con giocatori assegnati.");
     return;
   }
 
@@ -7433,8 +7500,16 @@ function openWallMemberPlayerModal(drawingIndex,memberIndex){
   document.getElementById("wallMemberLineBelow").checked=
     Boolean(member.showLineBelow);
 
-  document.getElementById("wallMemberVerticalName").checked=
-    Boolean(member.showVerticalName);
+  document.getElementById("wallMemberVerticalNameBelow").checked=
+    Boolean(member.showVerticalNameBelow ?? member.showVerticalName);
+
+  document.getElementById("wallMemberVerticalNameAbove").checked=
+    Boolean(member.showVerticalNameAbove);
+
+  document.getElementById("wallMemberNumber").value=String(
+    (Array.isArray(drawing.numbers) ? drawing.numbers[memberIndex] : null) ??
+    (memberIndex+1)
+  );
 
   const modal=document.getElementById("wallMemberPlayerModal");
   modal?.classList.add("open");
@@ -7457,14 +7532,41 @@ function saveWallMemberPlayerModal(){
   pushHistory();
 
   const nextPlayerId=String(select.value||"");
+  const numberInput=document.getElementById("wallMemberNumber");
+  const rawNumber=String(numberInput.value||"").trim();
+  const parsedNumber=Number(rawNumber);
+
+  if(
+    rawNumber==="" ||
+    !Number.isFinite(parsedNumber) ||
+    parsedNumber<0 ||
+    parsedNumber>999
+  ){
+    alert("Inserisci un numero valido da 0 a 999.");
+    numberInput.focus();
+    return;
+  }
 
   member.playerId=nextPlayerId;
   member.showLineAbove=
     document.getElementById("wallMemberLineAbove").checked;
   member.showLineBelow=
     document.getElementById("wallMemberLineBelow").checked;
-  member.showVerticalName=
-    document.getElementById("wallMemberVerticalName").checked;
+  member.showVerticalNameBelow=
+    document.getElementById("wallMemberVerticalNameBelow").checked;
+  member.showVerticalNameAbove=
+    document.getElementById("wallMemberVerticalNameAbove").checked;
+
+  drawing.numbers=Array.isArray(drawing.numbers)
+    ? drawing.numbers.slice(0,4)
+    : ["1","2","3","4"];
+
+  while(drawing.numbers.length<4){
+    drawing.numbers.push(String(drawing.numbers.length+1));
+  }
+
+  drawing.numbers[wallMemberPlayerTarget.memberIndex]=
+    String(Math.round(parsedNumber));
 
   const savedMemberIndex=wallMemberPlayerTarget.memberIndex;
 
@@ -7912,7 +8014,10 @@ function renderDrawings(){
             color:String(member?.color||""),
             showLineAbove:Boolean(member?.showLineAbove),
             showLineBelow:Boolean(member?.showLineBelow),
-            showVerticalName:Boolean(member?.showVerticalName)
+            showVerticalNameBelow:Boolean(
+              member?.showVerticalNameBelow ?? member?.showVerticalName
+            ),
+            showVerticalNameAbove:Boolean(member?.showVerticalNameAbove)
           };
         });
       }
@@ -7966,7 +8071,10 @@ function renderDrawings(){
           );
 
           const value=d.type==="wall4"
-            ? String(index+1)
+            ? String(
+                (Array.isArray(d.numbers) ? d.numbers[index] : null) ??
+                (index+1)
+              )
             : String(d.number ?? "5");
 
           label.textContent=value;
@@ -8079,7 +8187,7 @@ function renderDrawings(){
               "line"
             );
 
-            const endY=headCy-headR-9;
+            const endY=headCy-headR-Math.max(17,height*.19);
             const length=height*1.65;
 
             lineAbove.setAttribute("x1",centerX);
@@ -8113,47 +8221,66 @@ function renderDrawings(){
             g.appendChild(lineBelow);
           }
 
-          if(member.showVerticalName && member.playerId){
+          if(
+            (member.showVerticalNameBelow || member.showVerticalNameAbove) &&
+            member.playerId
+          ){
             const linkedPlayer=
               state.roster[getRosterIndexByPlayerId(member.playerId)];
 
             if(linkedPlayer){
-              const verticalName=document.createElementNS(
-                "http://www.w3.org/2000/svg",
-                "text"
-              );
-
-              const x=centerX+figureWidth*.62;
-              const y=torsoBottom+4;
-
-              verticalName.textContent=String(
+              const nameText=String(
                 linkedPlayer.lastName||
                 linkedPlayer.name||
                 ""
               ).toUpperCase();
 
-              verticalName.setAttribute("x",x);
-              verticalName.setAttribute("y",y);
-              verticalName.setAttribute(
-                "transform",
-                `rotate(-90 ${x} ${y})`
-              );
-              verticalName.setAttribute("text-anchor","start");
-              verticalName.setAttribute("fill","#111827");
-              verticalName.setAttribute(
-                "font-size",
-                String(Math.max(6.6,Math.min(10.2,height*.11)))
-              );
-              verticalName.setAttribute("font-weight","700");
-              verticalName.setAttribute(
-                "font-family",
-                "Arial, Helvetica, sans-serif"
-              );
-              verticalName.setAttribute("pointer-events","none");
-              verticalName.setAttribute("paint-order","stroke");
-              verticalName.setAttribute("stroke","#ffffff");
-              verticalName.setAttribute("stroke-width",".9");
-              g.appendChild(verticalName);
+              const addVerticalName=(placement)=>{
+                const verticalName=document.createElementNS(
+                  "http://www.w3.org/2000/svg",
+                  "text"
+                );
+
+                const x=centerX+figureWidth*.62;
+                const y=placement==="above"
+                  ? headCy-headR-Math.max(22,height*.28)
+                  : torsoBottom+Math.max(20,height*.34);
+
+                verticalName.textContent=nameText;
+                verticalName.setAttribute("x",x);
+                verticalName.setAttribute("y",y);
+                verticalName.setAttribute(
+                  "transform",
+                  `rotate(-90 ${x} ${y})`
+                );
+                verticalName.setAttribute(
+                  "text-anchor",
+                  placement==="above" ? "end" : "start"
+                );
+                verticalName.setAttribute("fill","#111827");
+                verticalName.setAttribute(
+                  "font-size",
+                  String(Math.max(6.6,Math.min(10.2,height*.11)))
+                );
+                verticalName.setAttribute("font-weight","700");
+                verticalName.setAttribute(
+                  "font-family",
+                  "Arial, Helvetica, sans-serif"
+                );
+                verticalName.setAttribute("pointer-events","none");
+                verticalName.setAttribute("paint-order","stroke");
+                verticalName.setAttribute("stroke","#ffffff");
+                verticalName.setAttribute("stroke-width",".9");
+                g.appendChild(verticalName);
+              };
+
+              if(member.showVerticalNameBelow){
+                addVerticalName("below");
+              }
+
+              if(member.showVerticalNameAbove){
+                addVerticalName("above");
+              }
             }
           }
 
@@ -9254,7 +9381,8 @@ function addTrainingMannequin(type){
           color:"",
           showLineAbove:false,
           showLineBelow:false,
-          showVerticalName:false
+          showVerticalNameBelow:false,
+          showVerticalNameAbove:false
         }))
       : null
   };
@@ -11045,9 +11173,13 @@ function flipSelectedHorizontally(){
       La barriera viene specchiata anche semanticamente:
       1-2-3-4 diventa 4-3-2-1.
     */
-    if(copy.type==="wall4" && Array.isArray(copy.members)){
-      copy.members=[...copy.members].reverse();
-      copy.numbers=["1","2","3","4"];
+    if(copy.type==="wall4"){
+      if(Array.isArray(copy.members)){
+        copy.members=[...copy.members].reverse();
+      }
+      if(Array.isArray(copy.numbers)){
+        copy.numbers=[...copy.numbers].reverse();
+      }
     }
 
     clampFlippedDrawingInPlace(copy);
@@ -11949,7 +12081,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v239",
+    appVersion:"v240",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -13084,7 +13216,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=239",
+        "./service-worker.js?v=240",
         { updateViaCache: "none" }
       );
 
