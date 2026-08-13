@@ -8660,20 +8660,10 @@ function renderDrawings(){
       const selectionY=
         minY-selectionPad-numberTopExtra;
 
-      const benchNameExtra=(
-        (d.type==="wall4" || d.type==="mannequin") &&
-        state.presentationMode==="bench" &&
-        Array.isArray(d.members) &&
-        d.members.some(member=>member?.playerId)
-      )
-        ? Math.max(18,height*.24)
-        : 0;
-
       const selectionHeight=
         height+
         (selectionPad*2)+
-        numberTopExtra+
-        benchNameExtra;
+        numberTopExtra;
 
       const selectionRect=document.createElementNS(
         "http://www.w3.org/2000/svg",
@@ -8793,45 +8783,10 @@ function renderDrawings(){
           g.appendChild(label);
         }
 
-        if(
-          (d.type==="wall4" || d.type==="mannequin") &&
-          member?.playerId &&
-          state.presentationMode==="bench"
-        ){
-          const playerIndex=state.roster.findIndex(player=>
-            String(player?.id||"")===String(member.playerId)
-          );
-          const player=state.roster[playerIndex];
-
-          if(player){
-            const surname=document.createElementNS(
-              "http://www.w3.org/2000/svg",
-              "text"
-            );
-            surname.textContent=String(
-              player.lastName||player.name||""
-            ).toUpperCase();
-            surname.setAttribute("x",centerX);
-            surname.setAttribute("y",torsoBottom+13);
-            surname.setAttribute("text-anchor","middle");
-            surname.setAttribute("dominant-baseline","hanging");
-            surname.setAttribute("fill","#111827");
-            surname.setAttribute(
-              "font-size",
-              String(Math.max(9.24,Math.min(14.7,height*.161)))
-            );
-            surname.setAttribute("font-weight","700");
-            surname.setAttribute(
-              "font-family",
-              "Arial, Helvetica, sans-serif"
-            );
-            surname.setAttribute("pointer-events","none");
-            surname.setAttribute("paint-order","stroke");
-            surname.setAttribute("stroke","#ffffff");
-            surname.setAttribute("stroke-width",".9");
-            g.appendChild(surname);
-          }
-        }
+        /*
+          v257: nessun cognome orizzontale automatico sotto sagoma/barriera.
+          Il nome compare soltanto tramite i flag verticali sopra/sotto.
+        */
 
         if((d.type==="wall4" || d.type==="mannequin") && member){
           const variant=String(member.displayVariant||"");
@@ -8855,14 +8810,28 @@ function renderDrawings(){
             const long=variant==="h-long" || variant==="v-long" || variant==="v-top-long";
 
             if(horizontal){
-              const half=figureWidth*(long?1.45:.85);
-              const y=torsoBottom+Math.max(14,height*.24);
+              /*
+                v256:
+                riga orizzontale sotto
+                - lunghezza +15%
+                - distanza dalla maglia +15%
+                Applicato in rendering, quindi vale anche sugli schemi
+                già esistenti nel database.
+              */
+              const half=figureWidth*(long?1.6675:.9775);
+              const y=torsoBottom+Math.max(16.1,height*.276);
               marker.setAttribute("x1",centerX-half);
               marker.setAttribute("x2",centerX+half);
               marker.setAttribute("y1",y);
               marker.setAttribute("y2",y);
             }else{
-              const length=height*(long?1.65:.95);
+              /*
+                v256:
+                linee verticali sopra/sotto +40%.
+                Anche questa è una modifica di rendering, quindi
+                aggiorna automaticamente gli schemi già salvati.
+              */
+              const length=height*(long?2.31:1.33);
               const above=variant==="v-top-long";
               marker.setAttribute("x1",centerX);
               marker.setAttribute("x2",centerX);
@@ -13126,7 +13095,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v255",
+    appVersion:"v257",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -14353,7 +14322,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=255",
+        "./service-worker.js?v=257",
         { updateViaCache: "none" }
       );
 
