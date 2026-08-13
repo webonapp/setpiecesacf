@@ -3033,12 +3033,12 @@ body.field-view-mode{
       Scegli il giocatore da collegare a questa sagoma della barriera.
     </p>
 
-    <label class="player-profile-field">
+    <label class="player-profile-field" id="wallMemberPlayerField">
       <span>Giocatore</span>
       <select class="select" id="wallMemberPlayerSelect"></select>
     </label>
 
-    <label class="player-profile-field">
+    <label class="player-profile-field" id="wallMemberNumberField">
       <span>Numero sopra la sagoma</span>
       <input class="input" id="wallMemberNumber" type="number" min="0" max="999" inputmode="numeric">
     </label>
@@ -5925,7 +5925,12 @@ function renderRoster(){
     return;
   }
 
-  const availablePlayers=state.roster.map((player,index)=>({player,index})).filter(entry=>!page().positions[entry.index]);
+  const availablePlayers=state.roster
+    .map((player,index)=>({player,index}))
+    .filter(entry=>
+      !page().positions[entry.index] &&
+      !assignedWallPlayerIds.has(String(entry.player?.id||entry.index))
+    );
   PLAYER_ROLE_ORDER.forEach(role=>{
     const rolePlayers=availablePlayers.filter(entry=>{
       const playerRole=entry.player.team==="away"
@@ -6417,6 +6422,171 @@ function selectFieldPlayer(index,additive=false){
 function refreshUnifiedSelectionVisuals(){
   refreshSelectionVisuals();
   refreshObjectSelectionVisuals();
+}
+
+function getUnifiedKeyboardSelection(){
+  const players=[...selectedPlayers].filter(i=>page().positions?.[i]);
+
+  const ballIndexes=new Set(
+    [...selectedBalls].filter(i=>page().balls?.[i])
+  );
+  if(Number.isInteger(selectedBall) && page().balls?.[selectedBall]){
+    ballIndexes.add(selectedBall);
+  }
+
+  const texts=getSelectedTextIndexes();
+
+  const drawingIndexes=new Set(
+    [...selectedDrawings].filter(i=>page().drawings?.[i])
+  );
+  if(
+    Number.isInteger(selectedDrawing) &&
+    page().drawings?.[selectedDrawing]
+  ){
+    drawingIndexes.add(selectedDrawing);
+  }
+
+  return {
+    players,
+    balls:[...ballIndexes],
+    texts,
+    drawings:[...drawingIndexes]
+  };
+}
+
+function getUnifiedKeyboardMoveBounds(selection){
+  let minDx=-Infinity;
+  let maxDx=Infinity;
+  let minDy=-Infinity;
+  let maxDy=Infinity;
+
+  selection.players.forEach(index=>{
+    const pos=page().positions[index];
+    if(!pos)return;
+    minDx=Math.max(minDx,-pos.x);
+    maxDx=Math.min(maxDx,100-pos.x);
+    minDy=Math.max(minDy,-pos.y);
+    maxDy=Math.min(maxDy,100-pos.y);
+  });
+
+  selection.balls.forEach(index=>{
+    const obj=page().balls?.[index];
+    if(!obj)return;
+    minDx=Math.max(minDx,-Number(obj.x));
+    maxDx=Math.min(maxDx,100-Number(obj.x));
+    minDy=Math.max(minDy,-Number(obj.y));
+    maxDy=Math.min(maxDy,100-Number(obj.y));
+  });
+
+  selection.texts.forEach(index=>{
+    const obj=page().texts?.[index];
+    if(!obj)return;
+    minDx=Math.max(minDx,-Number(obj.x));
+    maxDx=Math.min(maxDx,100-Number(obj.x));
+    minDy=Math.max(minDy,-Number(obj.y));
+    maxDy=Math.min(maxDy,100-Number(obj.y));
+  });
+
+  selection.drawings.forEach(index=>{
+    const d=page().drawings?.[index];
+    if(!d)return;
+
+    const xs=["x1","x2","c1x","c2x"]
+      .map(key=>Number(d[key]))
+      .filter(Number.isFinite);
+
+    const ys=["y1","y2","c1y","c2y"]
+      .map(key=>Number(d[key]))
+      .filter(Number.isFinite);
+
+    if(xs.length){
+      minDx=Math.max(minDx,-Math.min(...xs)/10);
+      maxDx=Math.min(maxDx,(1000-Math.max(...xs))/10);
+    }
+
+    if(ys.length){
+      minDy=Math.max(minDy,-Math.min(...ys)/6.2);
+      maxDy=Math.min(maxDy,(620-Math.max(...ys))/6.2);
+    }
+  });
+
+  return {
+    minDx:Number.isFinite(minDx)?minDx:0,
+    maxDx:Number.isFinite(maxDx)?maxDx:0,
+    minDy:Number.isFinite(minDy)?minDy:0,
+    maxDy:Number.isFinite(maxDy)?maxDy:0
+  };
+}
+
+function moveUnifiedSelectionByKeyboard(dx,dy){
+  const selection=getUnifiedKeyboardSelection();
+
+  const total=
+    selection.players.length+
+    selection.balls.length+
+    selection.texts.length+
+    selection.drawings.length;
+
+  if(!total)return false;
+
+  const bounds=getUnifiedKeyboardMoveBounds(selection);
+
+  dx=Math.max(bounds.minDx,Math.min(bounds.maxDx,dx));
+  dy=Math.max(bounds.minDy,Math.min(bounds.maxDy,dy));
+
+  if(Math.abs(dx)<1e-9 && Math.abs(dy)<1e-9)return false;
+
+  pushHistory();
+
+  selection.players.forEach(index=>{
+    const pos=page().positions[index];
+    pos.x+=dx;
+    pos.y+=dy;
+  });
+
+  selection.balls.forEach(index=>{
+    const obj=page().balls[index];
+    obj.x+=dx;
+    obj.y+=dy;
+  });
+
+  selection.texts.forEach(index=>{
+    const obj=page().texts[index];
+    obj.x+=dx;
+    obj.y+=dy;
+  });
+
+  selection.drawings.forEach(index=>{
+    const obj=page().drawings[index];
+
+    ["x1","x2","c1x","c2x"].forEach(key=>{
+      if(Number.isFinite(Number(obj[key]))){
+        obj[key]=Number(obj[key])+dx*10;
+      }
+    });
+
+    ["y1","y2","c1y","c2y"].forEach(key=>{
+      if(Number.isFinite(Number(obj[key]))){
+        obj[key]=Number(obj[key])+dy*6.2;
+      }
+    });
+  });
+
+  renderPlayers();
+  renderBalls();
+  renderTexts();
+  renderDrawings();
+  refreshUnifiedSelectionVisuals();
+  syncDrawingControls();
+  save(false);
+
+  setStatus(
+    total===1
+      ? "Elemento spostato"
+      : `${total} elementi spostati insieme`
+  );
+
+  return true;
 }
 
 
@@ -7778,6 +7948,56 @@ function closeWallMemberPlayerModal(){
   modal?.setAttribute("aria-hidden","true");
 }
 
+function openWallBulkFlagsModal(drawingIndex){
+  const drawing=page().drawings?.[drawingIndex];
+
+  if(
+    drawing?.type!=="wall4" ||
+    !Array.isArray(drawing.members) ||
+    !drawing.members.length
+  )return;
+
+  wallMemberPlayerTarget={
+    drawingIndex,
+    memberIndex:null,
+    bulk:true
+  };
+
+  const title=document.getElementById("wallMemberPlayerModalTitle");
+  const description=document.getElementById("wallMemberPlayerModalDescription");
+  const playerField=document.getElementById("wallMemberPlayerField");
+  const numberField=document.getElementById("wallMemberNumberField");
+
+  if(title)title.textContent="Barriera · modifica tutte le sagome";
+  if(description){
+    description.textContent=
+      "I flag scelti verranno applicati contemporaneamente a tutte le 4 sagome della barriera.";
+  }
+
+  if(playerField)playerField.hidden=true;
+  if(numberField)numberField.hidden=true;
+
+  const members=drawing.members;
+
+  document.getElementById("wallMemberLineAbove").checked=
+    members.every(member=>Boolean(member?.showLineAbove));
+
+  document.getElementById("wallMemberLineBelow").checked=
+    members.every(member=>Boolean(member?.showLineBelow));
+
+  document.getElementById("wallMemberVerticalNameBelow").checked=
+    members.every(member=>
+      Boolean(member?.showVerticalNameBelow ?? member?.showVerticalName)
+    );
+
+  document.getElementById("wallMemberVerticalNameAbove").checked=
+    members.every(member=>Boolean(member?.showVerticalNameAbove));
+
+  const modal=document.getElementById("wallMemberPlayerModal");
+  modal?.classList.add("open");
+  modal?.setAttribute("aria-hidden","false");
+}
+
 function openWallMemberPlayerModal(drawingIndex,memberIndex){
   const drawing=page().drawings?.[drawingIndex];
   const member=drawing?.members?.[memberIndex];
@@ -7787,7 +8007,12 @@ function openWallMemberPlayerModal(drawingIndex,memberIndex){
     !member
   )return;
 
-  wallMemberPlayerTarget={drawingIndex,memberIndex};
+  wallMemberPlayerTarget={drawingIndex,memberIndex,bulk:false};
+
+  const playerField=document.getElementById("wallMemberPlayerField");
+  const numberField=document.getElementById("wallMemberNumberField");
+  if(playerField)playerField.hidden=false;
+  if(numberField)numberField.hidden=false;
 
   const select=document.getElementById("wallMemberPlayerSelect");
   const title=document.getElementById("wallMemberPlayerModalTitle");
@@ -7883,6 +8108,38 @@ function saveWallMemberPlayerModal(){
   if(!wallMemberPlayerTarget)return;
 
   const drawing=page().drawings?.[wallMemberPlayerTarget.drawingIndex];
+
+  if(wallMemberPlayerTarget.bulk){
+    if(
+      drawing?.type!=="wall4" ||
+      !Array.isArray(drawing.members)
+    )return;
+
+    pushHistory();
+
+    const showLineAbove=
+      document.getElementById("wallMemberLineAbove").checked;
+    const showLineBelow=
+      document.getElementById("wallMemberLineBelow").checked;
+    const showVerticalNameBelow=
+      document.getElementById("wallMemberVerticalNameBelow").checked;
+    const showVerticalNameAbove=
+      document.getElementById("wallMemberVerticalNameAbove").checked;
+
+    drawing.members.forEach(member=>{
+      member.showLineAbove=showLineAbove;
+      member.showLineBelow=showLineBelow;
+      member.showVerticalNameBelow=showVerticalNameBelow;
+      member.showVerticalNameAbove=showVerticalNameAbove;
+    });
+
+    renderAll();
+    save(false);
+    closeWallMemberPlayerModal();
+    setStatus("Flag applicati a tutte le sagome della barriera");
+    return;
+  }
+
   const member=drawing?.members?.[wallMemberPlayerTarget.memberIndex];
   const select=document.getElementById("wallMemberPlayerSelect");
 
@@ -8818,8 +9075,21 @@ function renderDrawings(){
 
             wallSlotPress.moved=true;
 
-            selectWallSlot(event);
-            renderDrawings();
+            /*
+              v255:
+              se sagoma/barriera fanno già parte di una selezione multipla,
+              trascinare da una hit-area interna NON deve distruggere il gruppo.
+              Il gruppo intero viene spostato insieme.
+            */
+            const preserveUnifiedGroup=(
+              selectedDrawings.has(i) &&
+              getUnifiedSelectionCount()>1
+            );
+
+            if(!preserveUnifiedGroup){
+              selectWallSlot(event);
+              renderDrawings();
+            }
 
             startUnifiedSelectionDrag({
               event,
@@ -8873,6 +9143,18 @@ function renderDrawings(){
             event.preventDefault();
             event.stopPropagation();
 
+            const wholeWallWasSelected=(
+              d.type==="wall4" &&
+              selectedDrawing===i &&
+              selectedDrawings.has(i) &&
+              selectedWallMembers.size===0
+            );
+
+            if(isDoubleActivation && wholeWallWasSelected){
+              openWallBulkFlagsModal(i);
+              return;
+            }
+
             selectWallSlot(event);
             renderDrawings();
 
@@ -8899,6 +9181,18 @@ function renderDrawings(){
             wallMemberTapTimes.delete(
               wallMemberKey(i,index)
             );
+
+            const wholeWallWasSelected=(
+              d.type==="wall4" &&
+              selectedDrawing===i &&
+              selectedDrawings.has(i) &&
+              selectedWallMembers.size===0
+            );
+
+            if(wholeWallWasSelected){
+              openWallBulkFlagsModal(i);
+              return;
+            }
 
             selectWallSlot(event);
             renderDrawings();
@@ -8950,7 +9244,25 @@ function renderDrawings(){
         openMannequinNumberModal(i,targetIndex);
       };
 
-      hit.addEventListener("dblclick",editMannequinNumberAtEvent);
+      hit.addEventListener("dblclick",event=>{
+        if(d.type==="wall4"){
+          event.preventDefault();
+          event.stopPropagation();
+
+          const wholeWallSelected=(
+            selectedDrawing===i &&
+            selectedDrawings.has(i) &&
+            selectedWallMembers.size===0
+          );
+
+          if(wholeWallSelected){
+            openWallBulkFlagsModal(i);
+          }
+          return;
+        }
+
+        editMannequinNumberAtEvent(event);
+      });
 
       let lastMannequinTap=0;
       hit.addEventListener("pointerup",event=>{
@@ -9540,9 +9852,36 @@ function updateLineupCounters(){
   let home=0;
   let away=0;
 
+  const countedPlayerIds=new Set();
+
   page().positions.forEach((pos,i)=>{
     if(!pos || !state.roster[i])return;
-    if(state.roster[i].team==="away")away++;
+
+    const player=state.roster[i];
+    const playerId=String(player?.id||i);
+
+    if(countedPlayerIds.has(playerId))return;
+    countedPlayerIds.add(playerId);
+
+    if(player.team==="away")away++;
+    else home++;
+  });
+
+  /*
+    v254:
+    un giocatore assegnato a barriera/sagoma è realmente "in campo".
+    Quindi sparisce dalla lista laterale e partecipa al conteggio 0/11.
+  */
+  getAssignedWallPlayerIds().forEach(playerId=>{
+    if(countedPlayerIds.has(playerId))return;
+
+    const rosterIndex=getRosterIndexByPlayerId(playerId);
+    const player=state.roster[rosterIndex];
+    if(!player)return;
+
+    countedPlayerIds.add(playerId);
+
+    if(player.team==="away")away++;
     else home++;
   });
 
@@ -9871,8 +10210,12 @@ function addTrainingMannequin(type){
   const isWall=type==="wall4";
   const centerX=500;
   const centerY=310;
-  const width=isWall ? 96 : 24;
-  const height=isWall ? 53.2 : 53.2;
+  /*
+    v254: barriera e sagoma nascono di default il 15% più grandi.
+    Il rapporto tra larghezza e altezza resta invariato.
+  */
+  const width=isWall ? 110.4 : 27.6;
+  const height=61.18;
 
   const drawing={
     type,
@@ -12031,6 +12374,36 @@ function changeSelectedLayer(mode){
   setStatus(labels[mode]);
 }
 
+document.addEventListener("keydown",event=>{
+  if(
+    !["ArrowLeft","ArrowRight","ArrowUp","ArrowDown"].includes(event.key)
+  )return;
+
+  if(isEditableTarget(event.target))return;
+
+  /*
+    Non intercettiamo le frecce mentre una finestra modale è aperta:
+    select/input devono conservare la navigazione nativa da tastiera.
+  */
+  if(document.querySelector(".modal-backdrop.open"))return;
+
+  const step=event.shiftKey ? 1 : .25;
+
+  const delta={
+    ArrowLeft:{dx:-step,dy:0},
+    ArrowRight:{dx:step,dy:0},
+    ArrowUp:{dx:0,dy:-step},
+    ArrowDown:{dx:0,dy:step}
+  }[event.key];
+
+  if(!delta)return;
+
+  if(moveUnifiedSelectionByKeyboard(delta.dx,delta.dy)){
+    event.preventDefault();
+    event.stopPropagation();
+  }
+});
+
 document.addEventListener("keydown",e=>{
   if(e.key==="Escape"){
     clearAllSelections();
@@ -12753,7 +13126,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v253",
+    appVersion:"v255",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -13980,7 +14353,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=253",
+        "./service-worker.js?v=255",
         { updateViaCache: "none" }
       );
 
