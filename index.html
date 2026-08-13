@@ -2558,7 +2558,17 @@ body.export-in-progress .field-fullscreen-previews{
   filter:drop-shadow(0 0 3px #4b8dff) drop-shadow(0 0 5px rgba(75,141,255,.55));
 }
 
-.wall-member-options{display:grid;gap:7px;margin-top:14px;padding:10px;border:1px solid #30465d;border-radius:10px;background:#101a25}
+
+.wall-member-options{
+  display:grid;
+  gap:7px;
+  margin-top:14px;
+  padding:10px;
+  border:1px solid #30465d;
+  border-radius:10px;
+  background:#101a25;
+}
+
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
@@ -2941,9 +2951,20 @@ body.export-in-progress .field-fullscreen-previews{
     </label>
 
     <div class="wall-member-options">
-      <label class="roster-option-toggle"><input type="checkbox" id="wallMemberLineAbove"><span>Mostra linea verticale lunga sopra</span></label>
-      <label class="roster-option-toggle"><input type="checkbox" id="wallMemberLineBelow"><span>Mostra linea verticale lunga sotto</span></label>
-      <label class="roster-option-toggle"><input type="checkbox" id="wallMemberVerticalName"><span>Mostra nome giocatore in verticale</span></label>
+      <label class="roster-option-toggle">
+        <input type="checkbox" id="wallMemberLineAbove">
+        <span>Mostra linea verticale lunga sopra</span>
+      </label>
+
+      <label class="roster-option-toggle">
+        <input type="checkbox" id="wallMemberLineBelow">
+        <span>Mostra linea verticale lunga sotto</span>
+      </label>
+
+      <label class="roster-option-toggle">
+        <input type="checkbox" id="wallMemberVerticalName">
+        <span>Mostra nome giocatore in verticale</span>
+      </label>
     </div>
 
     <div class="modal-actions">
@@ -3183,6 +3204,7 @@ let dragSnapshot=null;
 let clipboardPayload=null;
 const playerClickTimes=new Map();
 const textClickTimes=new Map();
+const wallMemberTapTimes=new Map();
 
 
 function createRafDragUpdater(updateFn){
@@ -5781,8 +5803,18 @@ function renderPlayers(){
   const jerseyPath="M10 3 L18 0 L23 6 L28 10 L33 6 L38 0 L46 3 L56 14 L48 20 L45 50 L11 50 L8 20 L0 14 Z";
 
   state.roster.forEach((pl,i)=>{
-    if(assignedWallPlayerIds.has(String(pl?.id||i)))return;
-    if(assignedWallPlayerIds.has(String(pl?.id||i)))return;
+    if(
+      assignedWallPlayerIds.has(
+        String(pl?.id||i)
+      )
+    )return;
+
+    if(
+      assignedWallPlayerIds.has(
+        String(pl?.id||i)
+      )
+    )return;
+
     const pos=page().positions[i];
     if(!pos)return;
 
@@ -6609,22 +6641,29 @@ function wallMemberKey(drawingIndex,memberIndex){
   return `${drawingIndex}:${memberIndex}`;
 }
 
+
 function getAssignedWallPlayerIds(projectPage=page()){
   const ids=new Set();
+
   (projectPage?.drawings||[]).forEach(drawing=>{
     if(drawing?.type!=="wall4" || !Array.isArray(drawing.members))return;
+
     drawing.members.forEach(member=>{
       const id=String(member?.playerId||"");
       if(id)ids.add(id);
     });
   });
+
   return ids;
 }
 
 function getRosterIndexByPlayerId(playerId){
   const id=String(playerId||"");
   if(!id)return -1;
-  return state.roster.findIndex((player,index)=>String(player?.id||index)===id);
+
+  return state.roster.findIndex((player,index)=>
+    String(player?.id||index)===id
+  );
 }
 
 function getSelectedWallMemberRefs(){
@@ -7353,9 +7392,12 @@ function openWallMemberPlayerModal(drawingIndex,memberIndex){
 
   const usedByOtherSlots=new Set(
     (drawing.members||[])
-      .map((other,otherIndex)=>otherIndex===memberIndex ? "" : String(other?.playerId||""))
+      .map((other,otherIndex)=>
+        otherIndex===memberIndex ? "" : String(other?.playerId||"")
+      )
       .filter(Boolean)
   );
+
   const assignedAnywhere=getAssignedWallPlayerIds();
   const currentMemberPlayerId=String(member.playerId||"");
 
@@ -7363,8 +7405,13 @@ function openWallMemberPlayerModal(drawingIndex,memberIndex){
     if(player.team==="gk")return;
 
     const playerId=String(player.id||index);
+
     if(usedByOtherSlots.has(playerId))return;
-    if(assignedAnywhere.has(playerId) && playerId!==currentMemberPlayerId)return;
+
+    if(
+      assignedAnywhere.has(playerId) &&
+      playerId!==currentMemberPlayerId
+    )return;
 
     const option=document.createElement("option");
     option.value=playerId;
@@ -7374,13 +7421,20 @@ function openWallMemberPlayerModal(drawingIndex,memberIndex){
 
   const currentPlayerId=String(member.playerId||"");
 
-  select.value=[...select.options].some(option=>option.value===currentPlayerId)
+  select.value=[...select.options].some(option=>
+    option.value===currentPlayerId
+  )
     ? currentPlayerId
     : "";
 
-  document.getElementById("wallMemberLineAbove").checked=Boolean(member.showLineAbove);
-  document.getElementById("wallMemberLineBelow").checked=Boolean(member.showLineBelow);
-  document.getElementById("wallMemberVerticalName").checked=Boolean(member.showVerticalName);
+  document.getElementById("wallMemberLineAbove").checked=
+    Boolean(member.showLineAbove);
+
+  document.getElementById("wallMemberLineBelow").checked=
+    Boolean(member.showLineBelow);
+
+  document.getElementById("wallMemberVerticalName").checked=
+    Boolean(member.showVerticalName);
 
   const modal=document.getElementById("wallMemberPlayerModal");
   modal?.classList.add("open");
@@ -7403,15 +7457,29 @@ function saveWallMemberPlayerModal(){
   pushHistory();
 
   const nextPlayerId=String(select.value||"");
+
   member.playerId=nextPlayerId;
-  member.showLineAbove=document.getElementById("wallMemberLineAbove").checked;
-  member.showLineBelow=document.getElementById("wallMemberLineBelow").checked;
-  member.showVerticalName=document.getElementById("wallMemberVerticalName").checked;
+  member.showLineAbove=
+    document.getElementById("wallMemberLineAbove").checked;
+  member.showLineBelow=
+    document.getElementById("wallMemberLineBelow").checked;
+  member.showVerticalName=
+    document.getElementById("wallMemberVerticalName").checked;
+
   const savedMemberIndex=wallMemberPlayerTarget.memberIndex;
 
+  /*
+    Un giocatore assegnato alla barriera viene tolto dal campo
+    dello schema corrente. Non viene cancellato dalla rosa.
+    La lista laterale lo nasconde finché l'associazione esiste.
+  */
   if(nextPlayerId){
     const rosterIndex=getRosterIndexByPlayerId(nextPlayerId);
-    if(rosterIndex>=0 && page().positions?.[rosterIndex]){
+
+    if(
+      rosterIndex>=0 &&
+      page().positions?.[rosterIndex]
+    ){
       page().positions[rosterIndex]=null;
     }
   }
@@ -8004,43 +8072,88 @@ function renderDrawings(){
             g.appendChild(marker);
           }
 
+
           if(member.showLineAbove){
-            const line=document.createElementNS("http://www.w3.org/2000/svg","line");
-            const endY=headCy-headR-9, length=height*1.65;
-            line.setAttribute("x1",centerX); line.setAttribute("x2",centerX);
-            line.setAttribute("y1",endY-length); line.setAttribute("y2",endY);
-            line.setAttribute("stroke","#9aa0a8"); line.setAttribute("stroke-width","1.8");
-            line.setAttribute("vector-effect","non-scaling-stroke"); line.setAttribute("pointer-events","none");
-            g.appendChild(line);
+            const lineAbove=document.createElementNS(
+              "http://www.w3.org/2000/svg",
+              "line"
+            );
+
+            const endY=headCy-headR-9;
+            const length=height*1.65;
+
+            lineAbove.setAttribute("x1",centerX);
+            lineAbove.setAttribute("x2",centerX);
+            lineAbove.setAttribute("y1",endY-length);
+            lineAbove.setAttribute("y2",endY);
+            lineAbove.setAttribute("stroke","#9aa0a8");
+            lineAbove.setAttribute("stroke-width","1.8");
+            lineAbove.setAttribute("vector-effect","non-scaling-stroke");
+            lineAbove.setAttribute("pointer-events","none");
+            g.appendChild(lineAbove);
           }
 
           if(member.showLineBelow){
-            const line=document.createElementNS("http://www.w3.org/2000/svg","line");
-            const startY=torsoBottom+10, length=height*1.65;
-            line.setAttribute("x1",centerX); line.setAttribute("x2",centerX);
-            line.setAttribute("y1",startY); line.setAttribute("y2",startY+length);
-            line.setAttribute("stroke","#9aa0a8"); line.setAttribute("stroke-width","1.8");
-            line.setAttribute("vector-effect","non-scaling-stroke"); line.setAttribute("pointer-events","none");
-            g.appendChild(line);
+            const lineBelow=document.createElementNS(
+              "http://www.w3.org/2000/svg",
+              "line"
+            );
+
+            const startY=torsoBottom+10;
+            const length=height*1.65;
+
+            lineBelow.setAttribute("x1",centerX);
+            lineBelow.setAttribute("x2",centerX);
+            lineBelow.setAttribute("y1",startY);
+            lineBelow.setAttribute("y2",startY+length);
+            lineBelow.setAttribute("stroke","#9aa0a8");
+            lineBelow.setAttribute("stroke-width","1.8");
+            lineBelow.setAttribute("vector-effect","non-scaling-stroke");
+            lineBelow.setAttribute("pointer-events","none");
+            g.appendChild(lineBelow);
           }
 
           if(member.showVerticalName && member.playerId){
-            const linkedPlayer=state.roster[getRosterIndexByPlayerId(member.playerId)];
+            const linkedPlayer=
+              state.roster[getRosterIndexByPlayerId(member.playerId)];
+
             if(linkedPlayer){
-              const name=document.createElementNS("http://www.w3.org/2000/svg","text");
-              const x=centerX+figureWidth*.62, y=torsoBottom+4;
-              name.textContent=String(linkedPlayer.lastName||linkedPlayer.name||"").toUpperCase();
-              name.setAttribute("x",x); name.setAttribute("y",y);
-              name.setAttribute("transform",`rotate(-90 ${x} ${y})`);
-              name.setAttribute("text-anchor","start");
-              name.setAttribute("fill","#111827");
-              name.setAttribute("font-size",String(Math.max(6.6,Math.min(10.2,height*.11))));
-              name.setAttribute("font-weight","700");
-              name.setAttribute("font-family","Arial, Helvetica, sans-serif");
-              name.setAttribute("pointer-events","none");
-              name.setAttribute("paint-order","stroke");
-              name.setAttribute("stroke","#ffffff"); name.setAttribute("stroke-width",".9");
-              g.appendChild(name);
+              const verticalName=document.createElementNS(
+                "http://www.w3.org/2000/svg",
+                "text"
+              );
+
+              const x=centerX+figureWidth*.62;
+              const y=torsoBottom+4;
+
+              verticalName.textContent=String(
+                linkedPlayer.lastName||
+                linkedPlayer.name||
+                ""
+              ).toUpperCase();
+
+              verticalName.setAttribute("x",x);
+              verticalName.setAttribute("y",y);
+              verticalName.setAttribute(
+                "transform",
+                `rotate(-90 ${x} ${y})`
+              );
+              verticalName.setAttribute("text-anchor","start");
+              verticalName.setAttribute("fill","#111827");
+              verticalName.setAttribute(
+                "font-size",
+                String(Math.max(6.6,Math.min(10.2,height*.11)))
+              );
+              verticalName.setAttribute("font-weight","700");
+              verticalName.setAttribute(
+                "font-family",
+                "Arial, Helvetica, sans-serif"
+              );
+              verticalName.setAttribute("pointer-events","none");
+              verticalName.setAttribute("paint-order","stroke");
+              verticalName.setAttribute("stroke","#ffffff");
+              verticalName.setAttribute("stroke-width",".9");
+              g.appendChild(verticalName);
             }
           }
 
@@ -8170,16 +8283,16 @@ function renderDrawings(){
             renderDrawings();
             openWallMemberPlayerModal(i,index);
           });
-
-          let lastWallSlotTap=0;
-
           memberHit.addEventListener("pointerup",event=>{
             if(event.pointerType==="mouse")return;
 
+            const tapKey=wallMemberKey(i,index);
             const now=performance.now();
+            const previous=wallMemberTapTimes.get(tapKey)||0;
 
-            if(now-lastWallSlotTap<430){
-              lastWallSlotTap=0;
+            if(now-previous<430){
+              wallMemberTapTimes.delete(tapKey);
+
               event.preventDefault();
               event.stopPropagation();
 
@@ -8189,10 +8302,11 @@ function renderDrawings(){
               return;
             }
 
-            lastWallSlotTap=now;
+            wallMemberTapTimes.set(tapKey,now);
+
             setTimeout(()=>{
-              if(lastWallSlotTap===now){
-                lastWallSlotTap=0;
+              if(wallMemberTapTimes.get(tapKey)===now){
+                wallMemberTapTimes.delete(tapKey);
               }
             },460);
           });
@@ -11818,7 +11932,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v237",
+    appVersion:"v238",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -12953,7 +13067,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=237",
+        "./service-worker.js?v=238",
         { updateViaCache: "none" }
       );
 
