@@ -8838,7 +8838,7 @@ function renderDrawings(){
                 Anche questa è una modifica di rendering, quindi
                 aggiorna automaticamente gli schemi già salvati.
               */
-              const length=height*(long?3.234:1.862);
+              const length=height*(long?2.31:1.33);
               const above=variant==="v-top-long";
               marker.setAttribute("x1",centerX);
               marker.setAttribute("x2",centerX);
@@ -8863,7 +8863,7 @@ function renderDrawings(){
             );
 
             const endY=headCy-headR-Math.max(17,height*.19);
-            const length=height*3.234; // v260: ulteriore +40% lunghezza, distanza invariata
+            const length=height*2.31; // v261: barriera/sagoma ripristinate alla lunghezza precedente
 
             lineAbove.setAttribute("x1",centerX);
             lineAbove.setAttribute("x2",centerX);
@@ -8883,7 +8883,7 @@ function renderDrawings(){
             );
 
             const startY=torsoBottom+10;
-            const length=height*3.234; // v260: ulteriore +40% lunghezza, distanza invariata
+            const length=height*2.31; // v261: barriera/sagoma ripristinate alla lunghezza precedente
 
             lineBelow.setAttribute("x1",centerX);
             lineBelow.setAttribute("x2",centerX);
@@ -13102,7 +13102,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v260",
+    appVersion:"v261",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -14329,7 +14329,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=260",
+        "./service-worker.js?v=261",
         { updateViaCache: "none" }
       );
 
