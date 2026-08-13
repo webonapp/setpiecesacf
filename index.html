@@ -3840,6 +3840,32 @@ function normalizeDrawingRecord(drawing){
   safe.dashStyle=Math.round(clampNumber(safe.dashStyle,0,3,0));
 
   return safe;
+
+
+  if(["wall4","mannequin"].includes(safe.type)){
+    const memberCount=safe.type==="wall4" ? 4 : 1;
+    const currentMembers=Array.isArray(safe.members) ? safe.members : [];
+
+    safe.members=Array.from({length:memberCount},(_,index)=>{
+      const member=currentMembers[index]||{};
+      return {
+        playerId:String(member?.playerId||""),
+        displayVariant:[
+          "jersey","h-long","h-short","v-long","v-top-long"
+        ].includes(member?.displayVariant)
+          ? member.displayVariant
+          : "",
+        color:typeof member?.color==="string" ? member.color : "",
+        showLineAbove:Boolean(member?.showLineAbove),
+        showLineBelow:Boolean(member?.showLineBelow),
+        showVerticalNameBelow:Boolean(
+          member?.showVerticalNameBelow ?? member?.showVerticalName
+        ),
+        showVerticalNameAbove:Boolean(member?.showVerticalNameAbove)
+      };
+    });
+  }
+
 }
 
 function normalizePageRecord(projectPage,index,rosterLength){
@@ -6036,9 +6062,30 @@ card.addEventListener("dblclick",e=>{
 
     remove.addEventListener("click",e=>{
       e.stopPropagation();
+
+      const removedPlayer=state.roster[i];
+      const removedPlayerId=String(removedPlayer?.id||i);
+
       pushHistory();
+
+      state.pages.forEach(projectPage=>{
+        projectPage.positions.splice(i,1);
+
+        (projectPage.drawings||[]).forEach(drawing=>{
+          if(
+            !["wall4","mannequin"].includes(drawing?.type) ||
+            !Array.isArray(drawing.members)
+          )return;
+
+          drawing.members.forEach(member=>{
+            if(String(member?.playerId||"")===removedPlayerId){
+              member.playerId="";
+            }
+          });
+        });
+      });
+
       state.roster.splice(i,1);
-      state.pages.forEach(p=>p.positions.splice(i,1));
 
       const nextSelection=new Set();
       selectedPlayers.forEach(idx=>{
@@ -6093,12 +6140,6 @@ function renderPlayers(){
   const jerseyPath="M10 3 L18 0 L23 6 L28 10 L33 6 L38 0 L46 3 L56 14 L48 20 L45 50 L11 50 L8 20 L0 14 Z";
 
   state.roster.forEach((pl,i)=>{
-    if(
-      assignedWallPlayerIds.has(
-        String(pl?.id||i)
-      )
-    )return;
-
     if(
       assignedWallPlayerIds.has(
         String(pl?.id||i)
@@ -6446,6 +6487,13 @@ function getUnifiedKeyboardSelection(){
   const drawingIndexes=new Set(
     [...selectedDrawings].filter(i=>page().drawings?.[i])
   );
+
+  selectedWallMembers.forEach(key=>{
+    const drawingIndex=Number(String(key).split(":")[0]);
+    if(page().drawings?.[drawingIndex]){
+      drawingIndexes.add(drawingIndex);
+    }
+  });
   if(
     Number.isInteger(selectedDrawing) &&
     page().drawings?.[selectedDrawing]
@@ -7113,7 +7161,13 @@ function getAssignedWallPlayerIds(projectPage=page()){
 
     drawing.members.forEach(member=>{
       const id=String(member?.playerId||"");
-      if(id)ids.add(id);
+      if(!id)return;
+
+      const exists=state.roster.some((player,index)=>
+        String(player?.id||index)===id
+      );
+
+      if(exists)ids.add(id);
     });
   });
 
@@ -7183,11 +7237,20 @@ function toggleSelection(index){
 }
 
 function getUnifiedSelectionCount(){
+  const drawingIndexes=new Set(selectedDrawings);
+
+  selectedWallMembers.forEach(key=>{
+    const drawingIndex=Number(String(key).split(":")[0]);
+    if(page().drawings?.[drawingIndex]){
+      drawingIndexes.add(drawingIndex);
+    }
+  });
+
   return (
     selectedPlayers.size+
     selectedBalls.size+
     selectedTexts.size+
-    selectedDrawings.size
+    drawingIndexes.size
   );
 }
 
@@ -7785,6 +7848,15 @@ function resetTransientInteractionState(){
   */
   resetTextInteractionState();
 
+  wallMemberPlayerTarget=null;
+  if(typeof wallBulkTouchedFlags!=="undefined"){
+    wallBulkTouchedFlags.clear();
+  }
+
+  const wallModal=document.getElementById("wallMemberPlayerModal");
+  wallModal?.classList.remove("open");
+  wallModal?.setAttribute("aria-hidden","true");
+
   playerClickTimes.clear();
   wallMemberTapTimes.clear();
 
@@ -7810,6 +7882,9 @@ function resetTransientInteractionState(){
 }
 
 function cancelActivePointerInteractions(){
+  wallMemberTapTimes.clear();
+  fieldPlayerTapTimes.clear();
+
   drawingStart=null;
   drawingDragStart=null;
   drawingInitial=null;
@@ -7939,6 +8014,7 @@ function applyDrawingStrokeStyle(element,d){
 
 
 let wallMemberPlayerTarget=null;
+let wallBulkTouchedFlags=new Set();
 
 function getWallMemberPlayerIndex(member){
   if(!member?.playerId)return -1;
@@ -7950,6 +8026,13 @@ function getWallMemberPlayerIndex(member){
 
 function closeWallMemberPlayerModal(){
   wallMemberPlayerTarget=null;
+
+  const playerField=document.getElementById("wallMemberPlayerField");
+  const numberField=document.getElementById("wallMemberNumberField");
+
+  if(playerField)playerField.hidden=false;
+  if(numberField)numberField.hidden=false;
+
   const modal=document.getElementById("wallMemberPlayerModal");
   modal?.classList.remove("open");
   modal?.setAttribute("aria-hidden","true");
@@ -7986,19 +8069,40 @@ function openWallBulkFlagsModal(drawingIndex){
 
   const members=drawing.members;
 
-  document.getElementById("wallMemberLineAbove").checked=
-    members.every(member=>Boolean(member?.showLineAbove));
+  wallBulkTouchedFlags.clear();
 
-  document.getElementById("wallMemberLineBelow").checked=
-    members.every(member=>Boolean(member?.showLineBelow));
+  const setupMixedCheckbox=(id,values)=>{
+    const input=document.getElementById(id);
+    if(!input)return;
 
-  document.getElementById("wallMemberVerticalNameBelow").checked=
-    members.every(member=>
+    const allTrue=values.every(Boolean);
+    const allFalse=values.every(value=>!value);
+
+    input.checked=allTrue;
+    input.indeterminate=!allTrue&&!allFalse;
+  };
+
+  setupMixedCheckbox(
+    "wallMemberLineAbove",
+    members.map(member=>Boolean(member?.showLineAbove))
+  );
+
+  setupMixedCheckbox(
+    "wallMemberLineBelow",
+    members.map(member=>Boolean(member?.showLineBelow))
+  );
+
+  setupMixedCheckbox(
+    "wallMemberVerticalNameBelow",
+    members.map(member=>
       Boolean(member?.showVerticalNameBelow ?? member?.showVerticalName)
-    );
+    )
+  );
 
-  document.getElementById("wallMemberVerticalNameAbove").checked=
-    members.every(member=>Boolean(member?.showVerticalNameAbove));
+  setupMixedCheckbox(
+    "wallMemberVerticalNameAbove",
+    members.map(member=>Boolean(member?.showVerticalNameAbove))
+  );
 
   const modal=document.getElementById("wallMemberPlayerModal");
   modal?.classList.add("open");
@@ -8124,20 +8228,30 @@ function saveWallMemberPlayerModal(){
 
     pushHistory();
 
-    const showLineAbove=
-      document.getElementById("wallMemberLineAbove").checked;
-    const showLineBelow=
-      document.getElementById("wallMemberLineBelow").checked;
-    const showVerticalNameBelow=
-      document.getElementById("wallMemberVerticalNameBelow").checked;
-    const showVerticalNameAbove=
-      document.getElementById("wallMemberVerticalNameAbove").checked;
+    const values={
+      wallMemberLineAbove:
+        document.getElementById("wallMemberLineAbove").checked,
+      wallMemberLineBelow:
+        document.getElementById("wallMemberLineBelow").checked,
+      wallMemberVerticalNameBelow:
+        document.getElementById("wallMemberVerticalNameBelow").checked,
+      wallMemberVerticalNameAbove:
+        document.getElementById("wallMemberVerticalNameAbove").checked
+    };
 
     drawing.members.forEach(member=>{
-      member.showLineAbove=showLineAbove;
-      member.showLineBelow=showLineBelow;
-      member.showVerticalNameBelow=showVerticalNameBelow;
-      member.showVerticalNameAbove=showVerticalNameAbove;
+      if(wallBulkTouchedFlags.has("wallMemberLineAbove")){
+        member.showLineAbove=values.wallMemberLineAbove;
+      }
+      if(wallBulkTouchedFlags.has("wallMemberLineBelow")){
+        member.showLineBelow=values.wallMemberLineBelow;
+      }
+      if(wallBulkTouchedFlags.has("wallMemberVerticalNameBelow")){
+        member.showVerticalNameBelow=values.wallMemberVerticalNameBelow;
+      }
+      if(wallBulkTouchedFlags.has("wallMemberVerticalNameAbove")){
+        member.showVerticalNameAbove=values.wallMemberVerticalNameAbove;
+      }
     });
 
     renderAll();
@@ -9830,35 +9944,31 @@ function updateLineupCounters(){
 
   const countedPlayerIds=new Set();
 
-  page().positions.forEach((pos,i)=>{
-    if(!pos || !state.roster[i])return;
+  const countRosterIndex=index=>{
+    if(
+      !Number.isInteger(index) ||
+      index<0 ||
+      index>=state.roster.length
+    )return;
 
-    const player=state.roster[i];
-    const playerId=String(player?.id||i);
-
-    if(countedPlayerIds.has(playerId))return;
-    countedPlayerIds.add(playerId);
-
-    if(player.team==="away")away++;
-    else home++;
-  });
-
-  /*
-    v254:
-    un giocatore assegnato a barriera/sagoma è realmente "in campo".
-    Quindi sparisce dalla lista laterale e partecipa al conteggio 0/11.
-  */
-  getAssignedWallPlayerIds().forEach(playerId=>{
-    if(countedPlayerIds.has(playerId))return;
-
-    const rosterIndex=getRosterIndexByPlayerId(playerId);
-    const player=state.roster[rosterIndex];
+    const player=state.roster[index];
     if(!player)return;
 
+    const playerId=String(player?.id||index);
+    if(countedPlayerIds.has(playerId))return;
+
     countedPlayerIds.add(playerId);
 
     if(player.team==="away")away++;
     else home++;
+  };
+
+  (page().positions||[]).forEach((pos,index)=>{
+    if(pos)countRosterIndex(index);
+  });
+
+  getAssignedWallPlayerIds().forEach(playerId=>{
+    countRosterIndex(getRosterIndexByPlayerId(playerId));
   });
 
   const homeEl=document.getElementById("homeLineupCount");
@@ -9910,6 +10020,7 @@ function renderAll(){
   syncViewPresetControl();
 
   syncSnapControl();
+  updateLineupCounters();
 }
 
 
@@ -11857,6 +11968,13 @@ function collectClipboardPayload(){
   const drawingIndexes=new Set(
     [...selectedDrawings].filter(i=>page().drawings?.[i])
   );
+
+  selectedWallMembers.forEach(key=>{
+    const drawingIndex=Number(String(key).split(":")[0]);
+    if(page().drawings?.[drawingIndex]){
+      drawingIndexes.add(drawingIndex);
+    }
+  });
   if(Number.isInteger(selectedDrawing) && page().drawings?.[selectedDrawing]){
     drawingIndexes.add(selectedDrawing);
   }
@@ -11999,7 +12117,11 @@ function deleteCurrentSelection(){
   const drawingIndexes=new Set(
     [...selectedDrawings].filter(i=>page().drawings?.[i])
   );
-  if(Number.isInteger(selectedDrawing) && page().drawings?.[selectedDrawing]){
+  if(
+    Number.isInteger(selectedDrawing) &&
+    page().drawings?.[selectedDrawing] &&
+    selectedWallMembers.size===0
+  ){
     drawingIndexes.add(selectedDrawing);
   }
 
@@ -13102,7 +13224,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v261",
+    appVersion:"v262",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -14329,7 +14451,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=261",
+        "./service-worker.js?v=262",
         { updateViaCache: "none" }
       );
 
