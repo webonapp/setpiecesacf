@@ -9208,6 +9208,25 @@ function commitDragHistory(){
 const MIN_DRAWING_WIDTH=1;
 const MAX_DRAWING_WIDTH=18;
 
+function snapArrowEndpointToAllowedAngle(x1,y1,x2,y2){
+  const dx=x2-x1;
+  const dy=y2-y1;
+  const length=Math.hypot(dx,dy);
+
+  if(length<0.001){
+    return {x:x2,y:y2};
+  }
+
+  const rawAngle=Math.atan2(dy,dx);
+  const step=Math.PI/4; // 45°
+  const snappedAngle=Math.round(rawAngle/step)*step;
+
+  return {
+    x:x1+Math.cos(snappedAngle)*length,
+    y:y1+Math.sin(snappedAngle)*length
+  };
+}
+
 function normalizeDrawingWidth(value,fallback=drawingDefaults.width){
   const numeric=Number(value);
   const safe=Number.isFinite(numeric) ? numeric : Number(fallback);
@@ -9577,7 +9596,20 @@ document.getElementById("board").addEventListener("pointerup",e=>{
   }
 
   if(!drawingStart)return;
-  const end=boardPoint(e);
+
+  const freeEnd=boardPoint(e);
+  const end=(
+    state.snapEnabled &&
+    tool==="arrow"
+  )
+    ? snapArrowEndpointToAllowedAngle(
+        drawingStart.x,
+        drawingStart.y,
+        freeEnd.x,
+        freeEnd.y
+      )
+    : freeEnd;
+
   if(Math.hypot(end.x-drawingStart.x,end.y-drawingStart.y)>12){
     pushHistory();
     const drawing={
@@ -12510,7 +12542,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v247",
+    appVersion:"v248",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -13649,7 +13681,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=247",
+        "./service-worker.js?v=248",
         { updateViaCache: "none" }
       );
 
