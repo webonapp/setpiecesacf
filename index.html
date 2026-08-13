@@ -3036,6 +3036,20 @@ body.export-in-progress .field-fullscreen-previews{
       ></textarea>
     </label>
 
+    <label class="text-editor-field">
+      <span>Dimensione testo (pt)</span>
+      <input
+        class="input"
+        id="textEditorSize"
+        type="number"
+        min="8"
+        max="72"
+        step="1"
+        inputmode="numeric"
+        value="18"
+      >
+    </label>
+
     <div class="modal-actions">
       <button type="button" class="btn" id="cancelTextEditor">Annulla</button>
       <button type="button" class="btn primary" id="saveTextEditor">Salva</button>
@@ -3735,20 +3749,35 @@ function normalizePageRecord(projectPage,index,rosterLength){
     : [];
 
   safe.balls=Array.isArray(safe.balls)
-    ? safe.balls.map(ball=>({
-        ...ball,
-        x:clampNumber(ball?.x,0,100,50),
-        y:clampNumber(ball?.y,0,100,50)
-      }))
+    ? safe.balls
+        .filter(ball=>ball && typeof ball==="object")
+        .map(ball=>({
+          ...ball,
+          x:clampNumber(ball?.x,0,100,50),
+          y:clampNumber(ball?.y,0,100,50)
+        }))
     : [];
 
   safe.texts=Array.isArray(safe.texts)
-    ? safe.texts.map(text=>({
-        ...text,
-        x:clampNumber(text?.x,0,100,50),
-        y:clampNumber(text?.y,0,100,50),
-        text:String(text?.text??text?.value??"")
-      }))
+    ? safe.texts
+        .filter(text=>text && typeof text==="object")
+        .map(text=>{
+          const content=String(text?.text ?? text?.value ?? "").trim();
+          const rawColor=String(text?.color||"#171a20").trim();
+          const color=/^#[0-9a-f]{3,8}$/i.test(rawColor)
+            ? rawColor
+            : "#171a20";
+
+          return {
+            ...text,
+            x:clampNumber(text?.x,0,100,50),
+            y:clampNumber(text?.y,0,100,50),
+            text:content,
+            color,
+            size:clampNumber(text?.size,8,72,18)
+          };
+        })
+        .filter(text=>text.text.length>0)
     : [];
 
   if(!safe.playerDisplayOverrides || typeof safe.playerDisplayOverrides!=="object"){
@@ -4804,7 +4833,23 @@ function getSelectedWallSubstitutionPlayerIndexes(){
   const indexes=[];
   const used=new Set();
 
-  [...selectedDrawings].forEach(drawingIndex=>{
+  /*
+    v243:
+    una barriera selezionata come oggetto equivale alla selezione
+    dei suoi quattro posti. Consideriamo sia selectedDrawings sia
+    selectedDrawing, così il pulsante Sostituzioni si aggiorna anche
+    nella selezione singola classica.
+  */
+  const drawingIndexes=new Set(selectedDrawings);
+
+  if(
+    Number.isInteger(selectedDrawing) &&
+    page().drawings?.[selectedDrawing]?.type==="wall4"
+  ){
+    drawingIndexes.add(selectedDrawing);
+  }
+
+  drawingIndexes.forEach(drawingIndex=>{
     const drawing=page().drawings?.[drawingIndex];
     if(drawing?.type!=="wall4" || !Array.isArray(drawing.members))return;
 
@@ -4813,11 +4858,17 @@ function getSelectedWallSubstitutionPlayerIndexes(){
       .filter(parts=>parts[0]===drawingIndex)
       .map(parts=>parts[1]);
 
+    /*
+      Se è selezionata una sagoma interna, sostituiamo quella.
+      Se è selezionata la barriera intera, usiamo tutti e 4 i membri
+      nell'ordine grafico 1→4.
+    */
     const membersToUse=selectedMemberIndexes.length
       ? selectedMemberIndexes
+          .sort((a,b)=>a-b)
           .map(memberIndex=>drawing.members[memberIndex])
           .filter(Boolean)
-      : drawing.members;
+      : drawing.members.slice(0,4);
 
     membersToUse.forEach(member=>{
       const rosterIndex=getRosterIndexByPlayerId(member?.playerId);
@@ -4836,7 +4887,11 @@ function getSelectedSubstitutionPlayerIndexes(){
     ...getSelectedWallSubstitutionPlayerIndexes()
   ];
 
-  return [...new Set(combined)].sort((a,b)=>a-b);
+  /*
+    Non ordiniamo per indice rosa: per la barriera deve rimanere
+    l'ordine visivo delle quattro sagome.
+  */
+  return [...new Set(combined)];
 }
 
 function getSingleSelectedFieldPlayer(){
@@ -4869,11 +4924,20 @@ function updateSubstitutionButton(){
   const selectedIndexes=getSelectedSubstitutionPlayerIndexes();
   const available=getBatchReplacementCandidates(selectedIndexes);
 
+  const selectedWholeWall=(
+    Number.isInteger(selectedDrawing) &&
+    page().drawings?.[selectedDrawing]?.type==="wall4" &&
+    selectedDrawings.has(selectedDrawing) &&
+    selectedWallMembers.size===0
+  );
+
   button.disabled=
     selectedIndexes.length===0 ||
     available.length===0;
 
-  if(!selectedIndexes.length){
+  if(selectedWholeWall && selectedIndexes.length===4 && available.length){
+    button.title="Gestisci le 4 sostituzioni della barriera";
+  }else if(!selectedIndexes.length){
     button.title="Seleziona uno o più giocatori oppure una barriera con giocatori assegnati";
   }else if(!available.length){
     button.title="Non ci sono giocatori disponibili nella lista";
@@ -5073,6 +5137,20 @@ function openBatchSubstitutionModal(selectedIndexes,availableIndexes){
 function openSubstitutionModal(){
   const selectedIndexes=getSelectedSubstitutionPlayerIndexes();
 
+  const selectedWholeWall=(
+    Number.isInteger(selectedDrawing) &&
+    page().drawings?.[selectedDrawing]?.type==="wall4" &&
+    selectedDrawings.has(selectedDrawing) &&
+    selectedWallMembers.size===0
+  );
+
+  if(selectedWholeWall && selectedIndexes.length!==4){
+    alert(
+      "Per usare Sostituzioni sulla barriera intera, assegna prima un giocatore a tutte e 4 le sagome."
+    );
+    return;
+  }
+
   if(!selectedIndexes.length){
     alert("Seleziona uno o più giocatori oppure una barriera con giocatori assegnati.");
     return;
@@ -5082,6 +5160,14 @@ function openSubstitutionModal(){
 
   if(!availableIndexes.length){
     alert("Non ci sono giocatori disponibili nella lista laterale.");
+    return;
+  }
+
+  if(selectedWholeWall){
+    openBatchSubstitutionModal(
+      selectedIndexes,
+      availableIndexes
+    );
     return;
   }
 
@@ -6087,6 +6173,8 @@ function clearObjectSelections(){
 }
 
 function refreshObjectSelectionVisuals(){
+  updateSubstitutionButton();
+
   document.querySelectorAll(".ball").forEach(el=>{
     el.classList.toggle("selected-object",selectedBalls.has(Number(el.dataset.index)));
   });
@@ -6562,6 +6650,8 @@ function clearAllSelections(){
   renderBalls();
   renderTexts();
   renderRoster();
+  refreshObjectSelectionVisuals();
+  updateSubstitutionButton();
 }
 
 
@@ -6813,7 +6903,16 @@ function pruneTransientSelections(){
   selectedTexts=new Set([...selectedTexts].filter(index=>
     Number.isInteger(index) && Boolean(current.texts?.[index])
   ));
-  if(!selectedTexts.has(selectedText))selectedText=null;
+
+  if(Number.isInteger(selectedText) && current.texts?.[selectedText]){
+    selectedTexts.add(selectedText);
+  }
+
+  if(!selectedTexts.has(selectedText)){
+    selectedText=selectedTexts.size===1
+      ? [...selectedTexts][0]
+      : null;
+  }
 
   selectedDrawings=new Set([...selectedDrawings].filter(index=>
     Number.isInteger(index) && Boolean(current.drawings?.[index])
@@ -6928,7 +7027,7 @@ function startUnifiedSelectionDrag({
 }){
   const playerIndexes=[...selectedPlayers].filter(i=>page().positions[i]);
   const ballIndexes=[...selectedBalls].filter(i=>page().balls?.[i]);
-  const textIndexes=[...selectedTexts].filter(i=>page().texts?.[i]);
+  const textIndexes=getSelectedTextIndexes();
   const drawingIndexes=[...selectedDrawings].filter(i=>page().drawings?.[i]);
 
   const initial={
@@ -7197,14 +7296,17 @@ function renderTexts(){
   layer.innerHTML="";
 
   (page().texts||[]).forEach((item,i)=>{
+    if(!item || typeof item!=="object" || !String(item.text||"").trim())return;
+
+    const isSelected=selectedText===i || selectedTexts.has(i);
     const el=document.createElement("div");
-    el.className="tactical-text"+(selectedText===i?" selected":"")+(selectedTexts.has(i)?" selected-object":"");
+    el.className="tactical-text"+(isSelected?" selected selected-object":"");
     el.dataset.index=String(i);
-    el.textContent=item.text;
-    el.style.left=item.x+"%";
-    el.style.top=item.y+"%";
+    el.textContent=String(item.text);
+    el.style.left=clampNumber(item.x,0,100,50)+"%";
+    el.style.top=clampNumber(item.y,0,100,50)+"%";
     el.style.color=item.color||"#171a20";
-    el.style.fontSize=(item.size||18)+"px";
+    el.style.fontSize=clampNumber(item.size,8,72,18)+"px";
 el.addEventListener("pointerdown",e=>{
       if(tool!=="move")return;
       e.preventDefault();
@@ -7233,6 +7335,7 @@ el.addEventListener("pointerdown",e=>{
         ? true
         : selectObjectKind("text",i,additive);
 
+      syncPrimaryTextSelection();
       refreshUnifiedSelectionVisuals();
 
       if(!selected)return;
@@ -7269,6 +7372,14 @@ function openTextEditor(index=null){
     : "Scrivi il testo da inserire nello schema.";
 
   input.value=isEditing ? String(page().texts[index].text||"") : "";
+
+  const sizeInput=document.getElementById("textEditorSize");
+  sizeInput.value=String(
+    isEditing
+      ? clampNumber(page().texts[index].size,8,72,18)
+      : 18
+  );
+
   modal.classList.add("open");
 
   requestAnimationFrame(()=>{
@@ -7284,7 +7395,9 @@ function closeTextEditor(){
 
 function saveTextEditor(){
   const input=document.getElementById("textEditorInput");
+  const sizeInput=document.getElementById("textEditorSize");
   const text=input.value.trim();
+  const size=Number(sizeInput.value);
 
   if(!text){
     alert("Inserisci un testo.");
@@ -7292,11 +7405,20 @@ function saveTextEditor(){
     return;
   }
 
+  if(!Number.isFinite(size) || size<8 || size>72){
+    alert("Inserisci una dimensione valida da 8 a 72 pt.");
+    sizeInput.focus();
+    return;
+  }
+
   pushHistory();
+
+  let finalTextIndex=null;
 
   if(editingTextIndex!==null && page().texts?.[editingTextIndex]){
     page().texts[editingTextIndex].text=text;
-    selectedText=editingTextIndex;
+    page().texts[editingTextIndex].size=Math.round(size);
+    finalTextIndex=editingTextIndex;
     setStatus("Testo aggiornato");
   }else{
     if(!Array.isArray(page().texts))page().texts=[];
@@ -7305,20 +7427,19 @@ function saveTextEditor(){
       x:50,
       y:50,
       color:"#171a20",
-      size:18
+      size:Math.round(size)
     });
-    selectedText=page().texts.length-1;
-    selectedPlayers.clear();
-    selectedRosterPlayers.clear();
-    selectedDrawing=null;
-    selectedBall=null;
+    finalTextIndex=page().texts.length-1;
     setStatus("Testo inserito");
   }
 
-  renderTexts();
-  renderPlayers();
-  renderBalls();
-  renderDrawings();
+  clearSelectionKinds("text");
+  selectedTexts.clear();
+  selectedTexts.add(finalTextIndex);
+  selectedText=finalTextIndex;
+
+  renderAll();
+  refreshObjectSelectionVisuals();
   save(false);
   closeTextEditor();
 }
@@ -7328,11 +7449,26 @@ function addTextToScheme(){
 }
 
 function editSelectedText(index=selectedText){
-  if(index===null || !page().texts?.[index]){
-    setStatus("Seleziona prima un testo");
+  let target=Number.isInteger(index) ? index : null;
+
+  if(target===null){
+    const indexes=getSelectedTextIndexes();
+    target=indexes.length===1 ? indexes[0] : null;
+  }
+
+  if(target===null || !page().texts?.[target]){
+    setStatus(
+      getSelectedTextIndexes().length>1
+        ? "Seleziona un solo testo da modificare"
+        : "Seleziona prima un testo"
+    );
     return;
   }
-  openTextEditor(index);
+
+  selectedTexts=new Set([target]);
+  selectedText=target;
+  refreshObjectSelectionVisuals();
+  openTextEditor(target);
 }
 
 document.getElementById("saveTextEditor").addEventListener("click",saveTextEditor);
@@ -7529,8 +7665,6 @@ function saveWallMemberPlayerModal(){
 
   if(drawing?.type!=="wall4" || !member || !select)return;
 
-  pushHistory();
-
   const nextPlayerId=String(select.value||"");
   const numberInput=document.getElementById("wallMemberNumber");
   const rawNumber=String(numberInput.value||"").trim();
@@ -7546,6 +7680,8 @@ function saveWallMemberPlayerModal(){
     numberInput.focus();
     return;
   }
+
+  pushHistory();
 
   member.playerId=nextPlayerId;
   member.showLineAbove=
@@ -8241,10 +8377,18 @@ function renderDrawings(){
                   "text"
                 );
 
-                const x=centerX+figureWidth*.62;
+                /*
+                  v242:
+                  il nome verticale usa la STESSA asse delle linee verticali.
+                  Sotto: parte dalla stessa coordinata della linea sotto.
+                  Sopra: termina sulla stessa coordinata della linea sopra.
+                */
+                const x=centerX;
+                const belowStartY=torsoBottom+10;
+                const aboveEndY=headCy-headR-Math.max(17,height*.19);
                 const y=placement==="above"
-                  ? headCy-headR-Math.max(22,height*.28)
-                  : torsoBottom+Math.max(20,height*.34);
+                  ? aboveEndY
+                  : belowStartY;
 
                 verticalName.textContent=nameText;
                 verticalName.setAttribute("x",x);
@@ -8255,7 +8399,7 @@ function renderDrawings(){
                 );
                 verticalName.setAttribute(
                   "text-anchor",
-                  placement==="above" ? "end" : "start"
+                  placement==="above" ? "start" : "end"
                 );
                 verticalName.setAttribute("fill","#111827");
                 verticalName.setAttribute(
@@ -9059,6 +9203,7 @@ function renderAll(){
   renderRoster();
   renderPlayers();
   renderBalls();
+  renderTexts();
   renderDrawings();
   refreshObjectSelectionVisuals();
   document.getElementById("notes").value=page().notes;
@@ -9655,8 +9800,34 @@ document.getElementById("newSchemeModal").addEventListener("click",event=>{
   }
 });
 
-document.getElementById("deletePage").addEventListener("click",()=>{if(state.pages.length===1)return alert("Deve restare almeno uno schema");if(confirm("Eliminare lo schema corrente?")){pushHistory();state.pages.splice(currentPage,1);currentPage=Math.max(0,currentPage-1);renderAll();save()}});
-document.getElementById("duplicatePage").addEventListener("click",()=>{pushHistory();const copy=JSON.parse(JSON.stringify(page()));copy.title=page().title+" copia";state.pages.splice(currentPage+1,0,copy);currentPage++;renderAll();save()});
+document.getElementById("deletePage").addEventListener("click",()=>{
+  if(state.pages.length===1)return alert("Deve restare almeno uno schema");
+
+  if(confirm("Eliminare lo schema corrente?")){
+    pushHistory();
+    state.pages.splice(currentPage,1);
+    currentPage=Math.max(0,currentPage-1);
+    clearSelectionKinds();
+    editingTextIndex=null;
+    marqueeStart=null;
+    marqueeMoved=false;
+    renderAll();
+    save();
+  }
+});
+document.getElementById("duplicatePage").addEventListener("click",()=>{
+  pushHistory();
+  const copy=JSON.parse(JSON.stringify(page()));
+  copy.title=page().title+" copia";
+  state.pages.splice(currentPage+1,0,copy);
+  currentPage++;
+  clearSelectionKinds();
+  editingTextIndex=null;
+  marqueeStart=null;
+  marqueeMoved=false;
+  renderAll();
+  save();
+});
 let notesHistoryTimer=null;
 document.getElementById("notes").addEventListener("input",e=>{
   if(!notesHistoryTimer) pushHistory();
@@ -10422,9 +10593,12 @@ document.querySelectorAll(".add-ball-action").forEach(button=>button.addEventLis
   pushHistory();
   if(!Array.isArray(page().balls))page().balls=[];
   page().balls.push({x:50,y:50});
+
+  clearSelectionKinds("ball");
+  selectedBalls.clear();
   selectedBall=page().balls.length-1;
-  selectedPlayers.clear();
-  selectedDrawing=null;
+  selectedBalls.add(selectedBall);
+
   renderBalls();
   renderPlayers();
   renderDrawings();
@@ -10860,6 +11034,29 @@ function isEditableTarget(target){
 }
 
 
+function getSelectedTextIndexes(){
+  const indexes=new Set(
+    [...selectedTexts].filter(index=>
+      Number.isInteger(index) && Boolean(page().texts?.[index])
+    )
+  );
+
+  if(Number.isInteger(selectedText) && page().texts?.[selectedText]){
+    indexes.add(selectedText);
+  }
+
+  return [...indexes].sort((a,b)=>a-b);
+}
+
+function syncPrimaryTextSelection(){
+  const indexes=getSelectedTextIndexes();
+  selectedTexts=new Set(indexes);
+
+  if(selectedText===null || !indexes.includes(selectedText)){
+    selectedText=indexes.length===1 ? indexes[0] : null;
+  }
+}
+
 function collectClipboardPayload(){
   const players=[...selectedPlayers]
     .filter(i=>state.roster[i] && page().positions[i])
@@ -10873,8 +11070,7 @@ function collectClipboardPayload(){
     .filter(i=>page().balls?.[i])
     .map(i=>JSON.parse(JSON.stringify(page().balls[i])));
 
-  const texts=[...selectedTexts]
-    .filter(i=>page().texts?.[i])
+  const texts=getSelectedTextIndexes()
     .map(i=>JSON.parse(JSON.stringify(page().texts[i])));
 
   const drawings=[...selectedDrawings]
@@ -10884,9 +11080,6 @@ function collectClipboardPayload(){
   // Fallback per selezioni singole precedenti.
   if(!players.length && selectedBall!==null && page().balls?.[selectedBall]){
     balls.push(JSON.parse(JSON.stringify(page().balls[selectedBall])));
-  }
-  if(!texts.length && selectedText!==null && page().texts?.[selectedText]){
-    texts.push(JSON.parse(JSON.stringify(page().texts[selectedText])));
   }
   if(!drawings.length && selectedDrawing!==null && page().drawings?.[selectedDrawing]){
     drawings.push(JSON.parse(JSON.stringify(page().drawings[selectedDrawing])));
@@ -11662,6 +11855,7 @@ function renderArchive(){
           selectedBalls.clear();
           selectedTexts.clear();
           selectedDrawings.clear();
+          selectedWallMembers.clear();
           selectedDrawing=null;
           selectedBall=null;
           selectedText=null;
@@ -12081,7 +12275,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v240",
+    appVersion:"v244",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -12512,6 +12706,7 @@ async function importBackupFile(file){
     selectedBalls.clear();
     selectedTexts.clear();
     selectedDrawings.clear();
+    selectedWallMembers.clear();
     selectedBall=null;
     selectedText=null;
     selectedDrawing=null;
@@ -13216,7 +13411,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=240",
+        "./service-worker.js?v=244",
         { updateViaCache: "none" }
       );
 
