@@ -3334,6 +3334,7 @@ function restoreSnapshot(snapshot){
       throw new Error("Snapshot non valido");
     }
 
+    resetTextInteractionState();
     state=restored;
     currentPage=Math.max(
       0,
@@ -7306,7 +7307,7 @@ function renderTexts(){
     el.style.left=clampNumber(item.x,0,100,50)+"%";
     el.style.top=clampNumber(item.y,0,100,50)+"%";
     el.style.color=item.color||"#171a20";
-    el.style.fontSize=clampNumber(item.size,8,72,18)+"px";
+    el.style.fontSize=clampNumber(item.size,8,72,18)+"pt";
 el.addEventListener("pointerdown",e=>{
       if(tool!=="move")return;
       e.preventDefault();
@@ -7355,11 +7356,13 @@ el.addEventListener("pointerdown",e=>{
 }
 
 let editingTextIndex=null;
+let editingTextPageIndex=null;
 
 function openTextEditor(index=null){
   const isEditing=index!==null && Boolean(page().texts?.[index]);
 
   editingTextIndex=isEditing ? index : null;
+  editingTextPageIndex=currentPage;
 
   const modal=document.getElementById("textEditorModal");
   const title=document.getElementById("textEditorTitle");
@@ -7391,6 +7394,7 @@ function openTextEditor(index=null){
 function closeTextEditor(){
   document.getElementById("textEditorModal").classList.remove("open");
   editingTextIndex=null;
+  editingTextPageIndex=null;
 }
 
 function saveTextEditor(){
@@ -7398,6 +7402,20 @@ function saveTextEditor(){
   const sizeInput=document.getElementById("textEditorSize");
   const text=input.value.trim();
   const size=Number(sizeInput.value);
+
+  /*
+    v245: un editor aperto appartiene sempre allo schema da cui è stato aperto.
+    Se per qualsiasi motivo lo schema cambia, non deve poter modificare
+    un testo con lo stesso indice nello schema nuovo.
+  */
+  if(
+    editingTextPageIndex!==null &&
+    editingTextPageIndex!==currentPage
+  ){
+    closeTextEditor();
+    setStatus("Editor testo chiuso dopo cambio schema");
+    return;
+  }
 
   if(!text){
     alert("Inserisci un testo.");
@@ -7442,6 +7460,17 @@ function saveTextEditor(){
   refreshObjectSelectionVisuals();
   save(false);
   closeTextEditor();
+}
+
+function resetTextInteractionState(){
+  textClickTimes.clear();
+  editingTextIndex=null;
+  editingTextPageIndex=null;
+
+  const modal=document.getElementById("textEditorModal");
+  if(modal){
+    modal.classList.remove("open");
+  }
 }
 
 function addTextToScheme(){
@@ -9199,6 +9228,7 @@ function updateLineupCounters(){
 
 function renderAll(){
   pruneTransientSelections();
+  syncPrimaryTextSelection();
   renderSchemeSelect();
   renderRoster();
   renderPlayers();
@@ -9573,15 +9603,28 @@ document.querySelectorAll(".library-icon[data-tool]").forEach(btn=>{
 document.querySelectorAll(".tool[data-tool]").forEach(b=>b.addEventListener("click",()=>{tool=b.dataset.tool;if(tool!=="move"){selectedPlayers.clear();selectedDrawing=null;}refreshSelectionVisuals();renderDrawings();document.querySelectorAll(".tool[data-tool]").forEach(x=>x.classList.toggle("active",x===b))}));
 document.getElementById("schemeSelect").addEventListener("change",e=>{
   page().notes=document.getElementById("notes").value;
+  resetTextInteractionState();
   currentPage=Number(e.target.value);
   clearSelectionKinds();
   marqueeStart=null;
   marqueeMoved=false;
-  editingTextIndex=null;
   renderAll();
 });
 document.getElementById("renameScheme").addEventListener("click",()=>{pushHistory();page().title=document.getElementById("schemeName").value.trim()||`Schema-${currentPage+1}`;renderSchemeSelect();save(false)});
-document.getElementById("addScheme").addEventListener("click",()=>{if(state.pages.length>=30){alert("Massimo 30 schemi");return}pushHistory();state.pages.push(emptyPage(state.pages.length));currentPage=state.pages.length-1;renderAll();save()});
+document.getElementById("addScheme").addEventListener("click",()=>{
+  if(state.pages.length>=30){
+    alert("Massimo 30 schemi");
+    return;
+  }
+
+  pushHistory();
+  resetTextInteractionState();
+  state.pages.push(emptyPage(state.pages.length));
+  currentPage=state.pages.length-1;
+  clearSelectionKinds();
+  renderAll();
+  save();
+});
 
 function closeNewSchemeModal(){
   document.getElementById("newSchemeModal")?.classList.remove("open");
@@ -9706,13 +9749,13 @@ function addNewSchemeToProject(newPage,statusMessage){
   }
 
   pushHistory();
+  resetTextInteractionState();
   state.pages.push(newPage);
   currentPage=state.pages.length-1;
 
   clearSelectionKinds();
   marqueeStart=null;
   marqueeMoved=false;
-  editingTextIndex=null;
 
   renderAll();
   save(false);
@@ -9805,10 +9848,10 @@ document.getElementById("deletePage").addEventListener("click",()=>{
 
   if(confirm("Eliminare lo schema corrente?")){
     pushHistory();
+    resetTextInteractionState();
     state.pages.splice(currentPage,1);
     currentPage=Math.max(0,currentPage-1);
     clearSelectionKinds();
-    editingTextIndex=null;
     marqueeStart=null;
     marqueeMoved=false;
     renderAll();
@@ -9817,12 +9860,12 @@ document.getElementById("deletePage").addEventListener("click",()=>{
 });
 document.getElementById("duplicatePage").addEventListener("click",()=>{
   pushHistory();
+  resetTextInteractionState();
   const copy=JSON.parse(JSON.stringify(page()));
   copy.title=page().title+" copia";
   state.pages.splice(currentPage+1,0,copy);
   currentPage++;
   clearSelectionKinds();
-  editingTextIndex=null;
   marqueeStart=null;
   marqueeMoved=false;
   renderAll();
@@ -9948,6 +9991,28 @@ document.querySelectorAll(".drawing-preset").forEach(btn=>{
 document.querySelectorAll("#leftColorPalette .color-swatch").forEach(btn=>{
   btn.addEventListener("click",()=>{
     const color=btn.dataset.color;
+
+    const textIndexes=getSelectedTextIndexes();
+
+    if(textIndexes.length){
+      pushHistory();
+
+      textIndexes.forEach(index=>{
+        const item=page().texts?.[index];
+        if(item)item.color=color;
+      });
+
+      renderTexts();
+      refreshObjectSelectionVisuals();
+      save(false);
+
+      setStatus(
+        textIndexes.length===1
+          ? "Colore testo aggiornato"
+          : `Colore aggiornato su ${textIndexes.length} testi`
+      );
+      return;
+    }
 
     const opponentIndexes=new Set();
 
@@ -10372,6 +10437,8 @@ function clearExportSelections(){
 function restoreExportUiState(snapshot){
   if(!snapshot)return;
 
+  resetTextInteractionState();
+
   currentPage=Math.max(
     0,
     Math.min(
@@ -10514,6 +10581,9 @@ document.getElementById("exportPdf").addEventListener("click",async()=>{
     const maxH=pageHeight-imageTop-bottomMargin;
 
     for(let i=0;i<state.pages.length;i++){
+      editingTextIndex=null;
+      editingTextPageIndex=null;
+      textClickTimes.clear();
       currentPage=i;
       renderAll();
       clearExportSelections();
@@ -11207,7 +11277,7 @@ function pasteClipboardSelection(){
 function deleteCurrentSelection(){
   const playerIndexes=[...selectedPlayers].filter(i=>page().positions[i]);
   const ballIndexes=[...selectedBalls].filter(i=>page().balls?.[i]);
-  const textIndexes=[...selectedTexts].filter(i=>page().texts?.[i]);
+  const textIndexes=getSelectedTextIndexes();
   const drawingIndexes=[...selectedDrawings].filter(i=>page().drawings?.[i]);
 
   if(
@@ -11842,6 +11912,7 @@ function renderArchive(){
             Aprire un progetto/layout è un confine di sessione:
             niente Undo che possa riportare al progetto precedente.
           */
+          resetTextInteractionState();
           state=candidate;
           currentPage=0;
           undoStack=[];
@@ -12275,7 +12346,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v244",
+    appVersion:"v245",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -12650,6 +12721,7 @@ async function importBackupFile(file){
       return;
     }
 
+    resetTextInteractionState();
     state=normalizeProjectState(importedState);
     archiveState=importedArchive;
 
@@ -13304,6 +13376,7 @@ function buildFullscreenSchemePreview(projectPage,index){
 
   button.addEventListener("click",()=>{
     if(index===currentPage)return;
+    resetTextInteractionState();
     currentPage=index;
     clearAllSelections();
     renderAll();
@@ -13357,6 +13430,7 @@ function goToFullscreenScheme(direction){
   const target=currentPage+direction;
   if(target<0 || target>=state.pages.length)return;
 
+  resetTextInteractionState();
   currentPage=target;
   clearAllSelections();
   renderAll();
@@ -13411,7 +13485,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=244",
+        "./service-worker.js?v=245",
         { updateViaCache: "none" }
       );
 
