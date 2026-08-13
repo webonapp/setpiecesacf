@@ -8856,7 +8856,7 @@ function renderDrawings(){
             );
 
             const endY=headCy-headR-Math.max(17,height*.19);
-            const length=height*1.65;
+            const length=height*2.31; // v258: +40% lunghezza, distanza invariata
 
             lineAbove.setAttribute("x1",centerX);
             lineAbove.setAttribute("x2",centerX);
@@ -8876,7 +8876,7 @@ function renderDrawings(){
             );
 
             const startY=torsoBottom+10;
-            const length=height*1.65;
+            const length=height*2.31; // v258: +40% lunghezza, distanza invariata
 
             lineBelow.setAttribute("x1",centerX);
             lineBelow.setAttribute("x2",centerX);
@@ -13095,7 +13095,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v257",
+    appVersion:"v258",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -14322,7 +14322,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=257",
+        "./service-worker.js?v=258",
         { updateViaCache: "none" }
       );
 
