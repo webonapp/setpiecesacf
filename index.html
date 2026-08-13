@@ -8232,19 +8232,85 @@ function renderDrawings(){
         event:e,
         element:handle,
         onDelta:(dx,dy)=>{
-          d[xKey]=Math.max(
+          const candidateX=Math.max(
             0,
             Math.min(1000,startX+dx)
           );
 
-          d[yKey]=Math.max(
+          const candidateY=Math.max(
             0,
             Math.min(620,startY+dy)
           );
 
+          const isArrowEndpoint=
+            d.type==="arrow" &&
+            (
+              (xKey==="x1" && yKey==="y1") ||
+              (xKey==="x2" && yKey==="y2")
+            );
+
+          if(state.snapEnabled && isArrowEndpoint){
+            /*
+              v251:
+              lo Snap non è più applicato soltanto alla creazione.
+              Anche mentre trascini uno dei due estremi della freccia
+              l'angolo è rigidamente vincolato alle 8 direzioni ammesse.
+            */
+            if(xKey==="x2"){
+              const snapped=snapArrowEndpointToAllowedAngle(
+                d.x1,
+                d.y1,
+                candidateX,
+                candidateY
+              );
+
+              d.x2=Math.max(0,Math.min(1000,snapped.x));
+              d.y2=Math.max(0,Math.min(620,snapped.y));
+            }else{
+              /*
+                Spostando la coda usiamo la punta come origine.
+                Il risultato resta quindi sulla stessa famiglia
+                di angoli consentiti.
+              */
+              const snapped=snapArrowEndpointToAllowedAngle(
+                d.x2,
+                d.y2,
+                candidateX,
+                candidateY
+              );
+
+              d.x1=Math.max(0,Math.min(1000,snapped.x));
+              d.y1=Math.max(0,Math.min(620,snapped.y));
+            }
+          }else{
+            /*
+              Snap disattivato oppure oggetto diverso da freccia:
+              movimento libero invariato.
+            */
+            d[xKey]=candidateX;
+            d[yKey]=candidateY;
+          }
+
           renderDrawings();
         },
         onFinish:()=>{
+          /*
+            Seconda rete di sicurezza: Safari/iPad può consegnare
+            l'ultimo pointermove in modo differente. Se Snap è attivo,
+            una freccia non può mai terminare con un angolo intermedio.
+          */
+          if(state.snapEnabled && d.type==="arrow"){
+            const snapped=snapArrowEndpointToAllowedAngle(
+              d.x1,
+              d.y1,
+              d.x2,
+              d.y2
+            );
+
+            d.x2=Math.max(0,Math.min(1000,snapped.x));
+            d.y2=Math.max(0,Math.min(620,snapped.y));
+          }
+
           renderDrawings();
           refreshObjectSelectionVisuals();
           syncDrawingControls();
@@ -12687,7 +12753,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v250",
+    appVersion:"v251",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -13593,10 +13659,49 @@ document.getElementById("preparationModeBtn").addEventListener(
 document.getElementById("snapToggle").addEventListener("change",event=>{
   pushHistory();
   state.snapEnabled=event.target.checked;
+
+  if(state.snapEnabled){
+    /*
+      Se attivo Snap su una freccia già selezionata e precedentemente
+      libera, la porto subito alla direzione ammessa più vicina.
+    */
+    const arrowIndexes=new Set(selectedDrawings);
+
+    if(
+      Number.isInteger(selectedDrawing) &&
+      page().drawings?.[selectedDrawing]?.type==="arrow"
+    ){
+      arrowIndexes.add(selectedDrawing);
+    }
+
+    arrowIndexes.forEach(index=>{
+      const drawing=page().drawings?.[index];
+      if(drawing?.type!=="arrow")return;
+
+      const snapped=snapArrowEndpointToAllowedAngle(
+        drawing.x1,
+        drawing.y1,
+        drawing.x2,
+        drawing.y2
+      );
+
+      drawing.x2=Math.max(0,Math.min(1000,snapped.x));
+      drawing.y2=Math.max(0,Math.min(620,snapped.y));
+    });
+
+    renderDrawings();
+    refreshObjectSelectionVisuals();
+  }
+
   hideSnapGuides();
   syncSnapControl();
   save(false);
-  setStatus(state.snapEnabled?"Snap intelligente attivo · griglia + allineamenti":"Snap intelligente disattivato");
+
+  setStatus(
+    state.snapEnabled
+      ? "Snap attivo · frecce vincolate a 0°, ±45°, ±90°, ±135°, 180°"
+      : "Snap disattivato · movimento frecce libero"
+  );
 });
 
 
@@ -13875,7 +13980,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=250",
+        "./service-worker.js?v=251",
         { updateViaCache: "none" }
       );
 
