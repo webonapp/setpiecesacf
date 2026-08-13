@@ -8254,61 +8254,78 @@ function renderDrawings(){
 
           memberHit.addEventListener("pointerup",event=>{
             if(
-              wallSlotPress &&
-              wallSlotPress.pointerId===event.pointerId &&
-              !wallSlotPress.moved
-            ){
-              selectWallSlot(event);
-              renderDrawings();
-            }
+              !wallSlotPress ||
+              wallSlotPress.pointerId!==event.pointerId
+            )return;
 
+            const wasMoved=wallSlotPress.moved;
             wallSlotPress=null;
 
             try{
               memberHit.releasePointerCapture(event.pointerId);
             }catch(_){}
-          });
 
-          memberHit.addEventListener("pointercancel",()=>{
-            wallSlotPress=null;
-          });
+            if(wasMoved)return;
 
-          memberHit.addEventListener("dblclick",event=>{
-            if(tool!=="move")return;
+            /*
+              v239:
+              NON usiamo il dblclick nativo.
+              Il primo click ridisegna la barriera, quindi il browser vede
+              il secondo click su un nuovo nodo SVG e non genera dblclick.
+
+              Conserviamo invece il timestamp fuori dal renderDrawings().
+              Funziona allo stesso modo con mouse, trackpad, penna e touch.
+            */
+            const tapKey=wallMemberKey(i,index);
+            const now=performance.now();
+            const previous=wallMemberTapTimes.get(tapKey)||0;
+            const isDoubleActivation=now-previous<460;
+
+            if(isDoubleActivation){
+              wallMemberTapTimes.delete(tapKey);
+            }else{
+              wallMemberTapTimes.set(tapKey,now);
+
+              setTimeout(()=>{
+                if(wallMemberTapTimes.get(tapKey)===now){
+                  wallMemberTapTimes.delete(tapKey);
+                }
+              },500);
+            }
 
             event.preventDefault();
             event.stopPropagation();
 
             selectWallSlot(event);
             renderDrawings();
-            openWallMemberPlayerModal(i,index);
-          });
-          memberHit.addEventListener("pointerup",event=>{
-            if(event.pointerType==="mouse")return;
 
-            const tapKey=wallMemberKey(i,index);
-            const now=performance.now();
-            const previous=wallMemberTapTimes.get(tapKey)||0;
-
-            if(now-previous<430){
-              wallMemberTapTimes.delete(tapKey);
-
-              event.preventDefault();
-              event.stopPropagation();
-
-              selectWallSlot(event);
-              renderDrawings();
+            if(isDoubleActivation){
               openWallMemberPlayerModal(i,index);
-              return;
             }
+          });
 
-            wallMemberTapTimes.set(tapKey,now);
+          memberHit.addEventListener("pointercancel",()=>{
+            wallSlotPress=null;
+          });
 
-            setTimeout(()=>{
-              if(wallMemberTapTimes.get(tapKey)===now){
-                wallMemberTapTimes.delete(tapKey);
-              }
-            },460);
+          /*
+            Manteniamo il listener dblclick soltanto come fallback per
+            browser che lo generano comunque, ma il funzionamento principale
+            non dipende più da questo evento.
+          */
+          memberHit.addEventListener("dblclick",event=>{
+            if(tool!=="move")return;
+
+            event.preventDefault();
+            event.stopPropagation();
+
+            wallMemberTapTimes.delete(
+              wallMemberKey(i,index)
+            );
+
+            selectWallSlot(event);
+            renderDrawings();
+            openWallMemberPlayerModal(i,index);
           });
 
           g.appendChild(memberHit);
@@ -11932,7 +11949,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v238",
+    appVersion:"v239",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -13067,7 +13084,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=238",
+        "./service-worker.js?v=239",
         { updateViaCache: "none" }
       );
 
