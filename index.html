@@ -3662,6 +3662,26 @@ function normalizeDrawingRecord(drawing){
   if(safe.type==="mannequin"){
     if(safe.number===undefined || safe.number===null) safe.number="5";
     if(typeof safe.showNumber!=="boolean") safe.showNumber=true;
+
+    const member=Array.isArray(safe.members)
+      ? safe.members[0]
+      : safe.member;
+
+    safe.members=[{
+      playerId:String(member?.playerId||""),
+      displayVariant:[
+        "jersey","h-long","h-short","v-long","v-top-long"
+      ].includes(member?.displayVariant)
+        ? member.displayVariant
+        : "",
+      color:typeof member?.color==="string" ? member.color : "",
+      showLineAbove:Boolean(member?.showLineAbove),
+      showLineBelow:Boolean(member?.showLineBelow),
+      showVerticalNameBelow:Boolean(
+        member?.showVerticalNameBelow ?? member?.showVerticalName
+      ),
+      showVerticalNameAbove:Boolean(member?.showVerticalNameAbove)
+    }];
   }
   if(safe.type==="wall4"){
     const sourceNumbers=Array.isArray(safe.numbers) ? safe.numbers : [];
@@ -3878,7 +3898,10 @@ function normalizeProjectState(projectState){
 
   safe.pages.forEach(projectPage=>{
     (projectPage.drawings||[]).forEach(drawing=>{
-      if(drawing?.type!=="wall4" || !Array.isArray(drawing.members))return;
+      if(
+        !["wall4","mannequin"].includes(drawing?.type) ||
+        !Array.isArray(drawing.members)
+      )return;
 
       const usedIds=new Set();
 
@@ -3939,8 +3962,13 @@ function assertProjectIntegrity(projectState){
     )) return false;
 
     return projectPage.drawings.every(drawing=>{
-      if(drawing?.type!=="wall4")return true;
-      if(!Array.isArray(drawing.members) || drawing.members.length!==4)return false;
+      if(!["wall4","mannequin"].includes(drawing?.type))return true;
+
+      const expectedMembers=drawing.type==="wall4" ? 4 : 1;
+      if(
+        !Array.isArray(drawing.members) ||
+        drawing.members.length!==expectedMembers
+      )return false;
       const ids=drawing.members.map(member=>String(member?.playerId||"")).filter(Boolean);
       return ids.every(id=>validRosterIds.has(id)) && new Set(ids).size===ids.length;
     });
@@ -4845,14 +4873,17 @@ function getSelectedWallSubstitutionPlayerIndexes(){
 
   if(
     Number.isInteger(selectedDrawing) &&
-    page().drawings?.[selectedDrawing]?.type==="wall4"
+    ["wall4","mannequin"].includes(page().drawings?.[selectedDrawing]?.type)
   ){
     drawingIndexes.add(selectedDrawing);
   }
 
   drawingIndexes.forEach(drawingIndex=>{
     const drawing=page().drawings?.[drawingIndex];
-    if(drawing?.type!=="wall4" || !Array.isArray(drawing.members))return;
+    if(
+      !["wall4","mannequin"].includes(drawing?.type) ||
+      !Array.isArray(drawing.members)
+    )return;
 
     const selectedMemberIndexes=[...selectedWallMembers]
       .map(key=>String(key).split(":").map(Number))
@@ -5239,7 +5270,10 @@ function applyGlobalSubstitutionPairs(pairs){
       cambia esclusivamente il giocatore collegato.
     */
     (projectPage.drawings||[]).forEach(drawing=>{
-      if(drawing?.type!=="wall4" || !Array.isArray(drawing.members))return;
+      if(
+        !["wall4","mannequin"].includes(drawing?.type) ||
+        !Array.isArray(drawing.members)
+      )return;
 
       pairs.forEach(pair=>{
         const outgoingPlayer=state.roster[pair.outgoingIndex];
@@ -6804,7 +6838,10 @@ function getAssignedWallPlayerIds(projectPage=page()){
   const ids=new Set();
 
   (projectPage?.drawings||[]).forEach(drawing=>{
-    if(drawing?.type!=="wall4" || !Array.isArray(drawing.members))return;
+    if(
+      !["wall4","mannequin"].includes(drawing?.type) ||
+      !Array.isArray(drawing.members)
+    )return;
 
     drawing.members.forEach(member=>{
       const id=String(member?.playerId||"");
@@ -6834,7 +6871,7 @@ function getSelectedWallMemberRefs(){
     const drawing=page().drawings?.[drawingIndex];
 
     if(
-      drawing?.type==="wall4" &&
+      ["wall4","mannequin"].includes(drawing?.type) &&
       Array.isArray(drawing.members) &&
       drawing.members[memberIndex]
     ){
@@ -6927,7 +6964,7 @@ function pruneTransientSelections(){
     const drawing=current.drawings?.[drawingIndex];
 
     const valid=
-      drawing?.type==="wall4" &&
+      ["wall4","mannequin"].includes(drawing?.type) &&
       Array.isArray(drawing.members) &&
       Boolean(drawing.members[memberIndex]);
 
@@ -7597,7 +7634,10 @@ function openWallMemberPlayerModal(drawingIndex,memberIndex){
   const drawing=page().drawings?.[drawingIndex];
   const member=drawing?.members?.[memberIndex];
 
-  if(drawing?.type!=="wall4" || !member)return;
+  if(
+    !["wall4","mannequin"].includes(drawing?.type) ||
+    !member
+  )return;
 
   wallMemberPlayerTarget={drawingIndex,memberIndex};
 
@@ -7606,13 +7646,15 @@ function openWallMemberPlayerModal(drawingIndex,memberIndex){
   const description=document.getElementById("wallMemberPlayerModalDescription");
 
   if(title){
-    title.textContent=`Barriera · posizione ${memberIndex+1}`;
+    title.textContent=drawing.type==="wall4"
+      ? `Barriera · posizione ${memberIndex+1}`
+      : "Sagoma · assegna giocatore";
   }
 
   if(description){
-    description.textContent=
-      `Associa un giocatore alla sagoma ${memberIndex+1}. `+
-      `La numerazione sopra la testa resta ${memberIndex+1}.`;
+    description.textContent=drawing.type==="wall4"
+      ? `Associa un giocatore alla sagoma ${memberIndex+1}.`
+      : "Associa un giocatore alla sagoma singola.";
   }
 
   select.innerHTML="";
@@ -7672,8 +7714,12 @@ function openWallMemberPlayerModal(drawingIndex,memberIndex){
     Boolean(member.showVerticalNameAbove);
 
   document.getElementById("wallMemberNumber").value=String(
-    (Array.isArray(drawing.numbers) ? drawing.numbers[memberIndex] : null) ??
-    (memberIndex+1)
+    drawing.type==="wall4"
+      ? (
+          (Array.isArray(drawing.numbers) ? drawing.numbers[memberIndex] : null) ??
+          (memberIndex+1)
+        )
+      : (drawing.number ?? "5")
   );
 
   const modal=document.getElementById("wallMemberPlayerModal");
@@ -7692,7 +7738,11 @@ function saveWallMemberPlayerModal(){
   const member=drawing?.members?.[wallMemberPlayerTarget.memberIndex];
   const select=document.getElementById("wallMemberPlayerSelect");
 
-  if(drawing?.type!=="wall4" || !member || !select)return;
+  if(
+    !["wall4","mannequin"].includes(drawing?.type) ||
+    !member ||
+    !select
+  )return;
 
   const nextPlayerId=String(select.value||"");
   const numberInput=document.getElementById("wallMemberNumber");
@@ -7722,16 +7772,20 @@ function saveWallMemberPlayerModal(){
   member.showVerticalNameAbove=
     document.getElementById("wallMemberVerticalNameAbove").checked;
 
-  drawing.numbers=Array.isArray(drawing.numbers)
-    ? drawing.numbers.slice(0,4)
-    : ["1","2","3","4"];
+  if(drawing.type==="wall4"){
+    drawing.numbers=Array.isArray(drawing.numbers)
+      ? drawing.numbers.slice(0,4)
+      : ["1","2","3","4"];
 
-  while(drawing.numbers.length<4){
-    drawing.numbers.push(String(drawing.numbers.length+1));
+    while(drawing.numbers.length<4){
+      drawing.numbers.push(String(drawing.numbers.length+1));
+    }
+
+    drawing.numbers[wallMemberPlayerTarget.memberIndex]=
+      String(Math.round(parsedNumber));
+  }else{
+    drawing.number=String(Math.round(parsedNumber));
   }
-
-  drawing.numbers[wallMemberPlayerTarget.memberIndex]=
-    String(Math.round(parsedNumber));
 
   const savedMemberIndex=wallMemberPlayerTarget.memberIndex;
 
@@ -7761,7 +7815,11 @@ function saveWallMemberPlayerModal(){
 
   setStatus(
     player
-      ? `${player.lastName||player.name||"Giocatore"} associato alla posizione ${savedMemberIndex+1}`
+      ? (
+          drawing.type==="wall4"
+            ? `${player.lastName||player.name||"Giocatore"} associato alla posizione ${savedMemberIndex+1}`
+            : `${player.lastName||player.name||"Giocatore"} associato alla sagoma`
+        )
       : "Associazione rimossa"
   );
 }
@@ -8129,7 +8187,7 @@ function renderDrawings(){
         minY-selectionPad-numberTopExtra;
 
       const benchNameExtra=(
-        d.type==="wall4" &&
+        (d.type==="wall4" || d.type==="mannequin") &&
         state.presentationMode==="bench" &&
         Array.isArray(d.members) &&
         d.members.some(member=>member?.playerId)
@@ -8170,8 +8228,10 @@ function renderDrawings(){
       const figureWidth=d.type==="wall4" ? width/4 : width;
       const firstCenterX=minX+(figureWidth/2);
 
-      if(d.type==="wall4"){
-        d.members=Array.from({length:4},(_,index)=>{
+      if(d.type==="wall4" || d.type==="mannequin"){
+        const memberCount=d.type==="wall4" ? 4 : 1;
+
+        d.members=Array.from({length:memberCount},(_,index)=>{
           const member=Array.isArray(d.members) ? d.members[index] : null;
           return {
             playerId:String(member?.playerId||""),
@@ -8189,7 +8249,7 @@ function renderDrawings(){
 
       const addMannequinFigure=(index)=>{
         const centerX=firstCenterX+(index*figureWidth);
-        const member=d.type==="wall4" ? d.members?.[index] : null;
+        const member=d.members?.[index] || null;
         const figureColor=member?.color || d.color || "#f5bf2d";
 
         /*
@@ -8260,7 +8320,7 @@ function renderDrawings(){
         }
 
         if(
-          d.type==="wall4" &&
+          (d.type==="wall4" || d.type==="mannequin") &&
           member?.playerId &&
           state.presentationMode==="bench"
         ){
@@ -8299,7 +8359,7 @@ function renderDrawings(){
           }
         }
 
-        if(d.type==="wall4" && member){
+        if((d.type==="wall4" || d.type==="mannequin") && member){
           const variant=String(member.displayVariant||"");
 
           const marker=document.createElementNS(
@@ -9559,7 +9619,15 @@ function addTrainingMannequin(type){
           showVerticalNameBelow:false,
           showVerticalNameAbove:false
         }))
-      : null
+      : [{
+          playerId:"",
+          displayVariant:"",
+          color:"",
+          showLineAbove:false,
+          showLineBelow:false,
+          showVerticalNameBelow:false,
+          showVerticalNameAbove:false
+        }]
   };
 
   page().drawings.push(drawing);
@@ -12346,7 +12414,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v245",
+    appVersion:"v246",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -13485,7 +13553,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=245",
+        "./service-worker.js?v=246",
         { updateViaCache: "none" }
       );
 
