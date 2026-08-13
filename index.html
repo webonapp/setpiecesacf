@@ -9331,9 +9331,40 @@ function snapArrowEndpointToAllowedAngle(x1,y1,x2,y2){
     return {x:x2,y:y2};
   }
 
-  const rawAngle=Math.atan2(dy,dx);
-  const step=Math.PI/4; // 45°
-  const snappedAngle=Math.round(rawAngle/step)*step;
+  /*
+    v250:
+    angolazioni CONSENTITE in modalità Snap, e soltanto queste:
+    0°, ±45°, ±90°, ±135°, 180°.
+  */
+  const allowedAnglesDeg=[
+    -135,
+    -90,
+    -45,
+    0,
+    45,
+    90,
+    135,
+    180
+  ];
+
+  const rawAngleDeg=
+    Math.atan2(dy,dx) * 180 / Math.PI;
+
+  const angularDistance=(a,b)=>{
+    const delta=Math.abs(a-b)%360;
+    return Math.min(delta,360-delta);
+  };
+
+  const snappedDeg=allowedAnglesDeg.reduce(
+    (best,candidate)=>
+      angularDistance(rawAngleDeg,candidate) <
+      angularDistance(rawAngleDeg,best)
+        ? candidate
+        : best,
+    allowedAnglesDeg[0]
+  );
+
+  const snappedAngle=snappedDeg*Math.PI/180;
 
   return {
     x:x1+Math.cos(snappedAngle)*length,
@@ -12656,7 +12687,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v249",
+    appVersion:"v250",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -13844,7 +13875,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=249",
+        "./service-worker.js?v=250",
         { updateViaCache: "none" }
       );
 
