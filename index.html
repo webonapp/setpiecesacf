@@ -3334,7 +3334,7 @@ function restoreSnapshot(snapshot){
       throw new Error("Snapshot non valido");
     }
 
-    resetTextInteractionState();
+    resetTransientInteractionState();
     state=restored;
     currentPage=Math.max(
       0,
@@ -3766,7 +3766,9 @@ function normalizePageRecord(projectPage,index,rosterLength){
   });
 
   safe.drawings=Array.isArray(safe.drawings)
-    ? safe.drawings.map(normalizeDrawingRecord)
+    ? safe.drawings
+        .filter(drawing=>drawing && typeof drawing==="object")
+        .map(normalizeDrawingRecord)
     : [];
 
   safe.balls=Array.isArray(safe.balls)
@@ -6687,6 +6689,7 @@ function clearAllSelections(){
   renderRoster();
   refreshObjectSelectionVisuals();
   updateSubstitutionButton();
+  syncDrawingControls();
 }
 
 
@@ -7510,6 +7513,37 @@ function resetTextInteractionState(){
   }
 }
 
+function resetTransientInteractionState(){
+  /*
+    v247: stato temporaneo che NON deve attraversare:
+    cambio schema, Undo/Redo, import, apertura progetto, export.
+  */
+  resetTextInteractionState();
+
+  playerClickTimes.clear();
+  wallMemberTapTimes.clear();
+
+  drawingStart=null;
+  drawingDragStart=null;
+  drawingInitial=null;
+
+  marqueeStart=null;
+  marqueeMoved=false;
+  marqueeBaseSelection=new Set();
+
+  groupDragStart=null;
+  groupInitialPositions=null;
+  dragSnapshot=null;
+
+  historyTransaction=null;
+
+  document.body.classList.remove("is-dragging");
+
+  if(typeof hideSnapGuides==="function"){
+    hideSnapGuides();
+  }
+}
+
 function addTextToScheme(){
   openTextEditor(null);
 }
@@ -7803,6 +7837,9 @@ function saveWallMemberPlayerModal(){
     ){
       page().positions[rosterIndex]=null;
     }
+
+    selectedPlayers.delete(rosterIndex);
+    selectedRosterPlayers.delete(rosterIndex);
   }
 
   renderAll();
@@ -9295,6 +9332,7 @@ function renderAll(){
   renderBalls();
   renderTexts();
   renderDrawings();
+  refreshSelectionVisuals();
   refreshObjectSelectionVisuals();
   document.getElementById("notes").value=page().notes;
   const scaleInput=document.getElementById("playerScale");
@@ -9668,11 +9706,35 @@ document.querySelectorAll(".library-icon[data-tool]").forEach(btn=>{
   });
 });
 
-document.querySelectorAll(".tool[data-tool]").forEach(b=>b.addEventListener("click",()=>{tool=b.dataset.tool;if(tool!=="move"){selectedPlayers.clear();selectedDrawing=null;}refreshSelectionVisuals();renderDrawings();document.querySelectorAll(".tool[data-tool]").forEach(x=>x.classList.toggle("active",x===b))}));
+document.querySelectorAll(".tool[data-tool]").forEach(b=>b.addEventListener("click",()=>{
+  tool=b.dataset.tool;
+
+  if(tool!=="move"){
+    clearSelectionKinds();
+    selectedWallMembers.clear();
+  }
+
+  refreshSelectionVisuals();
+  refreshObjectSelectionVisuals();
+  renderDrawings();
+
+  document.querySelectorAll(".tool[data-tool]").forEach(x=>
+    x.classList.toggle("active",x===b)
+  );
+}));
 document.getElementById("schemeSelect").addEventListener("change",e=>{
   page().notes=document.getElementById("notes").value;
-  resetTextInteractionState();
-  currentPage=Number(e.target.value);
+  resetTransientInteractionState();
+
+  const targetPage=Math.max(
+    0,
+    Math.min(
+      state.pages.length-1,
+      Number(e.target.value)||0
+    )
+  );
+
+  currentPage=targetPage;
   clearSelectionKinds();
   marqueeStart=null;
   marqueeMoved=false;
@@ -9817,7 +9879,7 @@ function addNewSchemeToProject(newPage,statusMessage){
   }
 
   pushHistory();
-  resetTextInteractionState();
+  resetTransientInteractionState();
   state.pages.push(newPage);
   currentPage=state.pages.length-1;
 
@@ -10060,6 +10122,7 @@ document.querySelectorAll("#leftColorPalette .color-swatch").forEach(btn=>{
   btn.addEventListener("click",()=>{
     const color=btn.dataset.color;
 
+    syncPrimaryTextSelection();
     const textIndexes=getSelectedTextIndexes();
 
     if(textIndexes.length){
@@ -10173,7 +10236,17 @@ playerScaleInput.addEventListener("input",()=>{
   scaleHistoryTimer=setTimeout(()=>scaleHistoryTimer=null,350);
 });
 
-document.getElementById("clearDraw").addEventListener("click",()=>{pushHistory();page().drawings=[];renderDrawings();save(false)});
+document.getElementById("clearDraw").addEventListener("click",()=>{
+  pushHistory();
+  page().drawings=[];
+  selectedDrawings.clear();
+  selectedDrawing=null;
+  selectedWallMembers.clear();
+  renderDrawings();
+  refreshObjectSelectionVisuals();
+  updateSubstitutionButton();
+  save(false);
+});
 document.getElementById("applyPreset").addEventListener("click",()=>{
   const v=document.getElementById("presetSelect").value;if(!v)return;pushHistory();const P=page().positions;
   const presets={
@@ -10505,7 +10578,7 @@ function clearExportSelections(){
 function restoreExportUiState(snapshot){
   if(!snapshot)return;
 
-  resetTextInteractionState();
+  resetTransientInteractionState();
 
   currentPage=Math.max(
     0,
@@ -10652,6 +10725,8 @@ document.getElementById("exportPdf").addEventListener("click",async()=>{
       editingTextIndex=null;
       editingTextPageIndex=null;
       textClickTimes.clear();
+      playerClickTimes.clear();
+      wallMemberTapTimes.clear();
       currentPage=i;
       renderAll();
       clearExportSelections();
@@ -11204,24 +11279,28 @@ function collectClipboardPayload(){
       position:{...page().positions[i]}
     }));
 
-  const balls=[...selectedBalls]
-    .filter(i=>page().balls?.[i])
+  const ballIndexes=new Set(
+    [...selectedBalls].filter(i=>page().balls?.[i])
+  );
+  if(Number.isInteger(selectedBall) && page().balls?.[selectedBall]){
+    ballIndexes.add(selectedBall);
+  }
+
+  const balls=[...ballIndexes]
     .map(i=>JSON.parse(JSON.stringify(page().balls[i])));
 
   const texts=getSelectedTextIndexes()
     .map(i=>JSON.parse(JSON.stringify(page().texts[i])));
 
-  const drawings=[...selectedDrawings]
-    .filter(i=>page().drawings?.[i])
-    .map(i=>JSON.parse(JSON.stringify(page().drawings[i])));
+  const drawingIndexes=new Set(
+    [...selectedDrawings].filter(i=>page().drawings?.[i])
+  );
+  if(Number.isInteger(selectedDrawing) && page().drawings?.[selectedDrawing]){
+    drawingIndexes.add(selectedDrawing);
+  }
 
-  // Fallback per selezioni singole precedenti.
-  if(!players.length && selectedBall!==null && page().balls?.[selectedBall]){
-    balls.push(JSON.parse(JSON.stringify(page().balls[selectedBall])));
-  }
-  if(!drawings.length && selectedDrawing!==null && page().drawings?.[selectedDrawing]){
-    drawings.push(JSON.parse(JSON.stringify(page().drawings[selectedDrawing])));
-  }
+  const drawings=[...drawingIndexes]
+    .map(i=>JSON.parse(JSON.stringify(page().drawings[i])));
 
   return {players,balls,texts,drawings};
 }
@@ -11320,6 +11399,7 @@ function pasteClipboardSelection(){
   selectedBalls=new Set(newBallIndexes);
   selectedTexts=new Set(newTextIndexes);
   selectedDrawings=new Set(newDrawingIndexes);
+  selectedWallMembers.clear();
 
   selectedBall=newBallIndexes.length===1?newBallIndexes[0]:null;
   selectedText=newTextIndexes.length===1?newTextIndexes[0]:null;
@@ -11344,15 +11424,31 @@ function pasteClipboardSelection(){
 
 function deleteCurrentSelection(){
   const playerIndexes=[...selectedPlayers].filter(i=>page().positions[i]);
-  const ballIndexes=[...selectedBalls].filter(i=>page().balls?.[i]);
+
+  const ballIndexes=new Set(
+    [...selectedBalls].filter(i=>page().balls?.[i])
+  );
+  if(Number.isInteger(selectedBall) && page().balls?.[selectedBall]){
+    ballIndexes.add(selectedBall);
+  }
+
   const textIndexes=getSelectedTextIndexes();
-  const drawingIndexes=[...selectedDrawings].filter(i=>page().drawings?.[i]);
+
+  const drawingIndexes=new Set(
+    [...selectedDrawings].filter(i=>page().drawings?.[i])
+  );
+  if(Number.isInteger(selectedDrawing) && page().drawings?.[selectedDrawing]){
+    drawingIndexes.add(selectedDrawing);
+  }
+
+  const ballIndexList=[...ballIndexes];
+  const drawingIndexList=[...drawingIndexes];
 
   if(
     !playerIndexes.length &&
-    !ballIndexes.length &&
+    !ballIndexList.length &&
     !textIndexes.length &&
-    !drawingIndexes.length
+    !drawingIndexList.length
   ){
     setStatus("Nessun elemento selezionato");
     return false;
@@ -11360,9 +11456,9 @@ function deleteCurrentSelection(){
 
   pushHistory();
 
-  drawingIndexes.sort((a,b)=>b-a).forEach(i=>page().drawings.splice(i,1));
+  drawingIndexList.sort((a,b)=>b-a).forEach(i=>page().drawings.splice(i,1));
   textIndexes.sort((a,b)=>b-a).forEach(i=>page().texts.splice(i,1));
-  ballIndexes.sort((a,b)=>b-a).forEach(i=>page().balls.splice(i,1));
+  ballIndexList.sort((a,b)=>b-a).forEach(i=>page().balls.splice(i,1));
 
   playerIndexes.forEach(i=>{
     if(page().positions[i])page().positions[i]=null;
@@ -11380,9 +11476,9 @@ function deleteCurrentSelection(){
 
   const count=
     playerIndexes.length+
-    ballIndexes.length+
+    ballIndexList.length+
     textIndexes.length+
-    drawingIndexes.length;
+    drawingIndexList.length;
 
   setStatus(
     count===1
@@ -11980,7 +12076,7 @@ function renderArchive(){
             Aprire un progetto/layout è un confine di sessione:
             niente Undo che possa riportare al progetto precedente.
           */
-          resetTextInteractionState();
+          resetTransientInteractionState();
           state=candidate;
           currentPage=0;
           undoStack=[];
@@ -12414,7 +12510,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v246",
+    appVersion:"v247",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -12789,7 +12885,7 @@ async function importBackupFile(file){
       return;
     }
 
-    resetTextInteractionState();
+    resetTransientInteractionState();
     state=normalizeProjectState(importedState);
     archiveState=importedArchive;
 
@@ -13444,7 +13540,7 @@ function buildFullscreenSchemePreview(projectPage,index){
 
   button.addEventListener("click",()=>{
     if(index===currentPage)return;
-    resetTextInteractionState();
+    resetTransientInteractionState();
     currentPage=index;
     clearAllSelections();
     renderAll();
@@ -13498,7 +13594,7 @@ function goToFullscreenScheme(direction){
   const target=currentPage+direction;
   if(target<0 || target>=state.pages.length)return;
 
-  resetTextInteractionState();
+  resetTransientInteractionState();
   currentPage=target;
   clearAllSelections();
   renderAll();
@@ -13553,7 +13649,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=246",
+        "./service-worker.js?v=247",
         { updateViaCache: "none" }
       );
 
