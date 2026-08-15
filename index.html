@@ -11490,7 +11490,24 @@ function drawPdfArrowsVector(pdf,projectPage,x,y,w,h){
     liveBoardRect.width>0
   ) ? liveBoardRect.width/1000 : 1;
 
-  const strokeScale = 25.4 / 96; // v271: CSS px -> PDF mm
+  const strokeScale = 25.4 / 96;
+  // v272: 5 spessori canonici per una resa stabile editor -> PDF.
+  // I dati salvati non vengono modificati: la quantizzazione vale solo in export.
+  const canonicalArrowWidths = [
+    {screen:1, pdfMm:0.18},
+    {screen:2, pdfMm:0.30},
+    {screen:3, pdfMm:0.42},
+    {screen:4, pdfMm:0.54},
+    {screen:6, pdfMm:0.72}
+  ];
+  const pdfArrowWidth = rawWidth => {
+    const w = Math.max(1, Number(rawWidth) || 1);
+    let best = canonicalArrowWidths[0];
+    for (const candidate of canonicalArrowWidths) {
+      if (Math.abs(candidate.screen-w) < Math.abs(best.screen-w)) best = candidate;
+    }
+    return best.pdfMm;
+  };
 
   const toX=value=>x+(Number(value)||0)*sx;
   const toY=value=>y+(Number(value)||0)*sy;
@@ -11655,7 +11672,8 @@ function drawPdfArrowsVector(pdf,projectPage,x,y,w,h){
     };
 
     setColor(color);
-    pdf.setLineWidth(width*strokeScale);
+    const exportWidth=pdfArrowWidth(width);
+    pdf.setLineWidth(exportWidth);
 
     const patterns={
       0:null,
@@ -11700,7 +11718,7 @@ function drawPdfArrowsVector(pdf,projectPage,x,y,w,h){
             pdf.circle(
               toX(a.x),
               toY(a.y),
-              (width*strokeScale)/2,
+              exportWidth/2,
               "F"
             );
           }else{
@@ -13616,7 +13634,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v271",
+    appVersion:"v272",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -14843,7 +14861,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=271",
+        "./service-worker.js?v=272",
         { updateViaCache: "none" }
       );
 
