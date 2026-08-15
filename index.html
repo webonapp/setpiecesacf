@@ -11106,16 +11106,8 @@ async function captureCurrentScheme(){
 
   await waitForExportAssets(boardShell);
 
-  const preferredScale=getExportScale(boardShell);
-  const attempts=[
-    preferredScale,
-    Math.min(preferredScale,3),
-    2
-  ].filter((value,index,array)=>
-    value>=1.5 &&
-    array.findIndex(v=>Math.abs(v-value)<.05)===index
-  );
-
+  const preferredScale=1;
+  const attempts=[1];
   let lastError=null;
 
   for(const scale of attempts){
@@ -11167,7 +11159,7 @@ async function captureBoardVisualExact(){
 
   await waitForExportAssets(board);
 
-  const scale=Math.max(2,Math.min(4,window.devicePixelRatio||2));
+  const scale=1; // v274 WYSIWYG
 
   /*
     v267: cattura raster del board così come viene visualizzato.
@@ -11188,9 +11180,7 @@ async function captureBoardVisualExact(){
         ".snap-guide,"+
         ".drawing-handle,"+
         ".drawing-control-line,"+
-        ".mannequin-selection-outline,"+
-          ".drawing-visible,"+
-          ".drawing-arrow-head").forEach(element=>{
+        ".mannequin-selection-outline").forEach(element=>{
         element.style.display="none";
       });
 
@@ -11879,15 +11869,8 @@ document.getElementById("exportPdf").addEventListener("click",async()=>{
         undefined,
         "NONE"
       );
+      // v274: freccia inclusa nella stessa cattura del campo.
 
-      drawPdfArrowsVector(
-        pdf,
-        state.pages[i],
-        x,
-        y,
-        w,
-        imageHeight
-      );
     }
 
     pdf.save("ACF_Fiorentina_Schemi_Palle_Inattive.pdf");
@@ -13657,7 +13640,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v273",
+    appVersion:"v274",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -14884,7 +14867,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=273",
+        "./service-worker.js?v=274",
         { updateViaCache: "none" }
       );
 
