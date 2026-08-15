@@ -11012,71 +11012,234 @@ function normalizeExportArrowStrokeWidths(clonedDocument){
   )return;
 
   /*
-    v263 - STROKE LOCK
+    v264 - ARROW BODY FREEZE
 
-    Lo spessore viene convertito usando esclusivamente il rapporto
-    tra larghezza visibile del campo nell'editor e larghezza reale
-    del campo nel clone esportato.
+    Il problema non era soltanto il valore di stroke-width:
+    html2canvas/Safari possono rasterizzare uno stroke SVG in modo
+    visivamente più pesante rispetto allo stesso stroke nell'editor.
 
-    In questo modo:
-      stroke_export / campo_export
-      =
-      stroke_editor / campo_editor
+    Soluzione:
+    nell'export il corpo della freccia non viene più lasciato come
+    "stroke". Viene trasformato in geometria piena (polygon/circle)
+    con lo spessore equivalente ESATTO a quello visibile nel progetto.
 
-    Nessuna compensazione empirica (.80, .64, ecc.).
-    PNG e PDF mantengono quindi la stessa proporzione visiva
-    impostata nel progetto.
+    Un riempimento SVG non può essere reinterpretato come stroke dal
+    renderer PDF/PNG, quindi lo spessore resta stabile.
   */
-  const scaleRatio=targetWidth/liveWidth;
+  const boardScale=targetWidth/liveWidth;
 
-  const liveArrows=[...document.querySelectorAll(
+  const liveBodies=[...document.querySelectorAll(
     "#drawLayer .drawing-visible"
   )];
 
-  const clonedArrows=[...clonedDocument.querySelectorAll(
+  const clonedBodies=[...clonedDocument.querySelectorAll(
     "#drawLayer .drawing-visible"
   )];
 
-  clonedArrows.forEach((arrow,index)=>{
-    const liveArrow=liveArrows[index];
-    if(!liveArrow)return;
+  const svgNS="http://www.w3.org/2000/svg";
 
-    const liveStyle=window.getComputedStyle(liveArrow);
+  const pointAt=(path,length)=>{
+    const point=path.getPointAtLength(length);
+    return {x:point.x,y:point.y};
+  };
+
+  const createSegmentPolygon=(
+    path,
+    startLength,
+    endLength,
+    width,
+    fill,
+    opacity,
+    roundCaps
+  )=>{
+    const total=path.getTotalLength();
+    const start=Math.max(0,Math.min(total,startLength));
+    const end=Math.max(start,Math.min(total,endLength));
+    if(end-start<.01)return null;
+
+    const half=width/2;
+    const sampleStep=Math.max(.7,Math.min(3,width*.28));
+    const sampleCount=Math.max(
+      2,
+      Math.ceil((end-start)/sampleStep)+1
+    );
+
+    const left=[];
+    const right=[];
+
+    for(let index=0;index<sampleCount;index++){
+      const ratio=index/(sampleCount-1);
+      const length=start+(end-start)*ratio;
+      const p=pointAt(path,length);
+
+      const epsilon=Math.max(.15,Math.min(1.2,width*.12));
+      const p0=pointAt(path,Math.max(0,length-epsilon));
+      const p1=pointAt(path,Math.min(total,length+epsilon));
+
+      let dx=p1.x-p0.x;
+      let dy=p1.y-p0.y;
+      const magnitude=Math.hypot(dx,dy)||1;
+      dx/=magnitude;
+      dy/=magnitude;
+
+      const nx=-dy;
+      const ny=dx;
+
+      left.push({
+        x:p.x+nx*half,
+        y:p.y+ny*half
+      });
+
+      right.push({
+        x:p.x-nx*half,
+        y:p.y-ny*half
+      });
+    }
+
+    const polygon=clonedDocument.createElementNS(svgNS,"polygon");
+    const points=[
+      ...left,
+      ...right.reverse()
+    ]
+      .map(point=>`${point.x},${point.y}`)
+      .join(" ");
+
+    polygon.setAttribute("points",points);
+    polygon.setAttribute("fill",fill);
+    polygon.setAttribute("opacity",String(opacity));
+    polygon.setAttribute("stroke","none");
+    polygon.setAttribute("pointer-events","none");
+    polygon.setAttribute("shape-rendering","geometricPrecision");
+
+    const fragment=clonedDocument.createDocumentFragment();
+    fragment.appendChild(polygon);
+
+    if(roundCaps){
+      [start,end].forEach(length=>{
+        const p=pointAt(path,length);
+        const circle=clonedDocument.createElementNS(svgNS,"circle");
+        circle.setAttribute("cx",String(p.x));
+        circle.setAttribute("cy",String(p.y));
+        circle.setAttribute("r",String(half));
+        circle.setAttribute("fill",fill);
+        circle.setAttribute("opacity",String(opacity));
+        circle.setAttribute("stroke","none");
+        circle.setAttribute("pointer-events","none");
+        fragment.appendChild(circle);
+      });
+    }
+
+    return fragment;
+  };
+
+  clonedBodies.forEach((clonedPath,index)=>{
+    const livePath=liveBodies[index];
+    if(!livePath)return;
+
+    let totalLength=0;
+
+    try{
+      totalLength=clonedPath.getTotalLength();
+    }catch(_){
+      return;
+    }
+
+    if(!Number.isFinite(totalLength) || totalLength<=0)return;
+
+    const liveStyle=window.getComputedStyle(livePath);
     const liveStroke=parseFloat(liveStyle.strokeWidth);
 
     if(!Number.isFinite(liveStroke) || liveStroke<=0)return;
 
-    const targetStroke=liveStroke*scaleRatio;
-
-    arrow.setAttribute("stroke-width",String(targetStroke));
-    arrow.style.strokeWidth=String(targetStroke);
-
     /*
-      Nel clone lo stroke deve scalare insieme al campo.
-      html2canvas applicherà poi lo stesso raster scale a entrambi.
+      Il corpo nell'editor usa vector-effect=non-scaling-stroke.
+      liveStroke è quindi uno spessore CSS reale.
+      Lo convertiamo nella geometria logica del clone usando il rapporto
+      campo-export / campo-editor.
     */
-    arrow.setAttribute("vector-effect","none");
-    arrow.style.vectorEffect="none";
+    const bodyWidth=liveStroke*boardScale;
+    const fill=liveStyle.stroke || livePath.getAttribute("stroke") || "#171a20";
+    const opacity=Number(
+      livePath.getAttribute("opacity") ??
+      liveStyle.opacity ??
+      1
+    ) || 1;
 
-    const liveDash=liveStyle.strokeDasharray;
+    const dashText=String(
+      liveStyle.strokeDasharray ||
+      livePath.getAttribute("stroke-dasharray") ||
+      ""
+    ).trim();
+
+    const lineCap=String(
+      liveStyle.strokeLinecap ||
+      livePath.getAttribute("stroke-linecap") ||
+      "butt"
+    );
+
+    const container=clonedDocument.createElementNS(svgNS,"g");
+    container.classList.add("export-frozen-arrow-body");
+    container.setAttribute("pointer-events","none");
+
+    let dashValues=dashText
+      .split(/[,\s]+/)
+      .map(value=>parseFloat(value))
+      .filter(value=>Number.isFinite(value) && value>=0)
+      .map(value=>value*boardScale);
 
     if(
-      liveDash &&
-      liveDash!=="none" &&
-      liveDash.trim()!==""
+      !dashValues.length ||
+      dashText==="none"
     ){
-      const values=liveDash
-        .split(/[,\s]+/)
-        .map(value=>parseFloat(value))
-        .filter(Number.isFinite)
-        .map(value=>value*scaleRatio);
+      const fragment=createSegmentPolygon(
+        clonedPath,
+        0,
+        totalLength,
+        bodyWidth,
+        fill,
+        opacity,
+        false
+      );
 
-      if(values.length){
-        const targetDash=values.join(" ");
-        arrow.setAttribute("stroke-dasharray",targetDash);
-        arrow.style.strokeDasharray=targetDash;
+      if(fragment)container.appendChild(fragment);
+    }else{
+      if(dashValues.length%2===1){
+        dashValues=[...dashValues,...dashValues];
+      }
+
+      let position=0;
+      let dashIndex=0;
+      let draw=true;
+      let safety=0;
+
+      while(position<totalLength && safety<10000){
+        const patternValue=Math.max(.01,dashValues[dashIndex%dashValues.length]);
+        const next=Math.min(totalLength,position+patternValue);
+
+        if(draw && next>position){
+          const fragment=createSegmentPolygon(
+            clonedPath,
+            position,
+            next,
+            bodyWidth,
+            fill,
+            opacity,
+            lineCap==="round"
+          );
+
+          if(fragment)container.appendChild(fragment);
+        }
+
+        position=next;
+        dashIndex++;
+        draw=!draw;
+        safety++;
       }
     }
+
+    clonedPath.parentNode?.insertBefore(container,clonedPath);
+    clonedPath.style.display="none";
+    clonedPath.setAttribute("visibility","hidden");
   });
 }
 
@@ -11124,6 +11287,7 @@ async function captureCurrentScheme(){
               element.style.display="none";
             });
 
+          // v264: convert arrow strokes into filled geometry before rasterization.
           normalizeExportArrowStrokeWidths(clonedDocument);
           clonedDocument.body.classList.add("export-clean-view");
         }
@@ -11215,6 +11379,7 @@ async function captureBoardForPdf(){
             volte nel PDF: per questo il corpo delle frecce risultava
             sensibilmente più spesso nell'esportazione PDF.
           */
+          // v264: convert arrow strokes into filled geometry before rasterization.
           normalizeExportArrowStrokeWidths(clonedDocument);
           clonedDocument.body.classList.add("export-clean-view");
         }
@@ -13247,7 +13412,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v263",
+    appVersion:"v264",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -14474,7 +14639,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=263",
+        "./service-worker.js?v=264",
         { updateViaCache: "none" }
       );
 
