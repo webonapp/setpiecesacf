@@ -11188,9 +11188,9 @@ async function captureBoardVisualExact(){
         ".snap-guide,"+
         ".drawing-handle,"+
         ".drawing-control-line,"+
-        ".mannequin-selection-outline"
-          +".drawing-visible,"
-          +".drawing-arrow-head").forEach(element=>{
+        ".mannequin-selection-outline,"+
+          ".drawing-visible,"+
+          ".drawing-arrow-head").forEach(element=>{
         element.style.display="none";
       });
 
@@ -11498,7 +11498,63 @@ function drawPdfArrowsVector(pdf,projectPage,x,y,w,h){
     const width=normalizeDrawingWidth(d.width,drawingDefaults.width);
     const color=d.color||"#171a20";
     const dashStyle=Math.max(0,Math.min(3,Number(d.dashStyle)||0));
-    const head=arrowGeometry(d);
+    const getArrowHeadGeometry=drawing=>{
+      const width=normalizeDrawingWidth(
+        drawing.width,
+        drawingDefaults.width
+      );
+
+      const size=Math.max(
+        1,
+        Math.min(3,Number(drawing.arrowHeadSize)||2)
+      );
+
+      const factor=size===1?.78:size===3?1.28:1;
+
+      const tipX=Number(drawing.x2)||0;
+      const tipY=Number(drawing.y2)||0;
+
+      let tangentX=1;
+      let tangentY=0;
+
+      if(drawing.type==="curve"){
+        const dx=3*(tipX-(Number(drawing.c2x)||0));
+        const dy=3*(tipY-(Number(drawing.c2y)||0));
+        const magnitude=Math.hypot(dx,dy)||1;
+        tangentX=dx/magnitude;
+        tangentY=dy/magnitude;
+      }else{
+        const dx=tipX-(Number(drawing.x1)||0);
+        const dy=tipY-(Number(drawing.y1)||0);
+        const magnitude=Math.hypot(dx,dy)||1;
+        tangentX=dx/magnitude;
+        tangentY=dy/magnitude;
+      }
+
+      const headLength=Math.max(14,width*3.5)*factor;
+      const headHalfWidth=headLength*.38;
+
+      const baseX=tipX-(tangentX*headLength);
+      const baseY=tipY-(tangentY*headLength);
+
+      const normalX=-tangentY;
+      const normalY=tangentX;
+
+      return {
+        tip:{x:tipX,y:tipY},
+        base:{x:baseX,y:baseY},
+        left:{
+          x:baseX+(normalX*headHalfWidth),
+          y:baseY+(normalY*headHalfWidth)
+        },
+        right:{
+          x:baseX-(normalX*headHalfWidth),
+          y:baseY-(normalY*headHalfWidth)
+        }
+      };
+    };
+
+    const head=getArrowHeadGeometry(d);
 
     let points=[];
 
@@ -13534,7 +13590,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v268",
+    appVersion:"v269",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -14761,7 +14817,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=268",
+        "./service-worker.js?v=269",
         { updateViaCache: "none" }
       );
 
