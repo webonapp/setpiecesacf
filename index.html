@@ -11494,11 +11494,11 @@ function drawPdfArrowsVector(pdf,projectPage,x,y,w,h){
   // v272: 5 spessori canonici per una resa stabile editor -> PDF.
   // I dati salvati non vengono modificati: la quantizzazione vale solo in export.
   const canonicalArrowWidths = [
-    {screen:1, pdfMm:0.18},
-    {screen:2, pdfMm:0.30},
-    {screen:3, pdfMm:0.42},
-    {screen:4, pdfMm:0.54},
-    {screen:6, pdfMm:0.72}
+    {screen:1, pdfMm:0.20},
+    {screen:2, pdfMm:0.34},
+    {screen:3, pdfMm:0.47},
+    {screen:4, pdfMm:0.60},
+    {screen:6, pdfMm:0.80}
   ];
   const pdfArrowWidth = rawWidth => {
     const w = Math.max(1, Number(rawWidth) || 1);
@@ -11507,6 +11507,21 @@ function drawPdfArrowsVector(pdf,projectPage,x,y,w,h){
       if (Math.abs(candidate.screen-w) < Math.abs(best.screen-w)) best = candidate;
     }
     return best.pdfMm;
+  };
+  const pdfArrowHeadFactor = rawWidth => {
+    const w = Math.max(1, Number(rawWidth) || 1);
+    const levels = [
+      {screen:1, factor:.72},
+      {screen:2, factor:.70},
+      {screen:3, factor:.68},
+      {screen:4, factor:.66},
+      {screen:6, factor:.64}
+    ];
+    let best=levels[0];
+    for(const candidate of levels){
+      if(Math.abs(candidate.screen-w)<Math.abs(best.screen-w)) best=candidate;
+    }
+    return best.factor;
   };
 
   const toX=value=>x+(Number(value)||0)*sx;
@@ -11598,6 +11613,14 @@ function drawPdfArrowsVector(pdf,projectPage,x,y,w,h){
     };
 
     const head=getArrowHeadGeometry(d);
+    // v273: punta calibrata insieme allo spessore canonico.
+    const headFactor=pdfArrowHeadFactor(width);
+    head.base.x=head.tip.x+(head.base.x-head.tip.x)*headFactor;
+    head.base.y=head.tip.y+(head.base.y-head.tip.y)*headFactor;
+    head.left.x=head.tip.x+(head.left.x-head.tip.x)*headFactor;
+    head.left.y=head.tip.y+(head.left.y-head.tip.y)*headFactor;
+    head.right.x=head.tip.x+(head.right.x-head.tip.x)*headFactor;
+    head.right.y=head.tip.y+(head.right.y-head.tip.y)*headFactor;
 
     let points=[];
 
@@ -13634,7 +13657,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v272",
+    appVersion:"v273",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -14861,7 +14884,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=272",
+        "./service-worker.js?v=273",
         { updateViaCache: "none" }
       );
 
