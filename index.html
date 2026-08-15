@@ -7083,6 +7083,14 @@ function applyGlobalPlayerDisplayMode(mode){
         : "preparation";
 
   renderPlayers();
+
+  /*
+    v266:
+    barriera e sagoma sono disegnate nel layer SVG da renderDrawings().
+    Devono quindi essere ridisegnate nello STESSO evento che cambia
+    PANCHINA / SPOGLIATOIO / PREPARAZIONE.
+  */
+  renderDrawings();
   renderRoster();
   syncRosterDisplayOptions();
   syncChestCircleControls();
@@ -10997,42 +11005,67 @@ async function waitForExportAssets(boardShell){
 
 
 function normalizeExportArrowStrokeWidths(clonedDocument){
-  const liveBodies=[...document.querySelectorAll("#drawLayer .drawing-visible")];
-  const clonedBodies=[...clonedDocument.querySelectorAll("#drawLayer .drawing-visible")];
+  const liveBoard=document.getElementById("board");
+  if(!liveBoard)return;
+
+  const liveRect=liveBoard.getBoundingClientRect();
+  const liveBoardScale=liveRect.width/1000;
+
+  if(
+    !Number.isFinite(liveBoardScale) ||
+    liveBoardScale<=0
+  )return;
+
+  const liveBodies=[...document.querySelectorAll(
+    "#drawLayer .drawing-visible"
+  )];
+
+  const clonedBodies=[...clonedDocument.querySelectorAll(
+    "#drawLayer .drawing-visible"
+  )];
 
   /*
-    v265 - NOMINAL STROKE LOCK
+    v266 - PDF STROKE SCALE
 
-    Lo stroke di export NON viene più ricavato dalla scala del campo.
-    L'editor usa non-scaling-stroke: lo spessore percepito è quindi
-    una misura CSS/schermo, non una misura geometrica del viewBox.
+    Nell'editor il campo logico 1000px viene visualizzato con una
+    transform scale(S), mentre le frecce usano non-scaling-stroke.
+    Quindi uno stroke W occupa realmente:
 
-    Per ogni freccia leggiamo direttamente lo spessore effettivamente
-    visualizzato nell'editor e lo congeliamo nel clone di export.
-    Il clone mantiene vector-effect=non-scaling-stroke, così lo stesso
-    valore resta invariato durante il ridimensionamento per PDF/PNG.
+        W / (1000 * S)
+
+    della larghezza visibile del campo.
+
+    Nel clone PDF il campo viene riportato a 1000px senza transform.
+    Lo stroke equivalente deve quindi essere:
+
+        W / S
+
+    Questa conversione conserva esattamente il rapporto
+    corpo-freccia / larghezza-campo dell'editor.
   */
   clonedBodies.forEach((clonedPath,index)=>{
     const livePath=liveBodies[index];
     if(!livePath)return;
 
     const liveStyle=window.getComputedStyle(livePath);
-    const strokeWidth=parseFloat(liveStyle.strokeWidth);
-    if(!Number.isFinite(strokeWidth) || strokeWidth<=0)return;
+    const liveStroke=parseFloat(liveStyle.strokeWidth);
 
-    const stroke=liveStyle.stroke || livePath.getAttribute("stroke") || "#171a20";
-    const opacity=liveStyle.opacity || livePath.getAttribute("opacity") || "1";
-    const linecap=liveStyle.strokeLinecap || livePath.getAttribute("stroke-linecap") || "butt";
-    const linejoin=liveStyle.strokeLinejoin || livePath.getAttribute("stroke-linejoin") || "round";
+    if(!Number.isFinite(liveStroke) || liveStroke<=0)return;
 
-    clonedPath.setAttribute("stroke",stroke);
-    clonedPath.setAttribute("stroke-width",String(strokeWidth));
-    clonedPath.style.strokeWidth=`${strokeWidth}px`;
-    clonedPath.setAttribute("vector-effect","non-scaling-stroke");
-    clonedPath.style.vectorEffect="non-scaling-stroke";
-    clonedPath.setAttribute("stroke-linecap",linecap);
-    clonedPath.setAttribute("stroke-linejoin",linejoin);
-    clonedPath.setAttribute("opacity",opacity);
+    const exportStroke=liveStroke/liveBoardScale;
+
+    clonedPath.setAttribute(
+      "stroke-width",
+      String(exportStroke)
+    );
+    clonedPath.style.strokeWidth=`${exportStroke}px`;
+
+    /*
+      Il campo PDF non ha più transform. Da qui in avanti stroke e
+      geometria devono scalare insieme durante la rasterizzazione.
+    */
+    clonedPath.setAttribute("vector-effect","none");
+    clonedPath.style.vectorEffect="none";
 
     const dash=String(
       liveStyle.strokeDasharray ||
@@ -11041,12 +11074,20 @@ function normalizeExportArrowStrokeWidths(clonedDocument){
     ).trim();
 
     if(dash && dash!=="none"){
-      /*
-        Anche il pattern resta espresso nelle stesse unità CSS dello
-        stroke visibile, senza moltiplicatori legati al campo.
-      */
-      clonedPath.setAttribute("stroke-dasharray",dash);
-      clonedPath.style.strokeDasharray=dash;
+      const values=dash
+        .split(/[,\s]+/)
+        .map(value=>parseFloat(value))
+        .filter(Number.isFinite)
+        .map(value=>value/liveBoardScale);
+
+      if(values.length){
+        const exportDash=values.join(" ");
+        clonedPath.setAttribute(
+          "stroke-dasharray",
+          exportDash
+        );
+        clonedPath.style.strokeDasharray=exportDash;
+      }
     }else{
       clonedPath.removeAttribute("stroke-dasharray");
       clonedPath.style.strokeDasharray="none";
@@ -11098,8 +11139,12 @@ async function captureCurrentScheme(){
               element.style.display="none";
             });
 
-          // v264: convert arrow strokes into filled geometry before rasterization.
-          normalizeExportArrowStrokeWidths(clonedDocument);
+          /*
+            v266 PNG:
+            il PNG cattura il board-shell con la stessa scala visiva
+            dell'editor. Non deve quindi applicare alcuna conversione
+            supplementare allo stroke.
+          */
           clonedDocument.body.classList.add("export-clean-view");
         }
       });
@@ -11166,11 +11211,43 @@ async function captureBoardForPdf(){
               Nessuna trasformazione/resizing della UI desktop o iPad
               deve entrare nella cattura.
             */
-            clonedBoard.style.transform="none";
-            clonedBoard.style.left="0";
-            clonedBoard.style.top="0";
-            clonedBoard.style.width="1000px";
-            clonedBoard.style.height="620px";
+            /*
+              v266:
+              fitLogicalBoard() scrive transform/left/top con !important.
+              Una semplice assegnazione .style.transform non può
+              sovrascriverli in Safari. Usiamo setProperty(...,"important")
+              per garantire un clone PDF realmente 1000 × 620 non scalato.
+            */
+            clonedBoard.style.setProperty(
+              "transform",
+              "none",
+              "important"
+            );
+            clonedBoard.style.setProperty(
+              "transform-origin",
+              "0 0",
+              "important"
+            );
+            clonedBoard.style.setProperty(
+              "left",
+              "0px",
+              "important"
+            );
+            clonedBoard.style.setProperty(
+              "top",
+              "0px",
+              "important"
+            );
+            clonedBoard.style.setProperty(
+              "width",
+              "1000px",
+              "important"
+            );
+            clonedBoard.style.setProperty(
+              "height",
+              "620px",
+              "important"
+            );
           }
 
           clonedDocument
@@ -11190,7 +11267,7 @@ async function captureBoardForPdf(){
             volte nel PDF: per questo il corpo delle frecce risultava
             sensibilmente più spesso nell'esportazione PDF.
           */
-          // v264: convert arrow strokes into filled geometry before rasterization.
+          // v266: normalize PDF stroke after the clone is forced to 1000×620.
           normalizeExportArrowStrokeWidths(clonedDocument);
           clonedDocument.body.classList.add("export-clean-view");
         }
@@ -13223,7 +13300,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v265",
+    appVersion:"v266",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -14450,7 +14527,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=265",
+        "./service-worker.js?v=266",
         { updateViaCache: "none" }
       );
 
