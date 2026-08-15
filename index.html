@@ -11106,8 +11106,16 @@ async function captureCurrentScheme(){
 
   await waitForExportAssets(boardShell);
 
-  const preferredScale=1;
-  const attempts=[1];
+  const preferredScale=getExportScale(boardShell);
+  const attempts=[
+    preferredScale,
+    Math.min(preferredScale,3),
+    2
+  ].filter((value,index,array)=>
+    value>=1.5 &&
+    array.findIndex(v=>Math.abs(v-value)<.05)===index
+  );
+
   let lastError=null;
 
   for(const scale of attempts){
@@ -11159,7 +11167,7 @@ async function captureBoardVisualExact(){
 
   await waitForExportAssets(board);
 
-  const scale=1; // v274 WYSIWYG
+  const scale=Math.max(2,Math.min(4,window.devicePixelRatio||2));
 
   /*
     v267: cattura raster del board così come viene visualizzato.
@@ -11180,7 +11188,8 @@ async function captureBoardVisualExact(){
         ".snap-guide,"+
         ".drawing-handle,"+
         ".drawing-control-line,"+
-        ".mannequin-selection-outline").forEach(element=>{
+        ".mannequin-selection-outline"
+      ).forEach(element=>{
         element.style.display="none";
       });
 
@@ -11448,314 +11457,6 @@ document.getElementById("exportPng").addEventListener("click",async()=>{
   }
 });
 
-
-function drawPdfArrowsVector(pdf,projectPage,x,y,w,h){
-  if(!projectPage || !Array.isArray(projectPage.drawings))return;
-
-  const sx=w/1000;
-  const sy=h/620;
-  const scale=Math.min(sx,sy);
-
-  /*
-    v270 - PDF ARROW STROKE = EDITOR STROKE
-
-    Il corpo delle frecce nell'editor usa vector-effect="non-scaling-stroke":
-    d.width è quindi uno spessore VISIVO in pixel e non uno spessore
-    geometrico nelle coordinate 1000x620 del campo.
-
-    Il vecchio export vettoriale faceva width * (pdfWidth / 1000),
-    trattando invece d.width come coordinata logica. Se il board a video
-    era ingrandito (es. 1150/1200 px), il PDF risultava inevitabilmente
-    più spesso.
-
-    Convertiamo quindi pixel-video -> millimetri-PDF usando la larghezza
-    REALE del board nell'editor. Questo conserva il rapporto visivo
-    freccia/campo visto dall'utente.
-  */
-  const liveBoard=document.getElementById("board");
-  const liveBoardRect=liveBoard?.getBoundingClientRect?.();
-  const liveBoardScale=(
-    liveBoardRect &&
-    Number.isFinite(liveBoardRect.width) &&
-    liveBoardRect.width>0
-  ) ? liveBoardRect.width/1000 : 1;
-
-  const strokeScale = 25.4 / 96;
-  // v272: 5 spessori canonici per una resa stabile editor -> PDF.
-  // I dati salvati non vengono modificati: la quantizzazione vale solo in export.
-  const canonicalArrowWidths = [
-    {screen:1, pdfMm:0.20},
-    {screen:2, pdfMm:0.34},
-    {screen:3, pdfMm:0.47},
-    {screen:4, pdfMm:0.60},
-    {screen:6, pdfMm:0.80}
-  ];
-  const pdfArrowWidth = rawWidth => {
-    const w = Math.max(1, Number(rawWidth) || 1);
-    let best = canonicalArrowWidths[0];
-    for (const candidate of canonicalArrowWidths) {
-      if (Math.abs(candidate.screen-w) < Math.abs(best.screen-w)) best = candidate;
-    }
-    return best.pdfMm;
-  };
-  const pdfArrowHeadFactor = rawWidth => {
-    const w = Math.max(1, Number(rawWidth) || 1);
-    const levels = [
-      {screen:1, factor:.72},
-      {screen:2, factor:.70},
-      {screen:3, factor:.68},
-      {screen:4, factor:.66},
-      {screen:6, factor:.64}
-    ];
-    let best=levels[0];
-    for(const candidate of levels){
-      if(Math.abs(candidate.screen-w)<Math.abs(best.screen-w)) best=candidate;
-    }
-    return best.factor;
-  };
-
-  const toX=value=>x+(Number(value)||0)*sx;
-  const toY=value=>y+(Number(value)||0)*sy;
-
-  const setColor=hex=>{
-    const clean=String(hex||"#171a20").replace("#","");
-    const safe=/^[0-9a-fA-F]{6}$/.test(clean)?clean:"171a20";
-    pdf.setDrawColor(
-      parseInt(safe.slice(0,2),16),
-      parseInt(safe.slice(2,4),16),
-      parseInt(safe.slice(4,6),16)
-    );
-    pdf.setFillColor(
-      parseInt(safe.slice(0,2),16),
-      parseInt(safe.slice(2,4),16),
-      parseInt(safe.slice(4,6),16)
-    );
-  };
-
-  const cubicPoint=(d,t)=>{
-    const mt=1-t;
-    return {
-      x:mt*mt*mt*d.x1+3*mt*mt*t*d.c1x+3*mt*t*t*d.c2x+t*t*t*d.x2,
-      y:mt*mt*mt*d.y1+3*mt*mt*t*d.c1y+3*mt*t*t*d.c2y+t*t*t*d.y2
-    };
-  };
-
-  projectPage.drawings.forEach(d=>{
-    if(!d || !["arrow","curve"].includes(d.type))return;
-
-    const width=normalizeDrawingWidth(d.width,drawingDefaults.width);
-    const color=d.color||"#171a20";
-    const dashStyle=Math.max(0,Math.min(3,Number(d.dashStyle)||0));
-    const getArrowHeadGeometry=drawing=>{
-      const width=normalizeDrawingWidth(
-        drawing.width,
-        drawingDefaults.width
-      );
-
-      const size=Math.max(
-        1,
-        Math.min(3,Number(drawing.arrowHeadSize)||2)
-      );
-
-      const factor=size===1?.78:size===3?1.28:1;
-
-      const tipX=Number(drawing.x2)||0;
-      const tipY=Number(drawing.y2)||0;
-
-      let tangentX=1;
-      let tangentY=0;
-
-      if(drawing.type==="curve"){
-        const dx=3*(tipX-(Number(drawing.c2x)||0));
-        const dy=3*(tipY-(Number(drawing.c2y)||0));
-        const magnitude=Math.hypot(dx,dy)||1;
-        tangentX=dx/magnitude;
-        tangentY=dy/magnitude;
-      }else{
-        const dx=tipX-(Number(drawing.x1)||0);
-        const dy=tipY-(Number(drawing.y1)||0);
-        const magnitude=Math.hypot(dx,dy)||1;
-        tangentX=dx/magnitude;
-        tangentY=dy/magnitude;
-      }
-
-      const headLength=Math.max(14,width*3.5)*factor;
-      const headHalfWidth=headLength*.38;
-
-      const baseX=tipX-(tangentX*headLength);
-      const baseY=tipY-(tangentY*headLength);
-
-      const normalX=-tangentY;
-      const normalY=tangentX;
-
-      return {
-        tip:{x:tipX,y:tipY},
-        base:{x:baseX,y:baseY},
-        left:{
-          x:baseX+(normalX*headHalfWidth),
-          y:baseY+(normalY*headHalfWidth)
-        },
-        right:{
-          x:baseX-(normalX*headHalfWidth),
-          y:baseY-(normalY*headHalfWidth)
-        }
-      };
-    };
-
-    const head=getArrowHeadGeometry(d);
-    // v273: punta calibrata insieme allo spessore canonico.
-    const headFactor=pdfArrowHeadFactor(width);
-    head.base.x=head.tip.x+(head.base.x-head.tip.x)*headFactor;
-    head.base.y=head.tip.y+(head.base.y-head.tip.y)*headFactor;
-    head.left.x=head.tip.x+(head.left.x-head.tip.x)*headFactor;
-    head.left.y=head.tip.y+(head.left.y-head.tip.y)*headFactor;
-    head.right.x=head.tip.x+(head.right.x-head.tip.x)*headFactor;
-    head.right.y=head.tip.y+(head.right.y-head.tip.y)*headFactor;
-
-    let points=[];
-
-    if(d.type==="curve"){
-      const samples=80;
-
-      for(let i=0;i<=samples;i++){
-        points.push(cubicPoint(d,i/samples));
-      }
-
-      let nearest=0;
-      let best=Infinity;
-
-      points.forEach((point,index)=>{
-        const distance=Math.hypot(
-          point.x-head.base.x,
-          point.y-head.base.y
-        );
-
-        if(distance<best){
-          best=distance;
-          nearest=index;
-        }
-      });
-
-      points=points.slice(0,Math.max(2,nearest+1));
-      points[points.length-1]={
-        x:head.base.x,
-        y:head.base.y
-      };
-    }else{
-      points=[
-        {x:d.x1,y:d.y1},
-        {x:head.base.x,y:head.base.y}
-      ];
-    }
-
-    const segments=[];
-    let total=0;
-
-    for(let i=0;i<points.length-1;i++){
-      const a=points[i];
-      const b=points[i+1];
-      const length=Math.hypot(b.x-a.x,b.y-a.y);
-
-      segments.push({
-        a,b,
-        start:total,
-        end:total+length,
-        length
-      });
-
-      total+=length;
-    }
-
-    const pointAtLength=length=>{
-      const clamped=Math.max(0,Math.min(total,length));
-      const segment=
-        segments.find(item=>clamped<=item.end)||
-        segments[segments.length-1];
-
-      if(!segment || segment.length<=0){
-        return points[0]||{x:0,y:0};
-      }
-
-      const ratio=(clamped-segment.start)/segment.length;
-
-      return {
-        x:segment.a.x+(segment.b.x-segment.a.x)*ratio,
-        y:segment.a.y+(segment.b.y-segment.a.y)*ratio
-      };
-    };
-
-    setColor(color);
-    const exportWidth=pdfArrowWidth(width);
-    pdf.setLineWidth(exportWidth);
-
-    const patterns={
-      0:null,
-      1:[Math.max(9,width*2.2)*strokeScale,Math.max(7,width*1.7)*strokeScale],
-      2:[Math.max(20,width*4.5)*strokeScale,Math.max(11,width*2.2)*strokeScale],
-      3:[Math.max(2,width*.45)*strokeScale,Math.max(9,width*2.1)*strokeScale]
-    };
-
-    const pattern=patterns[dashStyle];
-
-    const drawSegment=(a,b)=>{
-      pdf.line(
-        toX(a.x),
-        toY(a.y),
-        toX(b.x),
-        toY(b.y)
-      );
-    };
-
-    if(!pattern){
-      segments.forEach(segment=>
-        drawSegment(segment.a,segment.b)
-      );
-    }else{
-      let position=0;
-      let patternIndex=0;
-      let shouldDraw=true;
-      let safety=0;
-
-      while(position<total && safety<10000){
-        const step=Math.max(
-          .01,
-          pattern[patternIndex%pattern.length]
-        );
-        const next=Math.min(total,position+step);
-
-        if(shouldDraw && next>position){
-          const a=pointAtLength(position);
-          const b=pointAtLength(next);
-
-          if(dashStyle===3){
-            pdf.circle(
-              toX(a.x),
-              toY(a.y),
-              exportWidth/2,
-              "F"
-            );
-          }else{
-            drawSegment(a,b);
-          }
-        }
-
-        position=next;
-        patternIndex++;
-        shouldDraw=!shouldDraw;
-        safety++;
-      }
-    }
-
-    setColor(color);
-    pdf.triangle(
-      toX(head.tip.x),toY(head.tip.y),
-      toX(head.left.x),toY(head.left.y),
-      toX(head.right.x),toY(head.right.y),
-      "F"
-    );
-  });
-}
-
 document.getElementById("exportPdf").addEventListener("click",async()=>{
   const uiSnapshot=snapshotExportUiState();
 
@@ -11869,8 +11570,6 @@ document.getElementById("exportPdf").addEventListener("click",async()=>{
         undefined,
         "NONE"
       );
-      // v274: freccia inclusa nella stessa cattura del campo.
-
     }
 
     pdf.save("ACF_Fiorentina_Schemi_Palle_Inattive.pdf");
@@ -13640,7 +13339,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v274",
+    appVersion:"v267",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -14867,7 +14566,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=274",
+        "./service-worker.js?v=267",
         { updateViaCache: "none" }
       );
 
