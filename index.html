@@ -11466,6 +11466,32 @@ function drawPdfArrowsVector(pdf,projectPage,x,y,w,h){
   const sy=h/620;
   const scale=Math.min(sx,sy);
 
+  /*
+    v270 - PDF ARROW STROKE = EDITOR STROKE
+
+    Il corpo delle frecce nell'editor usa vector-effect="non-scaling-stroke":
+    d.width è quindi uno spessore VISIVO in pixel e non uno spessore
+    geometrico nelle coordinate 1000x620 del campo.
+
+    Il vecchio export vettoriale faceva width * (pdfWidth / 1000),
+    trattando invece d.width come coordinata logica. Se il board a video
+    era ingrandito (es. 1150/1200 px), il PDF risultava inevitabilmente
+    più spesso.
+
+    Convertiamo quindi pixel-video -> millimetri-PDF usando la larghezza
+    REALE del board nell'editor. Questo conserva il rapporto visivo
+    freccia/campo visto dall'utente.
+  */
+  const liveBoard=document.getElementById("board");
+  const liveBoardRect=liveBoard?.getBoundingClientRect?.();
+  const liveBoardScale=(
+    liveBoardRect &&
+    Number.isFinite(liveBoardRect.width) &&
+    liveBoardRect.width>0
+  ) ? liveBoardRect.width/1000 : 1;
+
+  const strokeScale=scale/Math.max(.01,liveBoardScale);
+
   const toX=value=>x+(Number(value)||0)*sx;
   const toY=value=>y+(Number(value)||0)*sy;
 
@@ -11629,13 +11655,13 @@ function drawPdfArrowsVector(pdf,projectPage,x,y,w,h){
     };
 
     setColor(color);
-    pdf.setLineWidth(width*scale);
+    pdf.setLineWidth(width*strokeScale);
 
     const patterns={
       0:null,
-      1:[Math.max(9,width*2.2),Math.max(7,width*1.7)],
-      2:[Math.max(20,width*4.5),Math.max(11,width*2.2)],
-      3:[Math.max(2,width*.45),Math.max(9,width*2.1)]
+      1:[Math.max(9,width*2.2)/liveBoardScale,Math.max(7,width*1.7)/liveBoardScale],
+      2:[Math.max(20,width*4.5)/liveBoardScale,Math.max(11,width*2.2)/liveBoardScale],
+      3:[Math.max(2,width*.45)/liveBoardScale,Math.max(9,width*2.1)/liveBoardScale]
     };
 
     const pattern=patterns[dashStyle];
@@ -11674,7 +11700,7 @@ function drawPdfArrowsVector(pdf,projectPage,x,y,w,h){
             pdf.circle(
               toX(a.x),
               toY(a.y),
-              (width*scale)/2,
+              (width*strokeScale)/2,
               "F"
             );
           }else{
@@ -13590,7 +13616,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v269",
+    appVersion:"v270",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
