@@ -8970,7 +8970,10 @@ function renderDrawings(){
           }
 
 
-          if(member.showLineAbove){
+          if(
+            member.showLineAbove &&
+            state.presentationMode!=="bench"
+          ){
             const lineAbove=document.createElementNS(
               "http://www.w3.org/2000/svg",
               "line"
@@ -8990,7 +8993,10 @@ function renderDrawings(){
             g.appendChild(lineAbove);
           }
 
-          if(member.showLineBelow){
+          if(
+            member.showLineBelow &&
+            state.presentationMode!=="bench"
+          ){
             const lineBelow=document.createElementNS(
               "http://www.w3.org/2000/svg",
               "line"
@@ -9010,73 +9016,88 @@ function renderDrawings(){
             g.appendChild(lineBelow);
           }
 
-          if(
-            (member.showVerticalNameBelow || member.showVerticalNameAbove) &&
-            member.playerId
-          ){
+          if(member.playerId){
             const linkedPlayer=
               state.roster[getRosterIndexByPlayerId(member.playerId)];
 
             if(linkedPlayer){
-              const nameText=String(
-                linkedPlayer.lastName||
-                linkedPlayer.name||
-                ""
-              ).toUpperCase();
+              const benchNameBelow=(
+                state.presentationMode==="bench" &&
+                linkedPlayer.team!=="away"
+              );
 
-              const addVerticalName=(placement)=>{
-                const verticalName=document.createElementNS(
-                  "http://www.w3.org/2000/svg",
-                  "text"
-                );
+              const wantsVerticalName=(
+                member.showVerticalNameBelow ||
+                member.showVerticalNameAbove ||
+                benchNameBelow
+              );
+
+              if(wantsVerticalName){
+                const nameText=String(
+                  linkedPlayer.lastName||
+                  linkedPlayer.name||
+                  ""
+                ).toUpperCase();
+
+                const addVerticalName=(placement)=>{
+                  const verticalName=document.createElementNS(
+                    "http://www.w3.org/2000/svg",
+                    "text"
+                  );
+
+                  const x=centerX;
+                  const belowStartY=torsoBottom+10;
+                  const aboveEndY=headCy-headR-Math.max(17,height*.19);
+                  const y=placement==="above"
+                    ? aboveEndY
+                    : belowStartY;
+
+                  verticalName.textContent=nameText;
+                  verticalName.setAttribute("x",x);
+                  verticalName.setAttribute("y",y);
+                  verticalName.setAttribute(
+                    "transform",
+                    `rotate(-90 ${x} ${y})`
+                  );
+                  verticalName.setAttribute(
+                    "text-anchor",
+                    placement==="above" ? "start" : "end"
+                  );
+                  verticalName.setAttribute("fill","#111827");
+                  verticalName.setAttribute(
+                    "font-size",
+                    String(Math.max(9.24,Math.min(14.28,height*.154)))
+                  );
+                  verticalName.setAttribute("font-weight","700");
+                  verticalName.setAttribute(
+                    "font-family",
+                    "Arial, Helvetica, sans-serif"
+                  );
+                  verticalName.setAttribute("pointer-events","none");
+                  verticalName.setAttribute("paint-order","stroke");
+                  verticalName.setAttribute("stroke","#ffffff");
+                  verticalName.setAttribute("stroke-width",".9");
+                  g.appendChild(verticalName);
+                };
 
                 /*
-                  v242:
-                  il nome verticale usa la STESSA asse delle linee verticali.
-                  Sotto: parte dalla stessa coordinata della linea sotto.
-                  Sopra: termina sulla stessa coordinata della linea sopra.
+                  PANCHINA:
+                  per i giocatori Fiorentina associati a sagoma/barriera
+                  il nome verticale sotto sostituisce temporaneamente
+                  qualsiasi linea/flag grafico.
+                  I flag salvati NON vengono modificati.
                 */
-                const x=centerX;
-                const belowStartY=torsoBottom+10;
-                const aboveEndY=headCy-headR-Math.max(17,height*.19);
-                const y=placement==="above"
-                  ? aboveEndY
-                  : belowStartY;
+                if(benchNameBelow){
+                  addVerticalName("below");
+                }else{
+                  if(member.showVerticalNameBelow){
+                    addVerticalName("below");
+                  }
 
-                verticalName.textContent=nameText;
-                verticalName.setAttribute("x",x);
-                verticalName.setAttribute("y",y);
-                verticalName.setAttribute(
-                  "transform",
-                  `rotate(-90 ${x} ${y})`
-                );
-                verticalName.setAttribute(
-                  "text-anchor",
-                  placement==="above" ? "start" : "end"
-                );
-                verticalName.setAttribute("fill","#111827");
-                verticalName.setAttribute(
-                  "font-size",
-                  String(Math.max(9.24,Math.min(14.28,height*.154)))
-                );
-                verticalName.setAttribute("font-weight","700");
-                verticalName.setAttribute(
-                  "font-family",
-                  "Arial, Helvetica, sans-serif"
-                );
-                verticalName.setAttribute("pointer-events","none");
-                verticalName.setAttribute("paint-order","stroke");
-                verticalName.setAttribute("stroke","#ffffff");
-                verticalName.setAttribute("stroke-width",".9");
-                g.appendChild(verticalName);
-              };
-
-              if(member.showVerticalNameBelow){
-                addVerticalName("below");
-              }
-
-              if(member.showVerticalNameAbove){
-                addVerticalName("above");
+                  if(member.showVerticalNameAbove){
+                    addVerticalName("above");
+                  }
+                }
               }
             }
           }
@@ -10980,23 +11001,38 @@ function normalizeExportArrowStrokeWidths(clonedDocument){
   const clonedBoard=clonedDocument.getElementById("board");
   if(!liveBoard || !clonedBoard)return;
 
-  const liveRect=liveBoard.getBoundingClientRect();
-  const liveWidth=liveRect.width;
+  const liveWidth=liveBoard.getBoundingClientRect().width;
+  const targetWidth=clonedBoard.getBoundingClientRect().width;
 
-  if(!Number.isFinite(liveWidth) || liveWidth<=0)return;
+  if(
+    !Number.isFinite(liveWidth) ||
+    liveWidth<=0 ||
+    !Number.isFinite(targetWidth) ||
+    targetWidth<=0
+  )return;
 
   /*
-    Manteniamo nel file esportato la stessa proporzione visiva
-    "spessore freccia / larghezza campo" osservata nell'editor.
+    v263 - STROKE LOCK
 
-    Il campo logico esportato è 1000 px. Le frecce dell'editor usano
-    non-scaling-stroke, quindi il valore CSS dello stroke non può essere
-    copiato brutalmente nel clone: va convertito in unità del campo.
+    Lo spessore viene convertito usando esclusivamente il rapporto
+    tra larghezza visibile del campo nell'editor e larghezza reale
+    del campo nel clone esportato.
+
+    In questo modo:
+      stroke_export / campo_export
+      =
+      stroke_editor / campo_editor
+
+    Nessuna compensazione empirica (.80, .64, ecc.).
+    PNG e PDF mantengono quindi la stessa proporzione visiva
+    impostata nel progetto.
   */
-  const logicalBoardWidth=1000;
+  const scaleRatio=targetWidth/liveWidth;
+
   const liveArrows=[...document.querySelectorAll(
     "#drawLayer .drawing-visible"
   )];
+
   const clonedArrows=[...clonedDocument.querySelectorAll(
     "#drawLayer .drawing-visible"
   )];
@@ -11005,37 +11041,24 @@ function normalizeExportArrowStrokeWidths(clonedDocument){
     const liveArrow=liveArrows[index];
     if(!liveArrow)return;
 
-    const liveStroke=parseFloat(
-      window.getComputedStyle(liveArrow).strokeWidth
-    );
+    const liveStyle=window.getComputedStyle(liveArrow);
+    const liveStroke=parseFloat(liveStyle.strokeWidth);
 
     if(!Number.isFinite(liveStroke) || liveStroke<=0)return;
 
-    const relativeStroke=liveStroke/liveWidth;
+    const targetStroke=liveStroke*scaleRatio;
+
+    arrow.setAttribute("stroke-width",String(targetStroke));
+    arrow.style.strokeWidth=String(targetStroke);
 
     /*
-      v229 - calibrazione finale:
-      html2canvas/PDF rende il corpo della freccia visivamente circa
-      il 20% più pesante rispetto all'editor. Applichiamo quindi una
-      compensazione esclusivamente in export, senza modificare il progetto.
+      Nel clone lo stroke deve scalare insieme al campo.
+      html2canvas applicherà poi lo stesso raster scale a entrambi.
     */
-    const exportStrokeCompensation=.80;
-    const logicalStroke=
-      relativeStroke*
-      logicalBoardWidth*
-      exportStrokeCompensation;
-
-    arrow.setAttribute("stroke-width",String(logicalStroke));
-    arrow.style.strokeWidth=String(logicalStroke);
     arrow.setAttribute("vector-effect","none");
     arrow.style.vectorEffect="none";
 
-    /*
-      I pattern tratteggiati sono definiti nello stesso sistema della
-      freccia. Ridimensioniamo anche dash e gap con lo stesso rapporto,
-      evitando che nel PDF sembrino blocchi molto più grossi.
-    */
-    const liveDash=window.getComputedStyle(liveArrow).strokeDasharray;
+    const liveDash=liveStyle.strokeDasharray;
 
     if(
       liveDash &&
@@ -11046,12 +11069,12 @@ function normalizeExportArrowStrokeWidths(clonedDocument){
         .split(/[,\s]+/)
         .map(value=>parseFloat(value))
         .filter(Number.isFinite)
-        .map(value=>value/liveWidth*logicalBoardWidth);
+        .map(value=>value*scaleRatio);
 
       if(values.length){
-        const normalizedDash=values.join(" ");
-        arrow.setAttribute("stroke-dasharray",normalizedDash);
-        arrow.style.strokeDasharray=normalizedDash;
+        const targetDash=values.join(" ");
+        arrow.setAttribute("stroke-dasharray",targetDash);
+        arrow.style.strokeDasharray=targetDash;
       }
     }
   });
@@ -13224,7 +13247,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v262",
+    appVersion:"v263",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -14451,7 +14474,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=262",
+        "./service-worker.js?v=263",
         { updateViaCache: "none" }
       );
 
