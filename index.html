@@ -11160,6 +11160,45 @@ async function captureCurrentScheme(){
   throw lastError||new Error("Cattura campo non riuscita");
 }
 
+async function captureBoardVisualExact(){
+  const board=document.getElementById("board");
+  if(!board)throw new Error("Campo non disponibile");
+  if(!window.html2canvas)throw new Error("Libreria grafica non disponibile");
+
+  await waitForExportAssets(board);
+
+  const scale=Math.max(2,Math.min(4,window.devicePixelRatio||2));
+
+  /*
+    v267: cattura raster del board così come viene visualizzato.
+    Non viene eseguita alcuna normalizzazione geometrica delle frecce.
+  */
+  return await html2canvas(board,{
+    backgroundColor:"#ffffff",
+    scale,
+    useCORS:true,
+    allowTaint:false,
+    logging:false,
+    imageTimeout:15000,
+    removeContainer:true,
+    onclone:clonedDocument=>{
+      clonedDocument.querySelectorAll(
+        ".field-fullscreen-exit,"+
+        ".field-fullscreen-nav,"+
+        ".snap-guide,"+
+        ".drawing-handle,"+
+        ".drawing-control-line,"+
+        ".mannequin-selection-outline"
+      ).forEach(element=>{
+        element.style.display="none";
+      });
+
+      clonedDocument.body.classList.add("export-clean-view");
+    }
+  });
+}
+
+
 
 
 async function captureBoardForPdf(){
@@ -11489,7 +11528,7 @@ document.getElementById("exportPdf").addEventListener("click",async()=>{
         - spariscono le fasce vuote introdotte dal layout dell'app;
         - nessun crop fisso può tagliare giocatori vicini ai bordi.
       */
-      const canvas=await captureBoardForPdf();
+      const canvas=await captureBoardVisualExact();
       const imgData=canvas.toDataURL("image/png",1);
 
       const ratio=Math.min(
@@ -13300,7 +13339,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v266",
+    appVersion:"v267",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -14527,7 +14566,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=266",
+        "./service-worker.js?v=267",
         { updateViaCache: "none" }
       );
 
