@@ -10023,21 +10023,28 @@ function renderAll(){
   const scaleValue=document.getElementById("playerScaleValue");
   const scaleMode=document.getElementById("playerScaleMode");
 
-  const singleSelected=[...selectedPlayers].filter(i=>page().positions[i]).length===1
-    ? [...selectedPlayers].find(i=>page().positions[i])
-    : null;
+  const fieldSelected=[...selectedPlayers].filter(
+    i=>page().positions[i] && state.roster[i]
+  );
 
-  if(singleSelected!==null && state.roster[singleSelected]){
-    const player=state.roster[singleSelected];
+  if(fieldSelected.length>0){
+    const firstIndex=fieldSelected[0];
+    const player=state.roster[firstIndex];
     const value=player.individualScale ?? state.playerScale ?? .75;
     if(scaleInput)scaleInput.value=value;
     if(scaleValue)scaleValue.textContent=Math.round(value*100)+"%";
-    if(scaleMode)scaleMode.innerHTML=`<strong>Dimensione singola</strong><br>${escapeHtml(player.lastName||player.name||"Giocatore")}`;
+    if(scaleMode){
+      if(fieldSelected.length===1){
+        scaleMode.innerHTML=`<strong>Dimensione singola</strong><br>${escapeHtml(player.lastName||player.name||"Giocatore")}`;
+      }else{
+        scaleMode.innerHTML=`<strong>Dimensione selezione</strong><br>${fieldSelected.length} maglie selezionate`;
+      }
+    }
   }else{
     const value=state.playerScale||.75;
     if(scaleInput)scaleInput.value=value;
     if(scaleValue)scaleValue.textContent=Math.round(value*100)+"%";
-    if(scaleMode)scaleMode.innerHTML="<strong>Dimensione globale</strong><br>Seleziona una sola maglietta per modificarne soltanto la dimensione.";
+    if(scaleMode)scaleMode.innerHTML="<strong>Dimensione globale</strong><br>Seleziona una o più magliette per modificarne soltanto la dimensione.";
   }
   syncChestCircleControls();
 
@@ -10916,20 +10923,31 @@ let scaleHistoryTimer=null;
 playerScaleInput.addEventListener("input",()=>{
   if(!scaleHistoryTimer)pushHistory();
 
-  const fieldSelected=[...selectedPlayers].filter(i=>page().positions[i]);
+  const fieldSelected=[...selectedPlayers].filter(
+    i=>page().positions[i] && state.roster[i]
+  );
   const value=Number(playerScaleInput.value);
 
-  if(fieldSelected.length===1 && state.roster[fieldSelected[0]]){
-    state.roster[fieldSelected[0]].individualScale=value;
+  if(fieldSelected.length>0){
+    fieldSelected.forEach(i=>{
+      state.roster[i].individualScale=value;
+    });
+
     playerScaleValue.textContent=Math.round(value*100)+"%";
-    const player=state.roster[fieldSelected[0]];
-    document.getElementById("playerScaleMode").innerHTML=
-      `<strong>Dimensione singola</strong><br>${escapeHtml(player.lastName||player.name||"Giocatore")}`;
+
+    if(fieldSelected.length===1){
+      const player=state.roster[fieldSelected[0]];
+      document.getElementById("playerScaleMode").innerHTML=
+        `<strong>Dimensione singola</strong><br>${escapeHtml(player.lastName||player.name||"Giocatore")}`;
+    }else{
+      document.getElementById("playerScaleMode").innerHTML=
+        `<strong>Dimensione selezione</strong><br>${fieldSelected.length} maglie selezionate`;
+    }
   }else{
     state.playerScale=value;
     playerScaleValue.textContent=Math.round(value*100)+"%";
     document.getElementById("playerScaleMode").innerHTML=
-      "<strong>Dimensione globale</strong><br>Seleziona una sola maglietta per modificarne soltanto la dimensione.";
+      "<strong>Dimensione globale</strong><br>Seleziona una o più magliette per modificarne soltanto la dimensione.";
   }
 
   renderPlayers();
