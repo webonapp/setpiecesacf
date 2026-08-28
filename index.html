@@ -6072,6 +6072,13 @@ card.addEventListener("dblclick",e=>{
       state.pages.forEach(projectPage=>{
         projectPage.positions.splice(i,1);
 
+        if(
+          projectPage.playerDisplayOverrides &&
+          typeof projectPage.playerDisplayOverrides==="object"
+        ){
+          delete projectPage.playerDisplayOverrides[removedPlayerId];
+        }
+
         (projectPage.drawings||[]).forEach(drawing=>{
           if(
             !["wall4","mannequin"].includes(drawing?.type) ||
@@ -10559,9 +10566,11 @@ function makeSchemeFromLayoutProject(project){
 
   const overrides={};
   currentToSource.forEach((sourceIndex,currentIndex)=>{
-    const sourceOverride=sourcePage.playerDisplayOverrides?.[sourceIndex];
+    const sourcePlayerId=String(sourceRoster[sourceIndex]?.id||sourceIndex);
+    const targetPlayerId=String(state.roster[currentIndex]?.id||currentIndex);
+    const sourceOverride=sourcePage.playerDisplayOverrides?.[sourcePlayerId];
     if(sourceOverride && typeof sourceOverride==="object"){
-      overrides[currentIndex]=JSON.parse(JSON.stringify(sourceOverride));
+      overrides[targetPlayerId]=JSON.parse(JSON.stringify(sourceOverride));
     }
   });
 
@@ -10699,6 +10708,12 @@ document.getElementById("deletePage").addEventListener("click",()=>{
   }
 });
 document.getElementById("duplicatePage").addEventListener("click",()=>{
+  if(state.pages.length>=30){
+    alert("Massimo 30 schemi: elimina uno schema prima di duplicarne un altro.");
+    setStatus("Duplicazione non eseguita · limite di 30 schemi");
+    return;
+  }
+
   pushHistory();
   resetTextInteractionState();
   const copy=JSON.parse(JSON.stringify(page()));
@@ -12746,6 +12761,7 @@ let archiveState={
     projects:[]
   }]
 };
+let lastPersistedArchiveState=JSON.parse(JSON.stringify(archiveState));
 
 const ARCHIVE_SCHEMA_RECORD_VERSION=2;
 
@@ -12782,10 +12798,12 @@ function resolveArchiveProjectScheme(project){
     return {ok:false,reason:"Record archivio non valido"};
   }
 
-  const candidate=normalizeProjectState(
-    JSON.parse(JSON.stringify(project.data||{}))
-  );
-  const pages=Array.isArray(candidate.pages) ? candidate.pages : [];
+  const rawCandidate=JSON.parse(JSON.stringify(project.data||{}));
+  const pages=Array.isArray(rawCandidate.pages)
+    ? rawCandidate.pages.filter(projectPage=>
+        projectPage && typeof projectPage==="object"
+      )
+    : [];
 
   if(!pages.length){
     return {ok:false,reason:"Il record non contiene schemi"};
@@ -12800,7 +12818,8 @@ function resolveArchiveProjectScheme(project){
     project.schemaRecordVersion===ARCHIVE_SCHEMA_RECORD_VERSION &&
     pages.length===1
   ){
-    candidate.pages=[stripArchiveReference(pages[0])];
+    rawCandidate.pages=[stripArchiveReference(pages[0])];
+    const candidate=normalizeProjectState(rawCandidate);
     return {ok:true,state:candidate,page:candidate.pages[0],migrated:false};
   }
 
@@ -12808,7 +12827,8 @@ function resolveArchiveProjectScheme(project){
     Record legacy con una sola pagina: è già inequivocabile.
   */
   if(pages.length===1){
-    candidate.pages=[stripArchiveReference(pages[0])];
+    rawCandidate.pages=[stripArchiveReference(pages[0])];
+    const candidate=normalizeProjectState(rawCandidate);
     return {ok:true,state:candidate,page:candidate.pages[0],migrated:true};
   }
 
@@ -12823,7 +12843,8 @@ function resolveArchiveProjectScheme(project){
   );
 
   if(exactMatches.length===1){
-    candidate.pages=[stripArchiveReference(exactMatches[0])];
+    rawCandidate.pages=[stripArchiveReference(exactMatches[0])];
+    const candidate=normalizeProjectState(rawCandidate);
     return {ok:true,state:candidate,page:candidate.pages[0],migrated:true};
   }
 
@@ -12882,6 +12903,52 @@ function migrateArchiveRecords(targetArchive=archiveState){
   return {migrated,unresolved};
 }
 
+function makeUniqueArchiveId(prefix,usedIds){
+  let id;
+  do{
+    id=`${prefix}-${Date.now()}-${Math.random().toString(36).slice(2,10)}`;
+  }while(usedIds.has(id));
+  usedIds.add(id);
+  return id;
+}
+
+function normalizeArchiveIdentifiers(targetArchive){
+  if(!targetArchive || !Array.isArray(targetArchive.folders)){
+    return {repairedFolders:0,repairedProjects:0};
+  }
+
+  const usedFolderIds=new Set();
+  let repairedFolders=0;
+  let repairedProjects=0;
+
+  targetArchive.folders.forEach(folder=>{
+    const requestedFolderId=String(folder?.id||"").trim();
+    if(!requestedFolderId || usedFolderIds.has(requestedFolderId)){
+      folder.id=makeUniqueArchiveId("folder",usedFolderIds);
+      repairedFolders++;
+    }else{
+      folder.id=requestedFolderId;
+      usedFolderIds.add(requestedFolderId);
+    }
+
+    if(!Array.isArray(folder.projects))folder.projects=[];
+    const usedProjectIds=new Set();
+
+    folder.projects.forEach(project=>{
+      const requestedProjectId=String(project?.id||"").trim();
+      if(!requestedProjectId || usedProjectIds.has(requestedProjectId)){
+        project.id=makeUniqueArchiveId("project",usedProjectIds);
+        repairedProjects++;
+      }else{
+        project.id=requestedProjectId;
+        usedProjectIds.add(requestedProjectId);
+      }
+    });
+  });
+
+  return {repairedFolders,repairedProjects};
+}
+
 function loadArchive(){
   try{
     const raw=safeStorageGet(ARCHIVE_KEY);
@@ -12890,6 +12957,8 @@ function loadArchive(){
       if(parsed?.folders?.length)archiveState=parsed;
     }
   }catch(_){}
+
+  lastPersistedArchiveState=JSON.parse(JSON.stringify(archiveState));
 
   if(!archiveState.folders.some(f=>f.type==="layout")){
     archiveState.folders.unshift({
@@ -12901,14 +12970,43 @@ function loadArchive(){
     });
   }
 
+  const identifierRepair=normalizeArchiveIdentifiers(archiveState);
   const migration=migrateArchiveRecords(archiveState);
-  if(migration.migrated){
+  if(
+    migration.migrated ||
+    identifierRepair.repairedFolders ||
+    identifierRepair.repairedProjects
+  ){
     saveArchive();
   }
 }
 
 function saveArchive(){
-  safeStorageSet(ARCHIVE_KEY,JSON.stringify(archiveState));
+  let serialized;
+  try{
+    serialized=JSON.stringify(archiveState);
+  }catch(_){
+    serialized=null;
+  }
+
+  const written=Boolean(
+    serialized &&
+    safeStorageSet(ARCHIVE_KEY,serialized) &&
+    safeStorageGet(ARCHIVE_KEY)===serialized
+  );
+
+  if(written){
+    lastPersistedArchiveState=JSON.parse(serialized);
+    return true;
+  }
+
+  archiveState=JSON.parse(JSON.stringify(lastPersistedArchiveState));
+  alert(
+    "Il Database ACF non è stato salvato. Lo spazio locale potrebbe essere esaurito o non disponibile.\n\n"+
+    "L'operazione è stata annullata e il database precedente è stato ripristinato. Esporta subito un backup."
+  );
+  setStatus("Salvataggio Database ACF non riuscito");
+  return false;
 }
 
 function makeProjectSnapshot(name,folderId=null){
@@ -12941,6 +13039,84 @@ function bindPageToArchive(projectPage,folder,project){
   return copy;
 }
 
+function remapArchivePageToRoster(projectPage,sourceRoster,targetRoster){
+  const source=Array.isArray(sourceRoster) ? sourceRoster : [];
+  const target=Array.isArray(targetRoster) ? targetRoster : [];
+  const pageCopy=stripArchiveReference(projectPage);
+
+  const sourceIndexById=new Map();
+  source.forEach((player,index)=>{
+    const id=String(player?.id||"");
+    if(id && !sourceIndexById.has(id))sourceIndexById.set(id,index);
+  });
+
+  const targetIds=new Set(
+    target.map(player=>String(player?.id||"")).filter(Boolean)
+  );
+  const unresolvedPlayerIds=new Set();
+
+  source.forEach((player,index)=>{
+    const id=String(player?.id||"");
+    if(!id || targetIds.has(id))return;
+
+    const hasPosition=Boolean(projectPage?.positions?.[index]);
+    const hasOverride=Boolean(projectPage?.playerDisplayOverrides?.[id]);
+    const isAssigned=(projectPage?.drawings||[]).some(drawing=>
+      ["wall4","mannequin"].includes(drawing?.type) &&
+      Array.isArray(drawing.members) &&
+      drawing.members.some(member=>String(member?.playerId||"")===id)
+    );
+
+    if(hasPosition || hasOverride || isAssigned)unresolvedPlayerIds.add(id);
+  });
+
+  pageCopy.positions=target.map(player=>{
+    const sourceIndex=sourceIndexById.get(String(player?.id||""));
+    const position=Number.isInteger(sourceIndex)
+      ? projectPage?.positions?.[sourceIndex]
+      : null;
+
+    return position &&
+      Number.isFinite(Number(position.x)) &&
+      Number.isFinite(Number(position.y))
+        ? {x:Number(position.x),y:Number(position.y)}
+        : null;
+  });
+
+  const sourceOverrides=
+    projectPage?.playerDisplayOverrides &&
+    typeof projectPage.playerDisplayOverrides==="object"
+      ? projectPage.playerDisplayOverrides
+      : {};
+
+  pageCopy.playerDisplayOverrides={};
+  targetIds.forEach(id=>{
+    const override=sourceOverrides[id];
+    if(override && typeof override==="object"){
+      pageCopy.playerDisplayOverrides[id]=JSON.parse(JSON.stringify(override));
+    }
+  });
+
+  (pageCopy.drawings||[]).forEach(drawing=>{
+    if(
+      !["wall4","mannequin"].includes(drawing?.type) ||
+      !Array.isArray(drawing.members)
+    )return;
+
+    const usedIds=new Set();
+    drawing.members.forEach(member=>{
+      const playerId=String(member?.playerId||"");
+      if(!targetIds.has(playerId) || usedIds.has(playerId)){
+        member.playerId="";
+        return;
+      }
+      usedIds.add(playerId);
+    });
+  });
+
+  return {page:pageCopy,unresolvedPlayerIds:[...unresolvedPlayerIds]};
+}
+
 function findArchiveProjectByRef(ref){
   if(!ref?.folderId || !ref?.projectId)return null;
   const folder=archiveState.folders.find(item=>item.id===ref.folderId);
@@ -12951,22 +13127,23 @@ function findArchiveProjectByRef(ref){
 }
 
 function openArchiveState(candidate,pages,statusMessage){
-  const normalized=normalizeProjectState(
+  const normalizedCandidate=normalizeProjectState(
     JSON.parse(JSON.stringify(candidate))
   );
 
-  normalized.pages=pages.map(projectPage=>
+  normalizedCandidate.pages=pages.map(projectPage=>
     JSON.parse(JSON.stringify(projectPage))
   );
-  state=normalizeProjectState(normalized);
+  const nextState=normalizeProjectState(normalizedCandidate);
 
-  if(!assertProjectIntegrity(state)){
+  if(!assertProjectIntegrity(nextState)){
     alert("Questo progetto archiviato non è compatibile o risulta danneggiato.");
     setStatus("Progetto archivio non valido");
     return false;
   }
 
   resetTransientInteractionState();
+  state=nextState;
   currentPage=0;
   undoStack=[];
   redoStack=[];
@@ -13033,7 +13210,10 @@ function renderArchive(){
       const name=prompt("Nome dello schema:",page().title||"Nuovo schema");
       if(name===null||!name.trim())return;
       folder.projects.push(makeProjectSnapshot(name.trim(),folder.id));
-      saveArchive();
+      if(!saveArchive()){
+        renderArchive();
+        return;
+      }
       renderArchive();
       setStatus("Schema archiviato");
     });
@@ -13084,9 +13264,29 @@ function renderArchive(){
         new Date(a.project.updatedAt||a.project.createdAt||0)
       )[0];
 
-      const pages=resolvedProjects.map(({project,resolved})=>
-        bindPageToArchive(resolved.page,folder,project)
-      );
+      const targetRoster=baseEntry.resolved.state.roster;
+      const rosterErrors=[];
+      const pages=resolvedProjects.map(({project,resolved})=>{
+        const remapped=remapArchivePageToRoster(
+          resolved.page,
+          resolved.state.roster,
+          targetRoster
+        );
+        if(remapped.unresolvedPlayerIds.length){
+          rosterErrors.push(project.name);
+        }
+        return bindPageToArchive(remapped.page,folder,project);
+      });
+
+      if(rosterErrors.length){
+        alert(
+          "Non posso aprire la cartella senza perdere riferimenti a giocatori presenti in una rosa precedente.\n\n"+
+          "Aggiorna prima questi record con la rosa corrente:\n"+
+          rosterErrors.join("\n")
+        );
+        setStatus("Cartella non aperta · rose non compatibili");
+        return;
+      }
 
       openArchiveState(
         baseEntry.resolved.state,
@@ -13111,7 +13311,10 @@ function renderArchive(){
       if(!confirmed)return;
 
       archiveState.folders=archiveState.folders.filter(f=>f.id!==folder.id);
-      saveArchive();
+      if(!saveArchive()){
+        renderArchive();
+        return;
+      }
       renderArchive();
       setStatus("Cartella eliminata");
     });
@@ -13123,7 +13326,10 @@ function renderArchive(){
       const value=prompt("Nuovo nome cartella:",folder.name);
       if(value===null||!value.trim())return;
       folder.name=value.trim();
-      saveArchive();
+      if(!saveArchive()){
+        renderArchive();
+        return;
+      }
       renderArchive();
     });
 
@@ -13168,7 +13374,10 @@ function renderArchive(){
       }
 
       archiveState.folders.push(copy);
-      saveArchive();
+      if(!saveArchive()){
+        renderArchive();
+        return;
+      }
       renderArchive();
       setStatus("Cartella duplicata senza vecchi set nascosti");
     });
@@ -13265,8 +13474,27 @@ function renderArchive(){
 
           /*
             Dal Database ACF, Aggiorna continua a essere disponibile ma
-            aggiorna SOLO il record scelto con lo schema corrente.
+            aggiorna SOLO il record scelto con lo schema corrente. Uno schema
+            collegato a un record diverso non può sovrascriverlo per errore.
           */
+          const currentRef=page()?._archiveRef;
+          const isCurrentRecord=(
+            currentRef?.folderId===folder.id &&
+            currentRef?.projectId===project.id
+          );
+
+          if(!isCurrentRecord){
+            const sourceName=String(page()?.title||`Schema ${currentPage+1}`);
+            alert(
+              "Aggiornamento bloccato: lo schema corrente non proviene da questo record.\n\n"+
+              `Schema corrente: "${sourceName}"\n`+
+              `Destinazione: "${folder.name}" / "${project.name}"\n\n`+
+              "Apri prima il record di destinazione e poi aggiornalo, oppure usa “Aggiorna nel database” sullo schema collegato."
+            );
+            setStatus("Aggiornamento bloccato · record non collegato");
+            return;
+          }
+
           project.data=makeSingleSchemeState(state,currentPage);
           project.schemaRecordVersion=ARCHIVE_SCHEMA_RECORD_VERSION;
           project.updatedAt=new Date().toISOString();
@@ -13276,7 +13504,10 @@ function renderArchive(){
             projectId:project.id
           };
 
-          saveArchive();
+          if(!saveArchive()){
+            renderArchive();
+            return;
+          }
           renderArchive();
           setStatus(`"${project.name}" aggiornato nel database`);
         });
@@ -13289,7 +13520,10 @@ function renderArchive(){
           if(value===null||!value.trim())return;
           project.name=value.trim();
           project.updatedAt=new Date().toISOString();
-          saveArchive();
+          if(!saveArchive()){
+            renderArchive();
+            return;
+          }
           renderArchive();
         });
 
@@ -13298,7 +13532,10 @@ function renderArchive(){
         remove.addEventListener("click",e=>{
           e.stopPropagation();
           folder.projects=folder.projects.filter(p=>p.id!==project.id);
-          saveArchive();
+          if(!saveArchive()){
+            renderArchive();
+            return;
+          }
           renderArchive();
         });
 
@@ -13326,7 +13563,10 @@ function createArchiveFolder(type="match"){
     projects:[]
   };
   archiveState.folders.push(folder);
-  saveArchive();
+  if(!saveArchive()){
+    renderArchive();
+    return null;
+  }
   renderArchive();
   return folder;
 }
@@ -13340,7 +13580,10 @@ document.getElementById("saveArchiveBtn").addEventListener("click",()=>{
   if(projectName===null||!projectName.trim())return;
 
   folder.projects.push(makeProjectSnapshot(projectName.trim(),folder.id));
-  saveArchive();
+  if(!saveArchive()){
+    renderArchive();
+    return;
+  }
   renderArchive();
   setStatus("Schema salvato nella nuova cartella");
 });
@@ -13366,7 +13609,10 @@ document.getElementById("newMatchFolderBtn").addEventListener("click",()=>{
   const projectName=prompt("Nome del primo schema:",page().title||"Schema partita");
   if(projectName&&projectName.trim()){
     folder.projects.push(makeProjectSnapshot(projectName.trim(),folder.id));
-    saveArchive();
+    if(!saveArchive()){
+      renderArchive();
+      return;
+    }
     renderArchive();
   }
 });
@@ -13376,7 +13622,10 @@ document.getElementById("saveToLayoutBtn").addEventListener("click",()=>{
   const name=prompt("Nome del layout:",page().title||"Layout palle inattive");
   if(name===null||!name.trim())return;
   layout.projects.push(makeProjectSnapshot(name.trim(),layout.id));
-  saveArchive();
+  if(!saveArchive()){
+    renderArchive();
+    return;
+  }
   renderArchive();
   setStatus("Layout salvato");
 });
@@ -13405,7 +13654,7 @@ document.getElementById("updateCurrentArchiveBtn").addEventListener("click",()=>
     projectId:found.project.id
   };
 
-  saveArchive();
+  if(!saveArchive())return;
   setStatus(`"${found.project.name}" aggiornato nel Database ACF`);
 });
 
@@ -13693,8 +13942,6 @@ function getBackupPayload(){
     throw new Error("Stato progetto non valido");
   }
 
-  saveArchive();
-
   return {
     format:BACKUP_FORMAT,
     formatVersion:BACKUP_FORMAT_VERSION,
@@ -13703,7 +13950,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v275",
+    appVersion:"v277",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -14078,6 +14325,9 @@ async function importBackupFile(file){
       return;
     }
 
+    const previousState=state;
+    const previousCurrentPage=currentPage;
+
     resetTransientInteractionState();
     state=normalizeProjectState(importedState);
     archiveState=importedArchive;
@@ -14089,7 +14339,21 @@ async function importBackupFile(file){
       archiveState=makeDefaultArchiveState();
     }
 
+    if(!archiveState.folders.some(folder=>folder?.type==="layout")){
+      archiveState.folders.unshift(makeDefaultArchiveState().folders[0]);
+    }
+
+    const identifierRepair=normalizeArchiveIdentifiers(archiveState);
     const archiveMigration=migrateArchiveRecords(archiveState);
+
+    if(identifierRepair.repairedFolders || identifierRepair.repairedProjects){
+      state.pages.forEach(projectPage=>delete projectPage._archiveRef);
+      alert(
+        "Il backup conteneva identificatori duplicati o mancanti nel Database ACF.\n\n"+
+        `${identifierRepair.repairedFolders} cartelle e `+
+        `${identifierRepair.repairedProjects} schemi sono stati riparati con nuovi ID univoci.`
+      );
+    }
 
     if(archiveMigration.unresolved.length){
       const details=archiveMigration.unresolved
@@ -14133,7 +14397,13 @@ async function importBackupFile(file){
       Per conservarlo tra refresh si usa Esporta backup.
     */
     safeStorageRemove(STORAGE_KEY);
-    safeStorageSet(ARCHIVE_KEY,JSON.stringify(archiveState));
+    if(!saveArchive()){
+      state=previousState;
+      currentPage=previousCurrentPage;
+      const persistenceError=new Error("Importazione annullata: Database ACF non salvato");
+      persistenceError.alreadyNotified=true;
+      throw persistenceError;
+    }
 
     /*
       Un backup importato è un nuovo confine di progetto:
@@ -14172,11 +14442,13 @@ async function importBackupFile(file){
   }catch(error){
     console.error("Errore importazione backup:",error);
 
-    alert(
-      "Impossibile importare il backup.\n\n"+
-      (error?.message||"File non valido o danneggiato.")+
-      "\n\nProva a salvarlo nell’app File senza modificarne il contenuto."
-    );
+    if(!error?.alreadyNotified){
+      alert(
+        "Impossibile importare il backup.\n\n"+
+        (error?.message||"File non valido o danneggiato.")+
+        "\n\nProva a salvarlo nell’app File senza modificarne il contenuto."
+      );
+    }
 
     setStatus("Errore importazione backup");
   }
@@ -14945,7 +15217,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=275",
+        "./service-worker.js?v=277",
         { updateViaCache: "none" }
       );
 
