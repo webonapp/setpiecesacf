@@ -2797,7 +2797,7 @@ body.field-view-mode{
     <div class="library-title">Player size</div>
     <input id="playerScale" type="range" min="0.65" max="1.65" step="0.05" value="0.75" style="width:100%">
     <div id="playerScaleValue" class="library-help" style="text-align:right">75%</div>
-<div id="playerScaleMode" class="player-size-mode"><strong>Dimensione globale</strong><br>Seleziona una sola maglietta per modificarne soltanto la dimensione.</div>
+<div id="playerScaleMode" class="player-size-mode"><strong>Dimensione globale</strong><br>Seleziona una o più magliette per modificarne soltanto la dimensione.</div>
   </div>
 
   <div class="library-panel">
@@ -2808,6 +2808,7 @@ body.field-view-mode{
       <button class="btn" id="duplicatePage">Duplica</button>
       <button class="btn danger" id="deletePage">Elimina</button>
     </div>
+    <button type="button" class="btn" id="updateCurrentArchiveBtn" style="width:100%;margin-top:6px">Aggiorna nel database</button>
   </div>
 
   <div class="library-help">Trascina i giocatori dalla rosa al campo. ⌘C copia giocatori, palloni, frecce, curve, forme e testi selezionati. ⌘V incolla una copia leggermente spostata.</div>
@@ -10701,6 +10702,7 @@ document.getElementById("duplicatePage").addEventListener("click",()=>{
   pushHistory();
   resetTextInteractionState();
   const copy=JSON.parse(JSON.stringify(page()));
+  delete copy._archiveRef;
   copy.title=page().title+" copia";
   state.pages.splice(currentPage+1,0,copy);
   currentPage++;
@@ -12745,6 +12747,141 @@ let archiveState={
   }]
 };
 
+const ARCHIVE_SCHEMA_RECORD_VERSION=2;
+
+function normalizeArchiveTitle(value){
+  return String(value||"")
+    .trim()
+    .replace(/\s+/g," ")
+    .toLocaleLowerCase("it-IT");
+}
+
+function stripArchiveReference(projectPage){
+  if(!projectPage || typeof projectPage!=="object")return projectPage;
+  const clean=JSON.parse(JSON.stringify(projectPage));
+  delete clean._archiveRef;
+  return clean;
+}
+
+function makeSingleSchemeState(sourceState=state,pageIndex=currentPage){
+  const snapshot=JSON.parse(JSON.stringify(sourceState));
+  const pages=Array.isArray(sourceState?.pages) ? sourceState.pages : [];
+  const safeIndex=Math.max(0,Math.min(Number(pageIndex)||0,Math.max(0,pages.length-1)));
+  const sourcePage=pages[safeIndex];
+
+  if(!sourcePage){
+    throw new Error("Schema corrente non disponibile");
+  }
+
+  snapshot.pages=[stripArchiveReference(sourcePage)];
+  return normalizeProjectState(snapshot);
+}
+
+function resolveArchiveProjectScheme(project){
+  if(!project || typeof project!=="object"){
+    return {ok:false,reason:"Record archivio non valido"};
+  }
+
+  const candidate=normalizeProjectState(
+    JSON.parse(JSON.stringify(project.data||{}))
+  );
+  const pages=Array.isArray(candidate.pages) ? candidate.pages : [];
+
+  if(!pages.length){
+    return {ok:false,reason:"Il record non contiene schemi"};
+  }
+
+  /*
+    Nuovo formato: ogni record contiene esattamente uno schema.
+    Manteniamo il nome pagina così com'è: il record può essere rinominato
+    indipendentemente dal titolo dello schema.
+  */
+  if(
+    project.schemaRecordVersion===ARCHIVE_SCHEMA_RECORD_VERSION &&
+    pages.length===1
+  ){
+    candidate.pages=[stripArchiveReference(pages[0])];
+    return {ok:true,state:candidate,page:candidate.pages[0],migrated:false};
+  }
+
+  /*
+    Record legacy con una sola pagina: è già inequivocabile.
+  */
+  if(pages.length===1){
+    candidate.pages=[stripArchiveReference(pages[0])];
+    return {ok:true,state:candidate,page:candidate.pages[0],migrated:true};
+  }
+
+  /*
+    Record legacy multipagina.
+    NON prendiamo mai pages[0] arbitrariamente.
+    Cerchiamo la pagina il cui titolo corrisponde al nome visibile del record.
+  */
+  const target=normalizeArchiveTitle(project.name);
+  const exactMatches=pages.filter(projectPage=>
+    normalizeArchiveTitle(projectPage?.title)===target
+  );
+
+  if(exactMatches.length===1){
+    candidate.pages=[stripArchiveReference(exactMatches[0])];
+    return {ok:true,state:candidate,page:candidate.pages[0],migrated:true};
+  }
+
+  if(exactMatches.length>1){
+    return {
+      ok:false,
+      reason:`Il vecchio record "${project.name}" contiene più schemi con lo stesso nome.`
+    };
+  }
+
+  return {
+    ok:false,
+    reason:`Nel vecchio record "${project.name}" non esiste una pagina con lo stesso nome.`
+  };
+}
+
+function migrateArchiveRecords(targetArchive=archiveState){
+  if(!targetArchive || !Array.isArray(targetArchive.folders)){
+    return {migrated:0,unresolved:[]};
+  }
+
+  let migrated=0;
+  const unresolved=[];
+
+  targetArchive.folders.forEach(folder=>{
+    if(!Array.isArray(folder.projects))folder.projects=[];
+
+    folder.projects.forEach(project=>{
+      const resolved=resolveArchiveProjectScheme(project);
+
+      if(!resolved.ok){
+        unresolved.push({
+          folderId:folder.id,
+          folderName:folder.name,
+          projectId:project.id,
+          projectName:project.name,
+          reason:resolved.reason
+        });
+        return;
+      }
+
+      const needsMigration=
+        project.schemaRecordVersion!==ARCHIVE_SCHEMA_RECORD_VERSION ||
+        !Array.isArray(project.data?.pages) ||
+        project.data.pages.length!==1;
+
+      if(needsMigration){
+        project.data=resolved.state;
+        project.schemaRecordVersion=ARCHIVE_SCHEMA_RECORD_VERSION;
+        project.updatedAt=project.updatedAt||new Date().toISOString();
+        migrated++;
+      }
+    });
+  });
+
+  return {migrated,unresolved};
+}
+
 function loadArchive(){
   try{
     const raw=safeStorageGet(ARCHIVE_KEY);
@@ -12763,20 +12900,96 @@ function loadArchive(){
       projects:[]
     });
   }
+
+  const migration=migrateArchiveRecords(archiveState);
+  if(migration.migrated){
+    saveArchive();
+  }
 }
 
 function saveArchive(){
   safeStorageSet(ARCHIVE_KEY,JSON.stringify(archiveState));
 }
 
-function makeProjectSnapshot(name){
-  return {
+function makeProjectSnapshot(name,folderId=null){
+  const project={
     id:"project-"+Date.now()+"-"+Math.random().toString(36).slice(2,8),
     name,
     createdAt:new Date().toISOString(),
     updatedAt:new Date().toISOString(),
-    data:JSON.parse(JSON.stringify(state))
+    schemaRecordVersion:ARCHIVE_SCHEMA_RECORD_VERSION,
+    data:makeSingleSchemeState(state,currentPage)
   };
+
+  if(folderId){
+    project.data.pages[0]._archiveRef={
+      folderId,
+      projectId:project.id
+    };
+    delete project.data.pages[0]._archiveRef;
+  }
+
+  return project;
+}
+
+function bindPageToArchive(projectPage,folder,project){
+  const copy=stripArchiveReference(projectPage);
+  copy._archiveRef={
+    folderId:folder.id,
+    projectId:project.id
+  };
+  return copy;
+}
+
+function findArchiveProjectByRef(ref){
+  if(!ref?.folderId || !ref?.projectId)return null;
+  const folder=archiveState.folders.find(item=>item.id===ref.folderId);
+  if(!folder)return null;
+  const project=folder.projects?.find(item=>item.id===ref.projectId);
+  if(!project)return null;
+  return {folder,project};
+}
+
+function openArchiveState(candidate,pages,statusMessage){
+  const normalized=normalizeProjectState(
+    JSON.parse(JSON.stringify(candidate))
+  );
+
+  normalized.pages=pages.map(projectPage=>
+    JSON.parse(JSON.stringify(projectPage))
+  );
+  state=normalizeProjectState(normalized);
+
+  if(!assertProjectIntegrity(state)){
+    alert("Questo progetto archiviato non è compatibile o risulta danneggiato.");
+    setStatus("Progetto archivio non valido");
+    return false;
+  }
+
+  resetTransientInteractionState();
+  currentPage=0;
+  undoStack=[];
+  redoStack=[];
+  historyTransaction=null;
+  clipboardPayload=null;
+  dragSnapshot=null;
+
+  selectedPlayers.clear();
+  selectedRosterPlayers.clear();
+  selectedBalls.clear();
+  selectedTexts.clear();
+  selectedDrawings.clear();
+  selectedWallMembers.clear();
+  selectedDrawing=null;
+  selectedBall=null;
+  selectedText=null;
+
+  renderAll();
+  updateHistoryButtons();
+  save(false);
+  document.getElementById("archiveModal").classList.remove("open");
+  setStatus(statusMessage);
+  return true;
 }
 
 function formatArchiveDate(value){
@@ -12808,7 +13021,7 @@ function renderArchive(){
         ${escapeHtml(folder.name)}
         ${folder.type==="layout"?'<span class="archive-badge">Base</span>':""}
       </div>
-      <div class="archive-folder-meta">${folder.projects.length} progetto/i</div>`;
+      <div class="archive-folder-meta">${folder.projects.length} schema/i</div>`;
 
     const actions=document.createElement("div");
     actions.className="archive-folder-actions";
@@ -12817,12 +13030,69 @@ function renderArchive(){
     saveHere.textContent="Salva qui";
     saveHere.addEventListener("click",e=>{
       e.stopPropagation();
-      const name=prompt("Nome del progetto:",page().title||"Nuovo progetto");
+      const name=prompt("Nome dello schema:",page().title||"Nuovo schema");
       if(name===null||!name.trim())return;
-      folder.projects.push(makeProjectSnapshot(name.trim()));
+      folder.projects.push(makeProjectSnapshot(name.trim(),folder.id));
       saveArchive();
       renderArchive();
-      setStatus("Progetto archiviato");
+      setStatus("Schema archiviato");
+    });
+
+    const openFolder=document.createElement("button");
+    openFolder.type="button";
+    openFolder.textContent="Apri schemi";
+    openFolder.title="Apre tutti e soltanto gli schemi presenti in questa cartella";
+    openFolder.addEventListener("click",e=>{
+      e.preventDefault();
+      e.stopPropagation();
+
+      if(!folder.projects.length){
+        alert("Questa cartella non contiene schemi.");
+        return;
+      }
+
+      const resolvedProjects=[];
+      const errors=[];
+
+      folder.projects.forEach(project=>{
+        const resolved=resolveArchiveProjectScheme(project);
+        if(!resolved.ok){
+          errors.push(`${project.name}: ${resolved.reason}`);
+          return;
+        }
+        resolvedProjects.push({project,resolved});
+      });
+
+      if(errors.length){
+        alert(
+          "Non posso aprire la cartella perché alcuni vecchi record sono ambigui.\n\n"+
+          errors.join("\n")
+        );
+        setStatus("Cartella archivio non risolta");
+        return;
+      }
+
+      if(!resolvedProjects.length)return;
+
+      /*
+        Lo stato globale più recente della cartella è il riferimento più
+        aggiornato per rosa e impostazioni comuni. Le pagine, invece,
+        arrivano ESCLUSIVAMENTE dai record visibili nella cartella.
+      */
+      const baseEntry=[...resolvedProjects].sort((a,b)=>
+        new Date(b.project.updatedAt||b.project.createdAt||0)-
+        new Date(a.project.updatedAt||a.project.createdAt||0)
+      )[0];
+
+      const pages=resolvedProjects.map(({project,resolved})=>
+        bindPageToArchive(resolved.page,folder,project)
+      );
+
+      openArchiveState(
+        baseEntry.resolved.state,
+        pages,
+        `${pages.length} schemi aperti da "${folder.name}"`
+      );
     });
 
     const deleteFolder=document.createElement("button");
@@ -12861,23 +13131,49 @@ function renderArchive(){
     duplicate.textContent="Duplica";
     duplicate.addEventListener("click",e=>{
       e.stopPropagation();
-      const copy=JSON.parse(JSON.stringify(folder));
-      copy.id="folder-"+Date.now()+"-"+Math.random().toString(36).slice(2,6);
-      copy.name=folder.name+" copia";
-      copy.type="match";
-      copy.createdAt=new Date().toISOString();
-      copy.projects=copy.projects.map(p=>({
-        ...p,
-        id:"project-"+Date.now()+"-"+Math.random().toString(36).slice(2,8),
+
+      const copy={
+        id:"folder-"+Date.now()+"-"+Math.random().toString(36).slice(2,6),
+        name:folder.name+" copia",
+        type:"match",
         createdAt:new Date().toISOString(),
-        updatedAt:new Date().toISOString()
-      }));
+        projects:[]
+      };
+
+      const errors=[];
+
+      folder.projects.forEach(project=>{
+        const resolved=resolveArchiveProjectScheme(project);
+        if(!resolved.ok){
+          errors.push(`${project.name}: ${resolved.reason}`);
+          return;
+        }
+
+        copy.projects.push({
+          id:"project-"+Date.now()+"-"+Math.random().toString(36).slice(2,8),
+          name:project.name,
+          createdAt:new Date().toISOString(),
+          updatedAt:new Date().toISOString(),
+          schemaRecordVersion:ARCHIVE_SCHEMA_RECORD_VERSION,
+          data:JSON.parse(JSON.stringify(resolved.state))
+        });
+      });
+
+      if(errors.length){
+        alert(
+          "Duplicazione interrotta: alcuni vecchi record sono ambigui.\n\n"+
+          errors.join("\n")
+        );
+        return;
+      }
+
       archiveState.folders.push(copy);
       saveArchive();
       renderArchive();
+      setStatus("Cartella duplicata senza vecchi set nascosti");
     });
 
-    actions.append(saveHere,rename,duplicate);
+    actions.append(saveHere,openFolder,rename,duplicate);
     if(folder.type!=="layout")actions.append(deleteFolder);
 
     header.append(icon,info,actions);
@@ -12908,48 +13204,55 @@ function renderArchive(){
 
         const open=document.createElement("button");
         open.textContent=folder.type==="layout"?"Usa copia":"Apri";
-        const openProject=()=>{
-          const candidate=normalizeProjectState(
-            JSON.parse(JSON.stringify(project.data))
-          );
 
-          if(!assertProjectIntegrity(candidate)){
-            alert("Questo progetto archiviato non è compatibile o risulta danneggiato.");
-            setStatus("Progetto archivio non valido");
+        const openProject=()=>{
+          const resolved=resolveArchiveProjectScheme(project);
+
+          if(!resolved.ok){
+            alert(
+              "Questo vecchio record non può essere aperto automaticamente.\n\n"+
+              resolved.reason
+            );
+            setStatus("Record archivio ambiguo");
             return;
           }
 
-          /*
-            Aprire un progetto/layout è un confine di sessione:
-            niente Undo che possa riportare al progetto precedente.
-          */
-          resetTransientInteractionState();
-          state=candidate;
-          currentPage=0;
-          undoStack=[];
-          redoStack=[];
-          historyTransaction=null;
-          clipboardPayload=null;
-          dragSnapshot=null;
+          if(folder.type==="layout"){
+            const scheme=makeSchemeFromLayoutProject({
+              ...project,
+              data:resolved.state
+            });
 
-          selectedPlayers.clear();
-          selectedRosterPlayers.clear();
-          selectedBalls.clear();
-          selectedTexts.clear();
-          selectedDrawings.clear();
-          selectedWallMembers.clear();
-          selectedDrawing=null;
-          selectedBall=null;
-          selectedText=null;
+            if(!scheme){
+              alert("Il Layout selezionato non contiene uno schema valido.");
+              return;
+            }
 
-          renderAll();
-          updateHistoryButtons();
-          save(false);
-          document.getElementById("archiveModal").classList.remove("open");
-          setStatus(folder.type==="layout"?"Layout duplicato nel progetto":"Progetto aperto");
+            addNewSchemeToProject(
+              scheme,
+              `Layout "${project.name}" copiato`
+            );
+            document.getElementById("archiveModal").classList.remove("open");
+            return;
+          }
+
+          const singlePage=bindPageToArchive(
+            resolved.page,
+            folder,
+            project
+          );
+
+          openArchiveState(
+            resolved.state,
+            [singlePage],
+            `Schema "${project.name}" aperto`
+          );
         };
 
-        open.addEventListener("click",openProject);
+        open.addEventListener("click",e=>{
+          e.stopPropagation();
+          openProject();
+        });
         row.addEventListener("dblclick",e=>{
           if(e.target.closest("button"))return;
           openProject();
@@ -12957,18 +13260,32 @@ function renderArchive(){
 
         const update=document.createElement("button");
         update.textContent="Aggiorna";
-        update.addEventListener("click",()=>{
-          project.data=JSON.parse(JSON.stringify(state));
+        update.addEventListener("click",e=>{
+          e.stopPropagation();
+
+          /*
+            Dal Database ACF, Aggiorna continua a essere disponibile ma
+            aggiorna SOLO il record scelto con lo schema corrente.
+          */
+          project.data=makeSingleSchemeState(state,currentPage);
+          project.schemaRecordVersion=ARCHIVE_SCHEMA_RECORD_VERSION;
           project.updatedAt=new Date().toISOString();
+
+          page()._archiveRef={
+            folderId:folder.id,
+            projectId:project.id
+          };
+
           saveArchive();
           renderArchive();
-          setStatus("Archivio aggiornato");
+          setStatus(`"${project.name}" aggiornato nel database`);
         });
 
         const renameProject=document.createElement("button");
         renameProject.textContent="Rinomina";
-        renameProject.addEventListener("click",()=>{
-          const value=prompt("Nuovo nome progetto:",project.name);
+        renameProject.addEventListener("click",e=>{
+          e.stopPropagation();
+          const value=prompt("Nuovo nome schema:",project.name);
           if(value===null||!value.trim())return;
           project.name=value.trim();
           project.updatedAt=new Date().toISOString();
@@ -12978,7 +13295,8 @@ function renderArchive(){
 
         const remove=document.createElement("button");
         remove.textContent="×";
-        remove.addEventListener("click",()=>{
+        remove.addEventListener("click",e=>{
+          e.stopPropagation();
           folder.projects=folder.projects.filter(p=>p.id!==project.id);
           saveArchive();
           renderArchive();
@@ -13018,10 +13336,10 @@ document.getElementById("saveArchiveBtn").addEventListener("click",()=>{
   const folder=createArchiveFolder("match");
   if(!folder)return;
 
-  const projectName=prompt("Nome dello schema o del progetto:",page().title||"Schema partita");
+  const projectName=prompt("Nome dello schema:",page().title||"Schema partita");
   if(projectName===null||!projectName.trim())return;
 
-  folder.projects.push(makeProjectSnapshot(projectName.trim()));
+  folder.projects.push(makeProjectSnapshot(projectName.trim(),folder.id));
   saveArchive();
   renderArchive();
   setStatus("Schema salvato nella nuova cartella");
@@ -13045,9 +13363,9 @@ document.getElementById("archiveModal").addEventListener("click",e=>{
 document.getElementById("newMatchFolderBtn").addEventListener("click",()=>{
   const folder=createArchiveFolder("match");
   if(!folder)return;
-  const projectName=prompt("Nome del primo progetto:",page().title||"Schema partita");
+  const projectName=prompt("Nome del primo schema:",page().title||"Schema partita");
   if(projectName&&projectName.trim()){
-    folder.projects.push(makeProjectSnapshot(projectName.trim()));
+    folder.projects.push(makeProjectSnapshot(projectName.trim(),folder.id));
     saveArchive();
     renderArchive();
   }
@@ -13057,10 +13375,38 @@ document.getElementById("saveToLayoutBtn").addEventListener("click",()=>{
   const layout=archiveState.folders.find(f=>f.type==="layout");
   const name=prompt("Nome del layout:",page().title||"Layout palle inattive");
   if(name===null||!name.trim())return;
-  layout.projects.push(makeProjectSnapshot(name.trim()));
+  layout.projects.push(makeProjectSnapshot(name.trim(),layout.id));
   saveArchive();
   renderArchive();
   setStatus("Layout salvato");
+});
+
+document.getElementById("updateCurrentArchiveBtn").addEventListener("click",()=>{
+  loadArchive();
+
+  const ref=page()?._archiveRef;
+  const found=findArchiveProjectByRef(ref);
+
+  if(!found){
+    alert(
+      "Lo schema corrente non è collegato a un record del Database ACF.\n\n"+
+      "Aprilo dal Database ACF oppure salvalo in una cartella prima di aggiornarlo."
+    );
+    setStatus("Schema non collegato al database");
+    return;
+  }
+
+  found.project.data=makeSingleSchemeState(state,currentPage);
+  found.project.schemaRecordVersion=ARCHIVE_SCHEMA_RECORD_VERSION;
+  found.project.updatedAt=new Date().toISOString();
+
+  page()._archiveRef={
+    folderId:found.folder.id,
+    projectId:found.project.id
+  };
+
+  saveArchive();
+  setStatus(`"${found.project.name}" aggiornato nel Database ACF`);
 });
 
 loadArchive();
@@ -13357,7 +13703,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v267",
+    appVersion:"v275",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -13741,6 +14087,21 @@ async function importBackupFile(file){
       !Array.isArray(archiveState.folders)
     ){
       archiveState=makeDefaultArchiveState();
+    }
+
+    const archiveMigration=migrateArchiveRecords(archiveState);
+
+    if(archiveMigration.unresolved.length){
+      const details=archiveMigration.unresolved
+        .slice(0,8)
+        .map(item=>`${item.folderName} / ${item.projectName}`)
+        .join("\n");
+
+      alert(
+        "Attenzione: alcuni vecchi record del Database ACF non sono stati convertiti "+
+        "perché ambigui. Non verranno aperti automaticamente finché non saranno risolti.\n\n"+
+        details
+      );
     }
 
     currentPage=Math.max(
@@ -14584,7 +14945,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=267",
+        "./service-worker.js?v=275",
         { updateViaCache: "none" }
       );
 
