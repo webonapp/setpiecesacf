@@ -2533,6 +2533,24 @@ body.export-in-progress .field-fullscreen-previews{
   height:180.32px;
   transform:translateX(-50%);
 }
+.player-headshot{
+  position:absolute;
+  left:50%;
+  bottom:0;
+  z-index:2;
+  display:block;
+  width:56px;
+  height:56px;
+  object-fit:contain;
+  object-position:center bottom;
+  transform:translateX(-50%);
+  pointer-events:none;
+  user-select:none;
+  -webkit-user-drag:none;
+}
+.player.selected .player-headshot{
+  filter:drop-shadow(0 0 2px #8bd450) drop-shadow(0 0 5px rgba(139,212,80,.95));
+}
 
 
 /* v230 - allineamento orizzontale modalità con pulsante Sostituzione */
@@ -2913,6 +2931,10 @@ body.field-view-mode{
       </div>
       <div class="player-visual-mode-box" id="playerVisualModeBox">
         <div class="player-visual-mode-title">VISUALIZZAZIONE SELEZIONATI</div>
+        <label class="player-visual-mode-option">
+          <input type="checkbox" class="player-visual-mode-check" data-visual-mode="headshot">
+          <span>Testina — visualizza il volto del giocatore</span>
+        </label>
         <label class="player-visual-mode-option">
           <input type="checkbox" class="player-visual-mode-check" data-visual-mode="jersey">
           <span>Solo maglietta</span>
@@ -3763,7 +3785,7 @@ function normalizeDrawingRecord(drawing){
     safe.members=[{
       playerId:String(member?.playerId||""),
       displayVariant:[
-        "jersey","h-long","h-short","v-long","v-top-long"
+        "headshot","jersey","h-long","h-short","v-long","v-top-long"
       ].includes(member?.displayVariant)
         ? member.displayVariant
         : "",
@@ -3799,7 +3821,7 @@ function normalizeDrawingRecord(drawing){
       return {
         playerId:String(member?.playerId||""),
         displayVariant:[
-          "jersey","h-long","h-short","v-long","v-top-long"
+          "headshot","jersey","h-long","h-short","v-long","v-top-long"
         ].includes(member?.displayVariant)
           ? member.displayVariant
           : "",
@@ -3849,7 +3871,7 @@ function normalizeDrawingRecord(drawing){
       return {
         playerId:String(member?.playerId||""),
         displayVariant:[
-          "jersey","h-long","h-short","v-long","v-top-long"
+          "headshot","jersey","h-long","h-short","v-long","v-top-long"
         ].includes(member?.displayVariant)
           ? member.displayVariant
           : "",
@@ -3936,7 +3958,7 @@ function normalizePageRecord(projectPage,index,rosterLength){
 
     Object.keys(override).forEach(property=>{
       if(property==="displayVariant"){
-        const allowed=new Set(["jersey","h-long","h-short","v-long","v-top-long"]);
+        const allowed=new Set(["headshot","jersey","h-long","h-short","v-long","v-top-long"]);
         if(!allowed.has(override[property])){
           delete override[property];
         }
@@ -6128,6 +6150,43 @@ card.addEventListener("dblclick",e=>{
 
 const fieldPlayerTapTimes=new Map();
 
+const FIORENTINA_HEADSHOTS={
+  "atta":"assets/testine/atta.png",
+  "beto":"assets/testine/beto.png",
+  "brescianini":"assets/testine/brescianini.png",
+  "christensen":"assets/testine/christensen.png",
+  "croci":"assets/testine/croci.png",
+  "de gea":"assets/testine/de-gea.png",
+  "dodo":"assets/testine/dodo.png",
+  "dragusin":"assets/testine/dragusin.png",
+  "fagioli":"assets/testine/fagioli.png",
+  "gnonto":"assets/testine/gnonto.png",
+  "jimenez":"assets/testine/jimenez.png",
+  "joao mario":"assets/testine/joao-mario.png",
+  "lezzerini":"assets/testine/lezzerini.png",
+  "mastantuono":"assets/testine/mastantuono.png",
+  "ndour":"assets/testine/ndour.png",
+  "njie":"assets/testine/njie.png",
+  "oulai":"assets/testine/oulai.png",
+  "parisi":"assets/testine/parisi.png",
+  "pedro goncalves":"assets/testine/pedro-goncalves.png",
+  "pellegrino":"assets/testine/pellegrino.png",
+  "pongracic":"assets/testine/pongracic.png",
+  "ranieri":"assets/testine/ranieri.png",
+  "valdepenas":"assets/testine/valdepenas.png",
+  "viery":"assets/testine/viery.png"
+};
+
+function getPlayerHeadshotPath(player){
+  if(!player || player.team==="away")return "";
+  const key=String(player.lastName||player.name||"")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g,"")
+    .trim()
+    .toLowerCase();
+  return FIORENTINA_HEADSHOTS[key]||"";
+}
+
 function renderPlayers(){
   const assignedWallPlayerIds=getAssignedWallPlayerIds();
   const layer=document.getElementById("playersLayer");
@@ -6286,15 +6345,22 @@ function renderPlayers(){
 
     const visualMarker=(
       displayVariant &&
+      displayVariant!=="headshot" &&
       displayVariant!=="jersey" &&
       state.presentationMode!=="bench"
     )
       ? `<span class="player-visual-marker ${displayVariant}" aria-hidden="true"></span>`
       : "";
 
+    const headshotPath=getPlayerHeadshotPath(pl);
+    const playerVisual=(
+      displayVariant==="headshot" && headshotPath
+    )
+      ? `<img class="player-headshot" src="${headshotPath}" alt="">`
+      : `${visualMarker}${jerseySvg}`;
+
     el.innerHTML=`
-      ${visualMarker}
-      ${jerseySvg}
+      ${playerVisual}
       <div class="player-tag${
         effectiveShowOpponentLine
           ? (
@@ -13947,7 +14013,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v278",
+    appVersion:"v279",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -14791,7 +14857,7 @@ function applySelectedPlayerVisualMode(mode,enabled){
     return;
   }
 
-  const allowed=new Set(["jersey","h-long","h-short","v-long","v-top-long"]);
+  const allowed=new Set(["headshot","jersey","h-long","h-short","v-long","v-top-long"]);
   const nextMode=enabled && allowed.has(mode) ? mode : "";
 
   pushHistory();
@@ -15214,7 +15280,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=278",
+        "./service-worker.js?v=279",
         { updateViaCache: "none" }
       );
 

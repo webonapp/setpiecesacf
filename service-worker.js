@@ -1,4 +1,4 @@
-const APP_VERSION = "278";
+const APP_VERSION = "279";
 const CACHE_NAME = `acf-set-pieces-v${APP_VERSION}`;
 
 const APP_SHELL = [
@@ -7,7 +7,31 @@ const APP_SHELL = [
   "./manifest.webmanifest",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
-  "./assets/campo.png"
+  "./assets/campo.png",
+  "./assets/testine/atta.png",
+  "./assets/testine/beto.png",
+  "./assets/testine/brescianini.png",
+  "./assets/testine/christensen.png",
+  "./assets/testine/croci.png",
+  "./assets/testine/de-gea.png",
+  "./assets/testine/dodo.png",
+  "./assets/testine/dragusin.png",
+  "./assets/testine/fagioli.png",
+  "./assets/testine/gnonto.png",
+  "./assets/testine/jimenez.png",
+  "./assets/testine/joao-mario.png",
+  "./assets/testine/lezzerini.png",
+  "./assets/testine/mastantuono.png",
+  "./assets/testine/ndour.png",
+  "./assets/testine/njie.png",
+  "./assets/testine/oulai.png",
+  "./assets/testine/parisi.png",
+  "./assets/testine/pedro-goncalves.png",
+  "./assets/testine/pellegrino.png",
+  "./assets/testine/pongracic.png",
+  "./assets/testine/ranieri.png",
+  "./assets/testine/valdepenas.png",
+  "./assets/testine/viery.png"
 ];
 
 const EXTERNAL_EXPORT_ASSETS = [
