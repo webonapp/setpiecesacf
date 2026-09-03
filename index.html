@@ -3624,34 +3624,31 @@ const emptyPage=i=>({title:`Schema-${i+1}`,notes:"",positions:defaultPositions(d
 let state={roster:defaultRoster,pages:[emptyPage(0)],playerScale:.75,snapEnabled:true,homeChestCircle:true,awayChestCircle:false,homeRosterLoaded:false,awayRosterLoaded:false,homeRosterTemplate:null};
 
 const FIORENTINA_PRESET=[
-  {number:43,firstName:"",lastName:"De Gea",name:"De Gea",team:"gk",color:"#e3b52d"},
-  {number:53,firstName:"",lastName:"Christensen",name:"Christensen",team:"gk",color:"#e3b52d"},
-  {number:19,firstName:"",lastName:"Lezzerini",name:"Lezzerini",team:"gk",color:"#e3b52d"},
-  {number:50,firstName:"",lastName:"Fei",name:"Fei",team:"gk",color:"#e3b52d"},
-  {number:3,firstName:"",lastName:"Drăgușin",name:"Drăgușin",team:"home",color:"#5b3192"},
-  {number:5,firstName:"",lastName:"Pongračić",name:"Pongračić",team:"home",color:"#5b3192"},
-  {number:6,firstName:"",lastName:"Ranieri",name:"Ranieri",team:"home",color:"#5b3192"},
-  {number:33,firstName:"",lastName:"Viery",name:"Viery",team:"home",color:"#5b3192"},
-  {number:21,firstName:"",lastName:"Valdepeñas",name:"Valdepeñas",team:"home",color:"#5b3192"},
-  {number:71,firstName:"",lastName:"Košpo",name:"Košpo",team:"home",color:"#5b3192"},
-  {number:29,firstName:"",lastName:"Fortini",name:"Fortini",team:"home",color:"#5b3192"},
-  {number:65,firstName:"",lastName:"Parisi",name:"Parisi",team:"home",color:"#5b3192"},
-  {number:20,firstName:"",lastName:"Jiménez",name:"Jiménez",team:"home",color:"#5b3192"},
-  {number:2,firstName:"",lastName:"Dodô",name:"Dodô",team:"home",color:"#5b3192"},
+  {number:53,firstName:"",lastName:"Christensen",name:"Christensen",team:"gk",color:"#e3b52d",role:"portiere"},
+  {number:43,firstName:"",lastName:"De Gea",name:"De Gea",team:"gk",color:"#e3b52d",role:"portiere"},
+  {number:19,firstName:"",lastName:"Lezzerini",name:"Lezzerini",team:"gk",color:"#e3b52d",role:"portiere"},
+  {number:2,firstName:"",lastName:"Dodô",name:"Dodô",team:"home",color:"#5b3192",role:"difensore"},
+  {number:3,firstName:"",lastName:"Drăgușin",name:"Drăgușin",team:"home",color:"#5b3192",role:"difensore"},
+  {number:20,firstName:"",lastName:"Jiménez",name:"Jiménez",team:"home",color:"#5b3192",role:"difensore"},
   {number:17,firstName:"",lastName:"Joao Mario",name:"Joao Mario",team:"home",color:"#5b3192",role:"difensore"},
-  {number:8,firstName:"",lastName:"Mandragora",name:"Mandragora",team:"home",color:"#5b3192"},
-  {number:42,firstName:"",lastName:"Oulai",name:"Oulai",team:"home",color:"#5b3192"},
-  {number:14,firstName:"",lastName:"Atta",name:"Atta",team:"home",color:"#5b3192"},
-  {number:27,firstName:"",lastName:"Ndour",name:"Ndour",team:"home",color:"#5b3192"},
-  {number:44,firstName:"",lastName:"Fagioli",name:"Fagioli",team:"home",color:"#5b3192"},
-  {number:4,firstName:"",lastName:"Brescianini",name:"Brescianini",team:"home",color:"#5b3192"},
-  {number:80,firstName:"",lastName:"Fabbian",name:"Fabbian",team:"home",color:"#5b3192"},
-  {number:11,firstName:"",lastName:"Gudmundsson",name:"Gudmundsson",team:"home",color:"#5b3192"},
-  {number:30,firstName:"",lastName:"Mastantuono",name:"Mastantuono",team:"home",color:"#5b3192",role:"attaccante"},
-  {number:9,firstName:"",lastName:"Kean",name:"Kean",team:"home",color:"#5b3192"},
-  {number:32,firstName:"",lastName:"Pellegrino",name:"Pellegrino",team:"home",color:"#5b3192",role:"attaccante"},
+  {number:65,firstName:"",lastName:"Parisi",name:"Parisi",team:"home",color:"#5b3192",role:"difensore"},
+  {number:5,firstName:"",lastName:"Pongračić",name:"Pongračić",team:"home",color:"#5b3192",role:"difensore"},
+  {number:6,firstName:"",lastName:"Ranieri",name:"Ranieri",team:"home",color:"#5b3192",role:"difensore"},
+  {number:21,firstName:"",lastName:"Valdepeñas",name:"Valdepeñas",team:"home",color:"#5b3192",role:"difensore"},
+  {number:33,firstName:"",lastName:"Viery",name:"Viery",team:"home",color:"#5b3192",role:"difensore"},
+  {number:14,firstName:"",lastName:"Atta",name:"Atta",team:"home",color:"#5b3192",role:"centrocampista"},
+  {number:4,firstName:"",lastName:"Brescianini",name:"Brescianini",team:"home",color:"#5b3192",role:"centrocampista"},
+  {number:44,firstName:"",lastName:"Fagioli",name:"Fagioli",team:"home",color:"#5b3192",role:"centrocampista"},
+  {number:27,firstName:"",lastName:"Ndour",name:"Ndour",team:"home",color:"#5b3192",role:"centrocampista"},
+  {number:42,firstName:"",lastName:"Oulai",name:"Oulai",team:"home",color:"#5b3192",role:"centrocampista"},
+  {number:23,firstName:"",lastName:"Beto",name:"Beto",team:"home",color:"#5b3192",role:"attaccante"},
   {number:70,firstName:"",lastName:"Croci",name:"Croci",team:"home",color:"#5b3192",role:"attaccante"},
+  {number:29,firstName:"",lastName:"Gnonto",name:"Gnonto",team:"home",color:"#5b3192",role:"attaccante"},
+  {number:30,firstName:"",lastName:"Mastantuono",name:"Mastantuono",team:"home",color:"#5b3192",role:"attaccante"},
   {number:72,firstName:"",lastName:"Mazzeo",name:"Mazzeo",team:"home",color:"#5b3192",role:"attaccante"},
+  {number:25,firstName:"",lastName:"Njie",name:"Njie",team:"home",color:"#5b3192",role:"attaccante"},
+  {number:28,firstName:"",lastName:"Pedro Gonçalves",name:"Pedro Gonçalves",team:"home",color:"#5b3192",role:"attaccante"},
+  {number:32,firstName:"",lastName:"Pellegrino",name:"Pellegrino",team:"home",color:"#5b3192",role:"attaccante"},
 ].map((p,i)=>({id:"p"+i,...p}));
 
 
@@ -13950,7 +13947,7 @@ function getBackupPayload(){
       "acf-set-pieces-backup"
     ],
     app:"ACF Fiorentina - Set Pieces App",
-    appVersion:"v277",
+    appVersion:"v278",
     createdAt:new Date().toISOString(),
     currentPage:Number(currentPage)||0,
     state:cloneBackupValue(state),
@@ -15217,7 +15214,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register(
-        "./service-worker.js?v=277",
+        "./service-worker.js?v=278",
         { updateViaCache: "none" }
       );
 
